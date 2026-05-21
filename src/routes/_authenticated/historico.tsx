@@ -11,7 +11,10 @@ function HistoryPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["simulations"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("simulations").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("simulations")
+        .select("*")
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -21,7 +24,10 @@ function HistoryPage() {
       const { error } = await supabase.from("simulations").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Removida"); qc.invalidateQueries({ queryKey: ["simulations"] }); },
+    onSuccess: () => {
+      toast.success("Removida");
+      qc.invalidateQueries({ queryKey: ["simulations"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -38,18 +44,34 @@ function HistoryPage() {
         {data?.map((s) => {
           const r: any = s.results;
           return (
-            <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
+            <div
+              key={s.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4"
+            >
               <div>
                 <div className="text-sm font-bold">{s.title}</div>
-                <div className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleString("pt-BR")}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(s.created_at).toLocaleString("pt-BR")}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                  <span>SAC <b>{fmtBRL(r?.tSAC ?? 0)}</b></span>
-                  <span>PRICE <b>{fmtBRL(r?.tPrice ?? 0)}</b></span>
-                  <span>Consórcio <b>{fmtBRL(r?.tCons ?? 0)}</b></span>
-                  <span className="text-success">Patrimônio <b>{fmtBRL(r?.patrimonioConsTotal ?? 0)}</b></span>
+                  <span>
+                    SAC <b>{fmtBRL(r?.tSAC ?? 0)}</b>
+                  </span>
+                  <span>
+                    PRICE <b>{fmtBRL(r?.tPrice ?? 0)}</b>
+                  </span>
+                  <span>
+                    Consórcio <b>{fmtBRL(r?.tCons ?? 0)}</b>
+                  </span>
+                  <span className="text-success">
+                    Patrimônio <b>{fmtBRL(r?.patrimonioConsTotal ?? 0)}</b>
+                  </span>
                 </div>
               </div>
-              <button onClick={() => del.mutate(s.id)} className="rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10">
+              <button
+                onClick={() => del.mutate(s.id)}
+                className="rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
+              >
                 Excluir
               </button>
             </div>

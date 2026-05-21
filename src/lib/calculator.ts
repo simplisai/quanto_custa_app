@@ -8,23 +8,23 @@ export interface CalcInputs {
   valorImovel: number;
   entrada: number;
   prazoF: number;
-  jFinAnual: number;       // %
-  trAnual: number;         // %
+  jFinAnual: number; // %
+  trAnual: number; // %
   creditoCons: number;
-  percLanceEmb: number;    // %
+  percLanceEmb: number; // %
   baseLance: BaseLance;
   usoCredito: UsoCredito;
   lanceProprio: number;
-  tAdm: number;            // %
+  tAdm: number; // %
   prazoC: number;
-  inccAnual: number;       // %
-  percReducao: number;     // %
+  inccAnual: number; // %
+  percReducao: number; // %
   mesContemplacao: number;
   amortTipo: AmortTipo;
   aluguel: number;
   taxaOportunidadeMensal: number; // %
-  valorizacaoAnual: number;       // %
-  percItbi: number;               // %
+  valorizacaoAnual: number; // %
+  percItbi: number; // %
 }
 
 export interface CalcResults {
@@ -75,8 +75,11 @@ export function calcular(i: CalcInputs): CalcResults {
   if (maxMeses === 0) maxMeses = 1;
   const custoAluguelTotal = aluguel * mContemplacao;
 
-  const pSAC: number[] = [], pPrice: number[] = [], pCons: number[] = [];
-  const arrDesembolsoCons: number[] = [], arrPatrimonioCons: number[] = [];
+  const pSAC: number[] = [],
+    pPrice: number[] = [],
+    pCons: number[] = [];
+  const arrDesembolsoCons: number[] = [],
+    arrPatrimonioCons: number[] = [];
 
   let tSAC = entradaDisponivel + custoItbiFinanciamento;
   let tPrice = entradaDisponivel + custoItbiFinanciamento;
@@ -116,10 +119,16 @@ export function calcular(i: CalcInputs): CalcResults {
       if (isCorrectionMensal) saldoPrice *= 1 + trM;
       const mesesRestantes = pF - m + 1;
       const divisor = Math.pow(1 + jM_F, mesesRestantes) - 1;
-      let pmt = divisor > 0 ? saldoPrice * (jM_F * Math.pow(1 + jM_F, mesesRestantes)) / divisor : saldoPrice;
+      let pmt =
+        divisor > 0
+          ? (saldoPrice * (jM_F * Math.pow(1 + jM_F, mesesRestantes))) / divisor
+          : saldoPrice;
       const juros = saldoPrice * jM_F;
       let amort = pmt - juros;
-      if (pmt > saldoPrice + juros) { pmt = saldoPrice + juros; amort = saldoPrice; }
+      if (pmt > saldoPrice + juros) {
+        pmt = saldoPrice + juros;
+        amort = saldoPrice;
+      }
       saldoPrice -= amort;
       if (saldoPrice < 0) saldoPrice = 0;
       pPrice.push(pmt);
@@ -144,24 +153,28 @@ export function calcular(i: CalcInputs): CalcResults {
         const multINCC = Math.pow(1 + cC, anosPassados);
         const creditoReajustado = credito * multINCC;
         const montanteComTaxaReajustado = montanteComTaxa * multINCC;
-        const valorEmbReajustado = i.baseLance === "plano" ? montanteComTaxaReajustado * pEmb : creditoReajustado * pEmb;
+        const valorEmbReajustado =
+          i.baseLance === "plano" ? montanteComTaxaReajustado * pEmb : creditoReajustado * pEmb;
         saldoCons -= lanceP + valorEmbReajustado;
         if (saldoCons < 0) saldoCons = 0;
         saldoDevedorNaContemplacao = saldoCons;
         cdiCons -= lanceP;
         if (cdiCons < 0) cdiCons = 0;
-        if (usoCredito === "patrimonio") valorCreditoRentabilizado = creditoReajustado - valorEmbReajustado;
+        if (usoCredito === "patrimonio")
+          valorCreditoRentabilizado = creditoReajustado - valorEmbReajustado;
         if (i.amortTipo === "parcela") {
           const mesesRestantes = pC - m;
           parcelaConsAtual = mesesRestantes > 0 ? saldoCons / mesesRestantes : saldoCons;
         } else parcelaConsAtual = baseParcelC_integral;
       }
-      if (usoCredito === "patrimonio" && m > mContemplacao) valorCreditoRentabilizado *= 1 + rOportunidade;
+      if (usoCredito === "patrimonio" && m > mContemplacao)
+        valorCreditoRentabilizado *= 1 + rOportunidade;
       pCons.push(parcelaConsDoMes);
       tCons += parcelaConsDoMes;
     } else {
       pCons.push(0);
-      if (usoCredito === "patrimonio" && m > mContemplacao) valorCreditoRentabilizado *= 1 + rOportunidade;
+      if (usoCredito === "patrimonio" && m > mContemplacao)
+        valorCreditoRentabilizado *= 1 + rOportunidade;
     }
 
     if (m === 1) acumuladorDesembolso += custoItbiConsorcio;
@@ -184,19 +197,46 @@ export function calcular(i: CalcInputs): CalcResults {
   const valorEmbVisual = i.baseLance === "plano" ? credito * (1 + tA) * pEmb : credito * pEmb;
 
   return {
-    tSAC, tPrice, tCons, imovelNoFuturo,
-    custoItbiFinanciamento, custoItbiConsorcio, custoAluguelTotal,
-    cdiFin, cdiCons, valorCreditoRentabilizado, patrimonioConsTotal,
-    saldoDevedorNaContemplacao, valorEmbVisual,
-    parcelasSAC: pSAC, parcelasPrice: pPrice, parcelasCons: pCons,
-    desembolsoCons: arrDesembolsoCons, patrimonioCons: arrPatrimonioCons,
+    tSAC,
+    tPrice,
+    tCons,
+    imovelNoFuturo,
+    custoItbiFinanciamento,
+    custoItbiConsorcio,
+    custoAluguelTotal,
+    cdiFin,
+    cdiCons,
+    valorCreditoRentabilizado,
+    patrimonioConsTotal,
+    saldoDevedorNaContemplacao,
+    valorEmbVisual,
+    parcelasSAC: pSAC,
+    parcelasPrice: pPrice,
+    parcelasCons: pCons,
+    desembolsoCons: arrDesembolsoCons,
+    patrimonioCons: arrPatrimonioCons,
   };
 }
 
 export const defaultInputs: CalcInputs = {
-  valorImovel: 0, entrada: 0, prazoF: 0, jFinAnual: 0, trAnual: 0,
-  creditoCons: 0, percLanceEmb: 0, baseLance: "credito", usoCredito: "comprar",
-  lanceProprio: 0, tAdm: 0, prazoC: 0, inccAnual: 0,
-  percReducao: 0, mesContemplacao: 1, amortTipo: "prazo",
-  aluguel: 0, taxaOportunidadeMensal: 0, valorizacaoAnual: 0, percItbi: 0,
+  valorImovel: 0,
+  entrada: 0,
+  prazoF: 0,
+  jFinAnual: 0,
+  trAnual: 0,
+  creditoCons: 0,
+  percLanceEmb: 0,
+  baseLance: "credito",
+  usoCredito: "comprar",
+  lanceProprio: 0,
+  tAdm: 0,
+  prazoC: 0,
+  inccAnual: 0,
+  percReducao: 0,
+  mesContemplacao: 1,
+  amortTipo: "prazo",
+  aluguel: 0,
+  taxaOportunidadeMensal: 0,
+  valorizacaoAnual: 0,
+  percItbi: 0,
 };

@@ -14,10 +14,10 @@ export default defineConfig({
   tanstackStart: {
     server: {
       preset: "netlify",
-      entry: "server"
+      entry: "server",
     },
   },
   vite: {
     plugins: [netlify()],
-  }
+  },
 });
