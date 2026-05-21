@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Quanto custa? Imobiliário",
+  "description": "Sistema de inteligência patrimonial para comparar financiamento imobiliário e consórcio com simulações SAC e PRICE.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
