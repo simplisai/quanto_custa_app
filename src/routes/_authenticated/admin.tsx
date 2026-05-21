@@ -134,52 +134,55 @@ function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {usersQ.data?.map((u: any) => {
-                const isAdminUser = u.roles.includes("admin");
-                return (
-                  <tr key={u.id} className="border-t border-border">
-                    <td className="p-3">
-                      <div className="font-semibold">{u.full_name || u.email}</div>
-                      <div className="text-xs text-muted-foreground">{u.email}</div>
-                    </td>
-                    <td className="p-3">
-                      <select
-                        value={u.subscription?.plan_id || ""}
-                        onChange={(e) => changePlan(u.id, e.target.value)}
-                        className="rounded border border-input bg-background px-2 py-1 text-xs"
-                      >
-                        {plansQ.data?.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${u.subscription?.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"}`}
-                      >
-                        {u.subscription?.status || "—"}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <input
-                        type="checkbox"
-                        checked={isAdminUser}
-                        onChange={() => toggleAdmin(u.id, isAdminUser)}
-                      />
-                    </td>
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => toggleSub(u.id, u.subscription?.status || "active")}
-                        className="rounded border border-border px-2 py-1 text-xs font-semibold hover:bg-accent"
-                      >
-                        {u.subscription?.status === "active" ? "Bloquear" : "Liberar"}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {usersQ.data?.map(
+                (u: Record<string, string | string[] | Record<string, unknown>>) => {
+                  const roles = u.roles as string[];
+                  const isAdminUser = roles.includes("admin");
+                  return (
+                    <tr key={u.id} className="border-t border-border">
+                      <td className="p-3">
+                        <div className="font-semibold">{u.full_name || u.email}</div>
+                        <div className="text-xs text-muted-foreground">{u.email}</div>
+                      </td>
+                      <td className="p-3">
+                        <select
+                          value={u.subscription?.plan_id || ""}
+                          onChange={(e) => changePlan(u.id, e.target.value)}
+                          className="rounded border border-input bg-background px-2 py-1 text-xs"
+                        >
+                          {plansQ.data?.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-bold ${u.subscription?.status === "active" ? "bg-success/15 text-success" : "bg-danger/15 text-danger"}`}
+                        >
+                          {u.subscription?.status || "—"}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="checkbox"
+                          checked={isAdminUser}
+                          onChange={() => toggleAdmin(u.id, isAdminUser)}
+                        />
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => toggleSub(u.id, u.subscription?.status || "active")}
+                          className="rounded border border-border px-2 py-1 text-xs font-semibold hover:bg-accent"
+                        >
+                          {u.subscription?.status === "active" ? "Bloquear" : "Liberar"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                },
+              )}
             </tbody>
           </table>
         </div>

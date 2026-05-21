@@ -5,6 +5,18 @@ import { calcular, defaultInputs, type CalcInputs, type CalcResults } from "@/li
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Legend as RechartsLegend,
+} from "recharts";
 
 export const Route = createFileRoute("/_authenticated/app")({ component: CalculatorPage });
 
@@ -100,13 +112,13 @@ function CalculatorPage() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   const inputs: CalcInputs = useMemo(() => {
-    const obj: any = { ...defaultInputs, baseLance, usoCredito, amortTipo };
+    const obj: Record<string, unknown> = { ...defaultInputs, baseLance, usoCredito, amortTipo };
     for (const f of [...G1, ...FIN, ...CONS, ...ADV]) {
       const r = raws[f.key as string] ?? "";
       obj[f.key] = f.type === "int" ? parseInt(r || "0", 10) || 0 : unmask(r);
     }
     if (!obj.mesContemplacao) obj.mesContemplacao = 1;
-    return obj as CalcInputs;
+    return obj as unknown as CalcInputs;
   }, [raws, baseLance, usoCredito, amortTipo]);
 
   const lanceBadges = useMemo(() => {
@@ -140,14 +152,14 @@ function CalculatorPage() {
     const { error } = await supabase.from("simulations").insert({
       user_id: user.id,
       title,
-      inputs: inputs as any,
+      inputs: inputs as unknown as Record<string, unknown>,
       results: {
         tSAC: results.tSAC,
         tPrice: results.tPrice,
         tCons: results.tCons,
         patrimonioConsTotal: results.patrimonioConsTotal,
         imovelNoFuturo: results.imovelNoFuturo,
-      } as any,
+      } as unknown as Record<string, unknown>,
     });
     setSaving(false);
     if (error) toast.error(error.message);
@@ -252,7 +264,7 @@ function CalculatorPage() {
               <label className="mb-1.5 block text-xs font-semibold">Base de Cálculo do Lance</label>
               <Toggle
                 value={baseLance}
-                onChange={setBaseLance as any}
+                onChange={setBaseLance as never}
                 opts={[
                   ["credito", "Sobre Crédito"],
                   ["plano", "Sobre Plano"],
@@ -265,7 +277,7 @@ function CalculatorPage() {
               </label>
               <select
                 value={usoCredito}
-                onChange={(e) => setUsoCredito(e.target.value as any)}
+                onChange={(e) => setUsoCredito(e.target.value as "comprar" | "patrimonio")}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm font-medium focus:border-primary focus:outline-none"
               >
                 <option value="comprar">Comprar Imóvel</option>
@@ -321,7 +333,7 @@ function CalculatorPage() {
             </label>
             <Toggle
               value={amortTipo}
-              onChange={setAmortTipo as any}
+              onChange={setAmortTipo as never}
               opts={[
                 ["prazo", "Reduzir Prazo"],
                 ["parcela", "Reduzir Parcela"],
@@ -550,84 +562,142 @@ function Analytic({ title, rows }: { title: string; rows: [string, string, strin
 }
 
 function ChartParcelas({ r }: { r: CalcResults }) {
-  const max = Math.max(...r.parcelasSAC, ...r.parcelasPrice, ...r.parcelasCons, 1);
-  const w = 800,
-    h = 240;
-  const n = r.parcelasSAC.length || 1;
-  const path = (data: number[]) =>
-    data
-      .map((v, i) => `${i === 0 ? "M" : "L"}${(i / (n - 1 || 1)) * w},${h - (v / max) * h}`)
-      .join(" ");
+  if (!r) return null;
+  const maxLen = Math.max(r.parcelasSAC.length, r.parcelasPrice.length, r.parcelasCons.length, 1);
+  const data = Array.from({ length: maxLen }, (_, i) => ({
+    month: i + 1,
+    sac: r.parcelasSAC[i] || 0,
+    price: r.parcelasPrice[i] || 0,
+    cons: r.parcelasCons[i] || 0,
+  }));
+
+  const formatTooltip = (val: number) => fmtBRL(val);
+
   return (
     <Section title="Evolução das Parcelas ao Longo do Tempo">
       <div className="overflow-x-auto rounded-xl border border-border bg-card p-4">
-        <svg viewBox={`0 0 ${w} ${h}`} className="h-64 w-full">
-          <path d={path(r.parcelasSAC)} stroke="oklch(0.55 0.21 25)" strokeWidth="2" fill="none" />
-          <path
-            d={path(r.parcelasPrice)}
-            stroke="oklch(0.74 0.16 65)"
-            strokeWidth="2"
-            fill="none"
-          />
-          <path
-            d={path(r.parcelasCons)}
-            stroke="oklch(0.55 0.18 268)"
-            strokeWidth="3"
-            fill="none"
-          />
-        </svg>
-        <div className="mt-3 flex justify-center gap-4 text-xs">
-          <Legend color="oklch(0.55 0.21 25)" label="SAC" />
-          <Legend color="oklch(0.74 0.16 65)" label="PRICE" />
-          <Legend color="oklch(0.55 0.18 268)" label="Consórcio" />
+        <div className="h-72 w-full min-w-[600px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                tickFormatter={(val) => `R$ ${(val / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <RechartsTooltip
+                formatter={formatTooltip}
+                labelFormatter={(l) => `Mês ${l}`}
+                contentStyle={{ borderRadius: "8px", border: "1px solid var(--color-border)" }}
+              />
+              <RechartsLegend
+                iconType="circle"
+                wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="sac"
+                name="Financiamento SAC"
+                stroke="#b21f1f"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="price"
+                name="Financiamento PRICE"
+                stroke="#f39c12"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="cons"
+                name="Estratégia Consórcio"
+                stroke="#1a2a6c"
+                strokeWidth={3}
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </Section>
   );
 }
+
 function ChartAlavancagem({ r }: { r: CalcResults }) {
-  const max = Math.max(...r.desembolsoCons, ...r.patrimonioCons, 1);
-  const w = 800,
-    h = 240;
-  const n = r.desembolsoCons.length || 1;
-  const path = (d: number[]) =>
-    d
-      .map((v, i) => `${i === 0 ? "M" : "L"}${(i / (n - 1 || 1)) * w},${h - (v / max) * h}`)
-      .join(" ");
-  const area = (d: number[]) => `${path(d)} L${w},${h} L0,${h} Z`;
+  if (!r) return null;
+  const maxLen = Math.max(r.desembolsoCons.length, r.patrimonioCons.length, 1);
+  const data = Array.from({ length: maxLen }, (_, i) => ({
+    month: i + 1,
+    desembolso: r.desembolsoCons[i] || 0,
+    patrimonio: r.patrimonioCons[i] || 0,
+  }));
+
+  const formatTooltip = (val: number) => fmtBRL(val);
+
   return (
-    <Section title="Evolução Patrimonial vs Custo Global (Consórcio)">
+    <Section title="Evolução Patrimonial vs Custo Global (Consórcio)" accent>
       <div className="overflow-x-auto rounded-xl border border-border bg-card p-4">
-        <svg viewBox={`0 0 ${w} ${h}`} className="h-64 w-full">
-          <path d={area(r.desembolsoCons)} fill="oklch(0.55 0.21 25 / 0.15)" />
-          <path d={area(r.patrimonioCons)} fill="oklch(0.62 0.16 152 / 0.15)" />
-          <path
-            d={path(r.desembolsoCons)}
-            stroke="oklch(0.55 0.21 25)"
-            strokeWidth="3"
-            fill="none"
-          />
-          <path
-            d={path(r.patrimonioCons)}
-            stroke="oklch(0.62 0.16 152)"
-            strokeWidth="3"
-            fill="none"
-          />
-        </svg>
-        <div className="mt-3 flex justify-center gap-4 text-xs">
-          <Legend color="oklch(0.55 0.21 25)" label="Custo Global Acumulado" />
-          <Legend color="oklch(0.62 0.16 152)" label="Patrimônio Total" />
+        <div className="h-72 w-full min-w-[600px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                tickFormatter={(val) => `R$ ${(val / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <RechartsTooltip
+                formatter={formatTooltip}
+                labelFormatter={(l) => `Mês ${l}`}
+                contentStyle={{ borderRadius: "8px", border: "1px solid var(--color-border)" }}
+              />
+              <RechartsLegend
+                iconType="circle"
+                wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
+              />
+              <Area
+                type="monotone"
+                dataKey="desembolso"
+                name="Custo Global Acumulado"
+                stroke="#e74c3c"
+                fill="rgba(231, 76, 60, 0.1)"
+                strokeWidth={3}
+                isAnimationActive={false}
+              />
+              <Area
+                type="monotone"
+                dataKey="patrimonio"
+                name="Patrimônio Total Acumulado"
+                stroke="#27ae60"
+                fill="rgba(39, 174, 96, 0.1)"
+                strokeWidth={3}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </Section>
-  );
-}
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="inline-block h-2.5 w-4 rounded" style={{ background: color }} />
-      {label}
-    </div>
   );
 }
 

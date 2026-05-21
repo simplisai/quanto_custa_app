@@ -28,7 +28,7 @@ function HistoryPage() {
       toast.success("Removida");
       qc.invalidateQueries({ queryKey: ["simulations"] });
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
@@ -42,7 +42,7 @@ function HistoryPage() {
       )}
       <div className="space-y-3">
         {data?.map((s) => {
-          const r: any = s.results;
+          const r: Record<string, unknown> = s.results as Record<string, unknown>;
           return (
             <div
               key={s.id}
