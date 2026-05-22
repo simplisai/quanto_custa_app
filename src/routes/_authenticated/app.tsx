@@ -159,22 +159,28 @@ function CalculatorPage() {
   const salvar = async () => {
     if (!results || !user) return;
     setSaving(true);
-    const title = `Imóvel ${fmtBRL(inputs.valorImovel)} — ${new Date().toLocaleDateString("pt-BR")}`;
-    const { error } = await supabase.from("simulations").insert({
-      user_id: user.id,
-      title,
-      inputs: inputs as unknown as Record<string, unknown>,
-      results: {
-        tSAC: results.tSAC,
-        tPrice: results.tPrice,
-        tCons: results.tCons,
-        patrimonioConsTotal: results.patrimonioConsTotal,
-        imovelNoFuturo: results.imovelNoFuturo,
-      } as unknown as Record<string, unknown>,
-    });
-    setSaving(false);
-    if (error) toast.error(error.message);
-    else toast.success("Simulação salva no histórico.");
+    try {
+      const title = `Imóvel ${fmtBRL(inputs.valorImovel)} — ${new Date().toLocaleDateString("pt-BR")}`;
+      const { error } = await supabase.from("simulations").insert({
+        user_id: user.id,
+        title,
+        inputs: inputs as unknown as Record<string, unknown>,
+        results: {
+          tSAC: results.tSAC,
+          tPrice: results.tPrice,
+          tCons: results.tCons,
+          patrimonioConsTotal: results.patrimonioConsTotal,
+          imovelNoFuturo: results.imovelNoFuturo,
+        } as unknown as Record<string, unknown>,
+      });
+      if (error) throw error;
+      toast.success("Simulação salva no histórico.");
+    } catch (e: unknown) {
+      const err = e as Error;
+      toast.error(err.message || "Erro ao salvar histórico.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const exportPDF = async () => {
@@ -182,20 +188,28 @@ function CalculatorPage() {
       toast.error("Calcule primeiro.");
       return;
     }
-    const html2pdf = (await import("html2pdf.js")).default;
     if (!reportRef.current) return;
-    reportRef.current.style.display = "block";
-    await html2pdf()
-      .set({
-        margin: 10,
-        filename: "Relatorio_Inteligencia_Imobiliaria.pdf",
-        image: { type: "jpeg", quality: 1 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      })
-      .from(reportRef.current)
-      .save();
-    reportRef.current.style.display = "none";
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+      reportRef.current.style.display = "block";
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: "Relatorio_Inteligencia_Imobiliaria.pdf",
+          image: { type: "jpeg", quality: 1 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(reportRef.current)
+        .save();
+    } catch (e: unknown) {
+      const err = e as Error;
+      toast.error(err.message || "Erro ao exportar PDF.");
+    } finally {
+      if (reportRef.current) {
+        reportRef.current.style.display = "none";
+      }
+    }
   };
 
   useEffect(() => {
