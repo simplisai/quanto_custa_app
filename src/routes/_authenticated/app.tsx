@@ -6,17 +6,28 @@ import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  Legend as RechartsLegend,
-} from "recharts";
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+);
 
 export const Route = createFileRoute("/_authenticated/app")({ component: CalculatorPage });
 
@@ -564,72 +575,72 @@ function Analytic({ title, rows }: { title: string; rows: [string, string, strin
 function ChartParcelas({ r }: { r: CalcResults }) {
   if (!r) return null;
   const maxLen = Math.max(r.parcelasSAC.length, r.parcelasPrice.length, r.parcelasCons.length, 1);
-  const data = Array.from({ length: maxLen }, (_, i) => ({
-    month: i + 1,
-    sac: r.parcelasSAC[i] || 0,
-    price: r.parcelasPrice[i] || 0,
-    cons: r.parcelasCons[i] || 0,
-  }));
+  const labels = Array.from({ length: maxLen }, (_, i) => i + 1);
 
-  const formatTooltip = (val: number) => fmtBRL(val);
+  const data = {
+    labels,
+    datasets: [
+      {
+        label: "Financiamento SAC",
+        data: r.parcelasSAC,
+        borderColor: "#b21f1f",
+        borderWidth: 2,
+        fill: false,
+        pointRadius: 0,
+      },
+      {
+        label: "Financiamento PRICE",
+        data: r.parcelasPrice,
+        borderColor: "#f39c12",
+        borderWidth: 2,
+        fill: false,
+        pointRadius: 0,
+      },
+      {
+        label: "Estratégia Consórcio",
+        data: r.parcelasCons,
+        borderColor: "#1a2a6c",
+        borderWidth: 3,
+        fill: false,
+        pointRadius: 2,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 400 },
+    interaction: { mode: "index" as const, intersect: false },
+    scales: {
+      x: {
+        grid: { display: false },
+      },
+      y: {
+        ticks: {
+          callback: function (value: unknown) {
+            return `R$ ${(Number(value) / 1000).toFixed(0)}k`;
+          },
+        },
+      },
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: function (context: unknown) {
+            const ctx = context as { dataset: { label: string }; parsed: { y: number } };
+            return ctx.dataset.label + ": " + fmtBRL(ctx.parsed.y);
+          },
+        },
+      },
+    },
+  };
 
   return (
     <Section title="Evolução das Parcelas ao Longo do Tempo">
       <div className="overflow-x-auto rounded-xl border border-border bg-card p-4">
         <div className="h-72 w-full min-w-[600px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                tickFormatter={(val) => `R$ ${(val / 1000).toFixed(0)}k`}
-                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <RechartsTooltip
-                formatter={formatTooltip}
-                labelFormatter={(l) => `Mês ${l}`}
-                contentStyle={{ borderRadius: "8px", border: "1px solid var(--color-border)" }}
-              />
-              <RechartsLegend
-                iconType="circle"
-                wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
-              />
-              <Line
-                type="monotone"
-                dataKey="sac"
-                name="Financiamento SAC"
-                stroke="#b21f1f"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="price"
-                name="Financiamento PRICE"
-                stroke="#f39c12"
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="cons"
-                name="Estratégia Consórcio"
-                stroke="#1a2a6c"
-                strokeWidth={3}
-                dot={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <Line data={data} options={options} />
         </div>
       </div>
     </Section>
@@ -639,62 +650,66 @@ function ChartParcelas({ r }: { r: CalcResults }) {
 function ChartAlavancagem({ r }: { r: CalcResults }) {
   if (!r) return null;
   const maxLen = Math.max(r.desembolsoCons.length, r.patrimonioCons.length, 1);
-  const data = Array.from({ length: maxLen }, (_, i) => ({
-    month: i + 1,
-    desembolso: r.desembolsoCons[i] || 0,
-    patrimonio: r.patrimonioCons[i] || 0,
-  }));
+  const labels = Array.from({ length: maxLen }, (_, i) => i + 1);
 
-  const formatTooltip = (val: number) => fmtBRL(val);
+  const data = {
+    labels,
+    datasets: [
+      {
+        label: "Custo Global (Desembolso Acumulado)",
+        data: r.desembolsoCons,
+        borderColor: "#e74c3c",
+        backgroundColor: "rgba(231, 76, 60, 0.1)",
+        borderWidth: 3,
+        fill: true,
+        pointRadius: 0,
+      },
+      {
+        label: "Patrimônio Total Acumulado (Ativos)",
+        data: r.patrimonioCons,
+        borderColor: "#27ae60",
+        backgroundColor: "rgba(39, 174, 96, 0.1)",
+        borderWidth: 3,
+        fill: true,
+        pointRadius: 0,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 400 },
+    interaction: { mode: "index" as const, intersect: false },
+    scales: {
+      x: {
+        grid: { display: false },
+      },
+      y: {
+        ticks: {
+          callback: function (value: unknown) {
+            return `R$ ${(Number(value) / 1000).toFixed(0)}k`;
+          },
+        },
+      },
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: function (context: unknown) {
+            const ctx = context as { dataset: { label: string }; parsed: { y: number } };
+            return ctx.dataset.label + ": " + fmtBRL(ctx.parsed.y);
+          },
+        },
+      },
+    },
+  };
 
   return (
     <Section title="Evolução Patrimonial vs Custo Global (Consórcio)" accent>
       <div className="overflow-x-auto rounded-xl border border-border bg-card p-4">
         <div className="h-72 w-full min-w-[600px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                tickFormatter={(val) => `R$ ${(val / 1000).toFixed(0)}k`}
-                tick={{ fontSize: 12, fill: "var(--color-muted-foreground)" }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <RechartsTooltip
-                formatter={formatTooltip}
-                labelFormatter={(l) => `Mês ${l}`}
-                contentStyle={{ borderRadius: "8px", border: "1px solid var(--color-border)" }}
-              />
-              <RechartsLegend
-                iconType="circle"
-                wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
-              />
-              <Area
-                type="monotone"
-                dataKey="desembolso"
-                name="Custo Global Acumulado"
-                stroke="#e74c3c"
-                fill="rgba(231, 76, 60, 0.1)"
-                strokeWidth={3}
-                isAnimationActive={false}
-              />
-              <Area
-                type="monotone"
-                dataKey="patrimonio"
-                name="Patrimônio Total Acumulado"
-                stroke="#27ae60"
-                fill="rgba(39, 174, 96, 0.1)"
-                strokeWidth={3}
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <Line data={data} options={options} />
         </div>
       </div>
     </Section>
