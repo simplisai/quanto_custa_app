@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import html2pdf from "html2pdf.js";
 import { calcular, defaultInputs, type CalcInputs, type CalcResults } from "@/lib/calculator";
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -191,7 +192,6 @@ function CalculatorPage() {
     }
     if (!reportRef.current) return;
     try {
-      const html2pdf = (await import("html2pdf.js")).default;
       reportRef.current.style.display = "block";
       // Allow browser to paint
       await new Promise((r) => setTimeout(r, 100));
