@@ -1,5 +1,5 @@
-export const fmtBRL = (v: number) =>
-  (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+export const fmtBRL = (v: unknown) =>
+  (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export const unmask = (v: string | number | undefined | null): number => {
   if (v === null || v === undefined || v === "") return 0;

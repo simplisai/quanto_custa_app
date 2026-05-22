@@ -177,6 +177,7 @@ function CalculatorPage() {
       toast.success("Simulação salva no histórico.");
     } catch (e: unknown) {
       const err = e as Error;
+      console.error("ERRO_SALVAR_SIMUL", err);
       toast.error(err.message || "Erro ao salvar histórico.");
     } finally {
       setSaving(false);
@@ -192,7 +193,10 @@ function CalculatorPage() {
     try {
       const html2pdf = (await import("html2pdf.js")).default;
       reportRef.current.style.display = "block";
-      await html2pdf()
+      // Allow browser to paint
+      await new Promise((r) => setTimeout(r, 100));
+
+      const worker = html2pdf()
         .set({
           margin: 10,
           filename: "Relatorio_Inteligencia_Imobiliaria.pdf",
@@ -202,8 +206,11 @@ function CalculatorPage() {
         })
         .from(reportRef.current)
         .save();
+
+      await worker;
     } catch (e: unknown) {
       const err = e as Error;
+      console.error("ERRO_EXPORTAR_PDF", err);
       toast.error(err.message || "Erro ao exportar PDF.");
     } finally {
       if (reportRef.current) {
