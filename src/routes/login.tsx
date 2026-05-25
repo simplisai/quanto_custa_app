@@ -126,7 +126,7 @@ function LoginPage() {
             <button
               type="submit"
               disabled={busy}
-              className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-[13px] text-sm font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               {busy ? "Entrando..." : planInfo ? (
                 <>Entrar e ir ao checkout <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></>
