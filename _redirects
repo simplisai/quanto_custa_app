@@ -1,2 +1,2 @@
-
-/*    /index.html   200
+# Routing is handled by the Netlify SSR Function (path="/*", preferStatic=true).
+# Do NOT add catch-all SPA redirect here — it would intercept before the function runs.
