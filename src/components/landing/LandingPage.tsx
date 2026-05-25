@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ArrowRight, ArrowUpRight, Check, Minus, Plus, Menu, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
+import { Logo } from "@/components/Logo";
 
 /* ----------------------------- DATA ----------------------------- */
 
@@ -111,15 +112,10 @@ function SectionShell({
   );
 }
 
-function Logo() {
+function BrandLogo() {
   return (
     <a href="#top" className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-        <span className="font-display text-[18px] leading-none">Q</span>
-      </div>
-      <span className="font-sans-display text-[15px] font-medium text-foreground">
-        Quanto Custa?
-      </span>
+      <Logo size="md" />
     </a>
   );
 }
@@ -143,7 +139,7 @@ function Header() {
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-5 sm:h-16 sm:px-10">
-          <Logo />
+          <BrandLogo />
           <nav className="hidden items-center gap-10 md:flex">
             {nav.map((n) => (
               <a
@@ -198,7 +194,7 @@ function Header() {
           style={{ paddingTop: "calc(env(safe-area-inset-top) + 1rem)" }}
         >
           <div className="flex items-center justify-between">
-            <Logo />
+            <BrandLogo />
             <button
               onClick={() => setOpen(false)}
               aria-label="Fechar menu"
@@ -288,7 +284,7 @@ function Hero() {
           <div className="flex flex-col items-stretch gap-5 lg:items-end">
             <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
               <Link
-                to={isAuthenticated ? "/app" : "/signup"}
+                to={isAuthenticated ? "/app" : "/checkout"}
                 className="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-6 text-[14px] font-medium tracking-[-0.01em] text-primary-foreground transition-all hover:gap-3 sm:h-auto sm:py-3.5"
               >
                 {isAuthenticated ? "Abrir Calculadora" : "Multiplicar meus fechamentos"}
@@ -558,10 +554,12 @@ function Audiencia() {
 /* ----------------------------- PLANOS ----------------------------- */
 
 function Planos() {
+  const { isAuthenticated } = useAuth();
+
   const plans = [
     {
       name: "Mensal",
-      price: "R$ 197",
+      price: "R$ 99",
       period: "/mês",
       desc: "Para testar o impacto na próxima reunião.",
       features: [
@@ -571,22 +569,24 @@ function Planos() {
         "Suporte por e-mail",
       ],
       cta: "Assinar mensal",
+      cycle: "monthly",
       highlight: false,
     },
     {
       name: "Anual",
-      price: "R$ 1.497",
+      price: "R$ 799",
       period: "/ano",
-      desc: "Economize 37% e trave o preço por 12 meses.",
+      sub: "≈ R$ 66/mês",
+      desc: "Economize e trave o preço por 12 meses.",
       features: [
         "Tudo do plano mensal",
-        "Economia de R$ 867 no ano",
         "Suporte prioritário",
         "Acesso antecipado a novos módulos",
       ],
       cta: "Quero o plano anual",
+      cycle: "annual",
       highlight: true,
-      badge: "Recomendado",
+      badge: "Melhor valor",
     },
   ];
 
@@ -628,16 +628,40 @@ function Planos() {
                 {p.desc}
               </p>
               <div className="mt-10 flex items-baseline gap-1.5 sm:mt-12">
-                <span className="font-sans-display text-[52px] font-medium leading-none tracking-[-0.05em] sm:text-[64px]">
-                  {p.price}
-                </span>
-                <span
-                  className={`text-[14px] ${
-                    p.highlight ? "text-primary-foreground/70" : "text-muted-foreground"
-                  }`}
-                >
-                  {p.period}
-                </span>
+                {"sub" in p && p.sub ? (
+                  <>
+                    <span className="font-sans-display text-[52px] font-medium leading-none tracking-[-0.05em] sm:text-[64px]">
+                      {p.sub.replace('≈ ', '')}
+                    </span>
+                    <div className="flex flex-col">
+                      <span
+                        className={`text-[14px] ${
+                          p.highlight ? "text-primary-foreground/70" : "text-muted-foreground"
+                        }`}
+                      >
+                        {p.sub.includes('/mês') ? '/mês' : p.period}
+                      </span>
+                      <span className={`text-[12px] font-medium ${p.highlight ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                        Total: {p.price}{p.period}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-sans-display text-[52px] font-medium leading-none tracking-[-0.05em] sm:text-[64px]">
+                      {p.price}
+                    </span>
+                    <div className="flex flex-col">
+                      <span
+                        className={`text-[14px] ${
+                          p.highlight ? "text-primary-foreground/70" : "text-muted-foreground"
+                        }`}
+                      >
+                        {p.period}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
               <ul className="mt-10 space-y-3.5 sm:mt-12">
                 {p.features.map((f) => (
@@ -656,15 +680,15 @@ function Planos() {
                 ))}
               </ul>
             </div>
-            <Link
-              to="/signup"
+            <a
+              href={isAuthenticated ? `/assinar?plan=${p.cycle}` : `/checkout?plan=${p.cycle}`}
               className={`group mt-10 inline-flex h-12 items-center justify-between rounded-full px-6 text-[14px] font-medium tracking-[-0.01em] transition-all sm:mt-14 sm:h-auto sm:py-3.5 ${
                 p.highlight ? "bg-background text-foreground" : "bg-primary text-primary-foreground"
               }`}
             >
               <span>{p.cta}</span>
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            </a>
           </div>
         ))}
       </div>
@@ -764,7 +788,7 @@ function FinalCTA() {
               fechamento high ticket.
             </p>
             <Link
-              to={isAuthenticated ? "/app" : "/signup"}
+              to={isAuthenticated ? "/app" : "/checkout"}
               className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-background px-6 text-[14px] font-medium tracking-[-0.01em] text-foreground transition-all hover:gap-3 sm:h-auto sm:w-auto sm:py-3.5"
             >
               {isAuthenticated ? "Abrir Plataforma" : "Quero assinar agora"}
@@ -787,7 +811,7 @@ function Footer() {
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 6rem)" }}
       >
         <div className="flex items-center gap-6">
-          <Logo />
+          <BrandLogo />
           <span className="hidden sm:inline">
             <Eyebrow>v7.4 — Sinergia Total</Eyebrow>
           </span>
@@ -825,7 +849,7 @@ function MobileCTA() {
     >
       <div className="mx-3 rounded-full border border-border bg-background/85 p-1.5 shadow-xl backdrop-blur-xl">
         <Link
-          to={isAuthenticated ? "/app" : "/signup"}
+          to={isAuthenticated ? "/app" : "/checkout"}
           className="group flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-6 text-[14px] font-medium tracking-[-0.01em] text-primary-foreground"
         >
           {isAuthenticated ? "Abrir App" : "Multiplicar meus fechamentos"}

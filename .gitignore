@@ -1,3 +1,4 @@
+
 # Logs
 logs
 *.log
@@ -7,19 +8,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+
+# Production
 dist
 dist-ssr
-.output
-.vinxi
-.tanstack/**
-.nitro
-.netlify
 *.local
-
-# Wrangler / Cloudflare
-.wrangler/
-.dev.vars
 
 # Editor directories and files
 .vscode/*
@@ -31,3 +31,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (sensitive)
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+.netlify
+.output
+.turbo
+
+# Temporary files
+*.tmp
+*.temp
+.cache

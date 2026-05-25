@@ -165,6 +165,127 @@
   }
 }
 
+/* ── Mobile Native App Experience ──────────────────────────────────── */
+
+/*
+  Prevent iOS WebKit from auto-zooming when an input with font-size < 16px
+  receives focus. This is one of the biggest mobile UX killers.
+*/
+@media (max-width: 767px) {
+  input,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/*
+  Momentum-based (native-feeling) scrolling on iOS for any scroll container.
+*/
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/*
+  Remove the grey tap flash on all tappable elements (iOS/Android default).
+  Already set on body for the whole doc, but explicit here for safety.
+*/
+button,
+a,
+[role="button"],
+[tabindex] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+  Native-style tap feedback on touch devices.
+  Only applies when device has no fine pointer (i.e. touch screen).
+*/
+@media (hover: none) and (pointer: coarse) {
+  button:active,
+  a:active,
+  [role="button"]:active {
+    opacity: 0.75;
+    transform: scale(0.97);
+    transition: opacity 0.1s ease, transform 0.1s ease;
+  }
+}
+
+/*
+  Safe-area utility classes for iOS notch & home indicator.
+*/
+.safe-top    { padding-top:    env(safe-area-inset-top,    0px); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-left   { padding-left:   env(safe-area-inset-left,   0px); }
+.safe-right  { padding-right:  env(safe-area-inset-right,  0px); }
+
+/* ── End Mobile Native App Experience ──────────────────────────────── */
+
 @layer utilities {
   .shadow-elegant { box-shadow: 0 10px 40px -10px color-mix(in oklab, var(--primary) 25%, transparent); }
+
+  /* ── Design System utilitários de layout ────────────────────────── */
+
+  /* Raiz de página — nunca adicionar padding/min-h-screen nas pages */
+  .ds-page { @apply space-y-5; }
+  @media (min-width: 768px) { .ds-page { @apply space-y-6; } }
+
+  /* Header responsivo: empilhado no mobile, linha no sm+ */
+  .ds-page-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  @media (min-width: 640px) {
+    .ds-page-header {
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+  }
+
+  /* Tabela: scroll horizontal seguro em qualquer largura */
+  .ds-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* KPI grids */
+  .ds-kpi-4 { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 640px) { .ds-kpi-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+  .ds-kpi-3 { display: grid; gap: 0.75rem; grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  @media (min-width: 640px) { .ds-kpi-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+  .ds-kpi-5 { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 640px) { .ds-kpi-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 1024px) { .ds-kpi-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+
+  /* Content grids */
+  .ds-cards-2 { display: grid; gap: 1rem; grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  @media (min-width: 640px) { .ds-cards-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .ds-cards-3 { display: grid; gap: 1rem; grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  @media (min-width: 640px) { .ds-cards-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1024px) { .ds-cards-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+  .ds-cards-4 { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 640px) { .ds-cards-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+  /* Número grande de KPI — tabular para evitar salto de largura */
+  .ds-kpi-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
 }
