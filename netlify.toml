@@ -1,7 +1,7 @@
 
 [build]
   command = "npm run build"
-  publish = "dist"
+  publish = "dist/client"
 
 [build.environment]
   NETLIFY_USE_LATEST_NODE_VERSION = "true"
