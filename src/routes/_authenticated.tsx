@@ -189,7 +189,7 @@ function UserSidebar({
             : "flex-row items-center justify-between px-5",
         ].join(" ")}
       >
-        <Logo size={isCollapsed ? "sm" : "md"} />
+        <Logo size={isCollapsed ? "sm" : "md"} collapsed={isCollapsed} />
 
         {/* Desktop toggle — in the header so it's clearly separate from sign-out */}
         {onToggle && (
