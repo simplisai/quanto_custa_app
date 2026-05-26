@@ -9,83 +9,39 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, Plus, Pencil, Trash2, FileText, ExternalLink } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, FileText, ExternalLink, Sparkles } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { OPERATIONS } from '@/lib/operations'
 import { maskMoney, maskPercent } from '@/lib/format'
 import { toast } from 'sonner'
+import { SIMULATOR_FIELD_GROUPS, SEED_TEMPLATES, type FieldType } from '@/lib/template-fields'
 
 export const Route = createFileRoute('/_authenticated/templates')({
   component: TemplatesPage,
 })
 
-// Campos da Calculadora Patrimonial
-const FIELD_GROUPS = [
-  {
-    title: 'Dados Iniciais',
-    fields: [
-      { key: 'valorImovel', label: 'Valor do Imóvel Alvo (R$)', type: 'money' as const },
-      { key: 'entrada', label: 'Entrada Própria Disponível (R$)', type: 'money' as const },
-    ],
-  },
-  {
-    title: 'Financiamento Bancário',
-    fields: [
-      { key: 'prazoF', label: 'Prazo do Financiamento (meses)', type: 'int' as const },
-      { key: 'jFinAnual', label: 'Taxa de Juros Anual (%)', type: 'percent' as const },
-      { key: 'trAnual', label: 'Estimativa de TR / Ajuste (%)', type: 'percent' as const },
-    ],
-  },
-  {
-    title: 'Consórcio',
-    fields: [
-      { key: 'creditoCons', label: 'Valor de Crédito da Carta (R$)', type: 'money' as const },
-      { key: 'percLanceEmb', label: 'Lance Embutido (%)', type: 'int' as const },
-      { key: 'lanceProprio', label: 'Lance Recurso Próprio (R$)', type: 'money' as const },
-      { key: 'tAdm', label: 'Taxa de Administração (%)', type: 'percent' as const },
-      { key: 'prazoC', label: 'Prazo do Plano (meses)', type: 'int' as const },
-      { key: 'inccAnual', label: 'INCC / Reajuste (%)', type: 'percent' as const },
-      { key: 'percReducao', label: 'Redução Parcela Inicial (%)', type: 'int' as const },
-      { key: 'mesContemplacao', label: 'Contemplação (mês)', type: 'int' as const },
-    ],
-  },
-  {
-    title: 'Premissas Avançadas',
-    fields: [
-      { key: 'aluguel', label: 'Custo de Aluguel (R$/mês)', type: 'money' as const },
-      { key: 'taxaOportunidadeMensal', label: 'CDI (% ao mês)', type: 'percent' as const },
-      { key: 'valorizacaoAnual', label: 'Valorização do Imóvel (% a.a.)', type: 'percent' as const },
-      { key: 'percItbi', label: 'ITBI/Cartório (%)', type: 'percent' as const },
-    ],
-  },
-]
-
 type FieldPayload = Record<string, string>
-type TogglePayload = {
-  baseLance?: 'credito' | 'plano'
-  usoCredito?: 'comprar' | 'patrimonio'
-  amortTipo?: 'prazo' | 'parcela'
-}
 
 type Template = {
   id: string
   operation_slug: string
   name: string
-  payload: FieldPayload & TogglePayload
+  payload: FieldPayload
   is_default: boolean
   created_at: string
 }
 
 const emptyForm = { name: '', operation_slug: OPERATIONS[0]?.slug ?? '', is_default: false }
-const emptyPayload = (): FieldPayload & TogglePayload => ({})
+const emptyPayload = (): FieldPayload => ({})
 
-function maskField(v: string, type: 'money' | 'percent' | 'int'): string {
+function maskField(v: string, type: FieldType): string {
   if (type === 'money') return maskMoney(v)
   if (type === 'percent') return maskPercent(v)
   return v.replace(/\D/g, '')
 }
 
+// ─── Templates Page ───────────────────────────────────────────────────────────
 function TemplatesPage() {
   const { user } = useAuth()
   const [templates, setTemplates] = useState<Template[]>([])
@@ -93,9 +49,10 @@ function TemplatesPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Template | null>(null)
   const [form, setForm] = useState(emptyForm)
-  const [payload, setPayload] = useState<FieldPayload & TogglePayload>(emptyPayload())
+  const [payload, setPayload] = useState<FieldPayload>(emptyPayload())
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [seeding, setSeeding] = useState(false)
 
   const load = async () => {
     if (!user) return
@@ -121,9 +78,15 @@ function TemplatesPage() {
     setOpen(true)
   }
 
-  const setField = (key: string, rawInput: string, type: 'money' | 'percent' | 'int') => {
+  const setField = (key: string, rawInput: string, type: FieldType) => {
     const masked = maskField(rawInput, type)
     setPayload((prev) => ({ ...prev, [key]: masked }))
+  }
+
+  // Reset payload when operation changes
+  const handleOperationChange = (slug: string) => {
+    setForm((f) => ({ ...f, operation_slug: slug }))
+    setPayload(emptyPayload())
   }
 
   const save = async () => {
@@ -157,69 +120,114 @@ function TemplatesPage() {
     setDeleting(null)
   }
 
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR')
-  const opName = (slug: string) => OPERATIONS.find((o) => o.slug === slug)?.name ?? slug
-
-  const filledCount = (t: Template) => {
-    const p = t.payload as Record<string, string>
-    return Object.values(p).filter((v) => v && typeof v === 'string' && v !== '').length
+  const seedTemplates = async () => {
+    if (!user) return
+    if (!confirm(`Criar ${SEED_TEMPLATES.length} templates de exemplo para todos os simuladores?`)) return
+    setSeeding(true)
+    const rows = SEED_TEMPLATES.map((t) => ({ ...t, user_id: user.id }))
+    const { error } = await supabase.from('templates').insert(rows)
+    if (error) toast.error('Erro ao criar exemplos: ' + error.message)
+    else { toast.success(`${SEED_TEMPLATES.length} templates de exemplo criados!`); load() }
+    setSeeding(false)
   }
 
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR')
+  const opName = (slug: string) => OPERATIONS.find((o) => o.slug === slug)?.name ?? slug
+  const opRoute = (slug: string) => OPERATIONS.find((o) => o.slug === slug)?.route ?? '/simuladores'
+  const opIcon = (slug: string) => OPERATIONS.find((o) => o.slug === slug)?.icon ?? '📋'
+
+  const filledCount = (t: Template) =>
+    Object.values(t.payload as Record<string, string>).filter((v) => v && v !== '').length
+
+  // Field groups for current operation in form
+  const currentFieldGroups = SIMULATOR_FIELD_GROUPS[form.operation_slug] ?? []
+
+  // Group templates by operation
+  const templatesByOp = OPERATIONS.filter((op) => op.isActive).map((op) => ({
+    op,
+    list: templates.filter((t) => t.operation_slug === op.slug),
+  })).filter(({ list }) => list.length > 0)
+
   return (
-    <div className="ds-page">
-      <header className="ds-page-header">
+    <div className="ds-page space-y-6 pb-20">
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Templates</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pré-configure campos da calculadora para reutilizar rapidamente.
+          <p className="mt-1 text-sm text-muted-foreground max-w-lg">
+            Pré-configure campos de qualquer simulador para reutilizar em reuniões. Aplique com 1 clique diretamente do simulador.
           </p>
         </div>
-        <Button onClick={openNew} size="sm">
-          <Plus className="mr-2 h-4 w-4" />Novo template
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          {templates.length === 0 && (
+            <Button onClick={seedTemplates} disabled={seeding} variant="outline" size="sm">
+              {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Criar exemplos
+            </Button>
+          )}
+          <Button onClick={openNew} size="sm">
+            <Plus className="mr-2 h-4 w-4" />Novo template
+          </Button>
+        </div>
       </header>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Seus templates</CardTitle>
-            <CardDescription>
-              {loading ? 'Carregando…' : `${templates.length} template(s) cadastrado(s)`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex items-center justify-center p-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : templates.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 p-12 text-center text-muted-foreground">
-                <FileText className="h-10 w-10 opacity-30" />
-                <p>Nenhum template criado ainda.</p>
-                <p className="text-xs max-w-sm">
-                  Templates permitem salvar combinações de campos da calculadora. Ex: taxas de uma operadora específica.
-                </p>
-                <Button size="sm" variant="outline" onClick={openNew}>Criar primeiro template</Button>
-              </div>
-            ) : (
-              <>
-                {/* ── Mobile: card list ───────────────────────────── */}
+      {/* ── Seed CTA when empty ─────────────────────────────────────── */}
+      {!loading && templates.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
+            <FileText className="h-12 w-12 text-muted-foreground/30" />
+            <div>
+              <p className="font-semibold">Nenhum template criado ainda</p>
+              <p className="mt-1 text-sm text-muted-foreground max-w-sm">
+                Templates pre-configuram campos de simuladores para reutilizar em reuniões com clientes.
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap justify-center">
+              <Button onClick={seedTemplates} disabled={seeding}>
+                {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                Criar {SEED_TEMPLATES.length} templates de exemplo
+              </Button>
+              <Button variant="outline" onClick={openNew}>
+                <Plus className="mr-2 h-4 w-4" />Criar manualmente
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Templates por operação ──────────────────────────────────── */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : templatesByOp.length > 0 && (
+        <div className="space-y-6">
+          {templatesByOp.map(({ op, list }) => (
+            <Card key={op.slug}>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <span className="text-xl">{op.icon}</span>
+                  {op.name}
+                  <Badge variant="secondary" className="ml-auto">{list.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Mobile */}
                 <ul className="divide-y sm:hidden">
-                  {templates.map((t) => (
+                  {list.map((t) => (
                     <li key={t.id} className="flex items-start gap-3 px-4 py-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-sm font-semibold">{t.name}</span>
                           {t.is_default && <Badge className="text-[10px] px-1.5 py-0">Padrão</Badge>}
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{opName(t.operation_slug)}</Badge>
-                          <span className="text-xs text-muted-foreground">{filledCount(t)} campo(s)</span>
-                          <span className="text-xs text-muted-foreground">· {fmtDate(t.created_at)}</span>
-                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{filledCount(t)} campo(s) · {fmtDate(t.created_at)}</p>
                       </div>
                       <div className="flex shrink-0 gap-1">
-                        <Button size="icon" variant="ghost" className="h-9 w-9" title="Aplicar na calculadora" asChild>
-                          <Link to="/app" search={{ template: t.id }}><ExternalLink className="h-4 w-4" /></Link>
+                        <Button size="icon" variant="ghost" className="h-9 w-9" title="Abrir simulador com template" asChild>
+                          <Link to={opRoute(t.operation_slug) as never} search={{ template: t.id } as never}>
+                            <ExternalLink className="h-4 w-4" />
+                          </Link>
                         </Button>
                         <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openEdit(t)}>
                           <Pencil className="h-4 w-4" />
@@ -232,12 +240,11 @@ function TemplatesPage() {
                   ))}
                 </ul>
 
-                {/* ── Desktop: table ───────────────────────────────── */}
+                {/* Desktop */}
                 <Table className="hidden sm:table">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
-                      <TableHead>Operação</TableHead>
                       <TableHead>Campos</TableHead>
                       <TableHead>Padrão</TableHead>
                       <TableHead>Criado em</TableHead>
@@ -245,10 +252,9 @@ function TemplatesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {templates.map((t) => (
+                    {list.map((t) => (
                       <TableRow key={t.id}>
                         <TableCell className="font-medium">{t.name}</TableCell>
-                        <TableCell><Badge variant="secondary">{opName(t.operation_slug)}</Badge></TableCell>
                         <TableCell>
                           <span className="text-sm text-muted-foreground">{filledCount(t)} campo(s)</span>
                         </TableCell>
@@ -258,8 +264,10 @@ function TemplatesPage() {
                         <TableCell className="text-sm text-muted-foreground">{fmtDate(t.created_at)}</TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button size="icon" variant="ghost" title="Aplicar na calculadora" asChild>
-                              <Link to="/app" search={{ template: t.id }}><ExternalLink className="h-4 w-4" /></Link>
+                            <Button size="icon" variant="ghost" title="Abrir simulador com template" asChild>
+                              <Link to={opRoute(t.operation_slug) as never} search={{ template: t.id } as never}>
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
                             </Button>
                             <Button size="icon" variant="ghost" onClick={() => openEdit(t)}>
                               <Pencil className="h-4 w-4" />
@@ -273,35 +281,58 @@ function TemplatesPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          ))}
 
+          {/* Seed button when there are templates */}
+          <div className="flex justify-center">
+            <Button onClick={seedTemplates} disabled={seeding} variant="outline" size="sm">
+              {seeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              Adicionar templates de exemplo
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dialog: criar / editar ──────────────────────────────────── */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? 'Editar template' : 'Novo template'}</DialogTitle>
           </DialogHeader>
+
           <div className="space-y-6">
             {/* Info básica */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2 space-y-1.5">
                 <Label>Nome *</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Taxa Itaú — Padrão 2025" />
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Ex: Caixa 10% a.a. — Padrão"
+                />
               </div>
               <div className="space-y-1.5">
-                <Label>Operação</Label>
-                <Select value={form.operation_slug} onValueChange={(v) => setForm({ ...form, operation_slug: v })}>
+                <Label>Simulador</Label>
+                <Select value={form.operation_slug} onValueChange={handleOperationChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {OPERATIONS.map((op) => <SelectItem key={op.slug} value={op.slug}>{op.name}</SelectItem>)}
+                    {OPERATIONS.filter((op) => op.isActive).map((op) => (
+                      <SelectItem key={op.slug} value={op.slug}>
+                        {op.icon} {op.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex items-center gap-3 pt-6">
-                <Switch checked={form.is_default} onCheckedChange={(v) => setForm({ ...form, is_default: v })} id="is_default" />
-                <Label htmlFor="is_default">Template padrão desta operação</Label>
+                <Switch
+                  checked={form.is_default}
+                  onCheckedChange={(v) => setForm({ ...form, is_default: v })}
+                  id="is_default"
+                />
+                <Label htmlFor="is_default">Template padrão</Label>
               </div>
             </div>
 
@@ -309,67 +340,51 @@ function TemplatesPage() {
               Preencha apenas os campos que deseja pré-configurar. Campos vazios serão ignorados ao aplicar o template.
             </p>
 
-            {/* Campos por grupo */}
-            {FIELD_GROUPS.map((group) => (
-              <div key={group.title} className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{group.title}</h4>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {group.fields.map((f) => (
-                    <div key={f.key} className="space-y-1.5">
-                      <Label className="text-xs">{f.label}</Label>
-                      <Input
-                        value={(payload[f.key] as string) ?? ''}
-                        onChange={(e) => setField(f.key, e.target.value, f.type)}
-                        placeholder={f.type === 'money' ? '0,00' : f.type === 'percent' ? '0,00' : '0'}
-                        className="text-sm"
-                      />
-                    </div>
-                  ))}
+            {/* Campos dinâmicos por simulador */}
+            {currentFieldGroups.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Selecione um simulador para ver os campos disponíveis.
+              </p>
+            ) : (
+              currentFieldGroups.map((group) => (
+                <div key={group.title} className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    {group.title}
+                  </h4>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {group.fields.map((f) => (
+                      <div key={f.key} className="space-y-1.5">
+                        <Label className="text-xs">
+                          {f.label}
+                          {f.hint && (
+                            <span className="ml-1.5 text-muted-foreground font-normal">
+                              ({f.hint})
+                            </span>
+                          )}
+                        </Label>
+                        <Input
+                          value={(payload[f.key] as string) ?? ''}
+                          onChange={(e) => setField(f.key, e.target.value, f.type)}
+                          placeholder={
+                            f.type === 'money' ? '0,00' :
+                            f.type === 'percent' ? '0,00' : '0'
+                          }
+                          className="text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-
-            {/* Toggles */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Configurações</h4>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Base do Lance</Label>
-                  <Select value={payload.baseLance} onValueChange={(v) => setPayload((p) => ({ ...p, baseLance: v as 'credito' | 'plano' }))}>
-                    <SelectTrigger className="text-sm"><SelectValue placeholder="Não definido" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="credito">Sobre Crédito</SelectItem>
-                      <SelectItem value="plano">Sobre Plano</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Uso do Crédito</Label>
-                  <Select value={payload.usoCredito} onValueChange={(v) => setPayload((p) => ({ ...p, usoCredito: v as 'comprar' | 'patrimonio' }))}>
-                    <SelectTrigger className="text-sm"><SelectValue placeholder="Não definido" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="comprar">Comprar Imóvel</SelectItem>
-                      <SelectItem value="patrimonio">Render Patrimônio</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Amortização</Label>
-                  <Select value={payload.amortTipo} onValueChange={(v) => setPayload((p) => ({ ...p, amortTipo: v as 'prazo' | 'parcela' }))}>
-                    <SelectTrigger className="text-sm"><SelectValue placeholder="Não definido" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prazo">Reduzir Prazo</SelectItem>
-                      <SelectItem value="parcela">Reduzir Parcela</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
+              ))
+            )}
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={save} disabled={saving}>
-              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando…</> : 'Salvar template'}
+              {saving
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando…</>
+                : 'Salvar template'}
             </Button>
           </DialogFooter>
         </DialogContent>

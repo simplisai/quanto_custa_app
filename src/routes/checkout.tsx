@@ -109,6 +109,14 @@ function CheckoutPage() {
     ?? "monthly";
   const initialCycle: "monthly" | "annual" = planParam === "annual" ? "annual" : "monthly";
 
+  // Capture referral code from URL (?ref=ABCD1234) and persist in sessionStorage
+  useEffect(() => {
+    const refCode = new URLSearchParams(location.search).get("ref");
+    if (refCode && typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem("referral_code", refCode.toLowerCase().trim());
+    }
+  }, [location.search]);
+
   // Session state
   const [sessionLoading, setSessionLoading] = useState(true);
   const [existingUser, setExistingUser] = useState<{ id: string; email: string; name?: string } | null>(null);
@@ -294,6 +302,9 @@ function CheckoutPage() {
             body: JSON.stringify({
               idempotencyKey: idempotencyKey.current,
               billingCycle: cycle,
+              referralCode: typeof sessionStorage !== "undefined"
+                ? (sessionStorage.getItem("referral_code") ?? undefined)
+                : undefined,
               customer: {
                 name: name.trim(),
                 email: email.trim(),
@@ -350,6 +361,8 @@ function CheckoutPage() {
           return;
         }
 
+        // Limpa o código de indicação após uso bem-sucedido
+        if (typeof sessionStorage !== "undefined") sessionStorage.removeItem("referral_code");
         toast.success("Trial iniciado! 14 dias grátis. Bem-vindo ao Quanto Custa!");
         nav({ to: "/assinatura" });
       }

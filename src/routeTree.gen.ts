@@ -17,6 +17,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedSuporteRouteImport } from './routes/_authenticated/suporte'
 import { Route as AuthenticatedSimuladoresRouteImport } from './routes/_authenticated/simuladores'
+import { Route as AuthenticatedSimuladoresLanceRouteImport } from './routes/_authenticated/simuladores/lance'
+import { Route as AuthenticatedSimuladoresAluguelVsConsorcioRouteImport } from './routes/_authenticated/simuladores/aluguel-vs-consorcio'
+import { Route as AuthenticatedSimuladoresRendaPassivaRouteImport } from './routes/_authenticated/simuladores/renda-passiva'
+import { Route as AuthenticatedSimuladoresFlipCotaRouteImport } from './routes/_authenticated/simuladores/flip-cota'
+import { Route as AuthenticatedSimuladoresEstrategiaSlugRouteImport } from './routes/_authenticated/simuladores/estrategia/$slug'
+import { Route as AuthenticatedSimuladoresSaidaFinanciamentoRouteImport } from './routes/_authenticated/simuladores/saida-financiamento'
+import { Route as AuthenticatedSimuladoresMetaPatrimonialRouteImport } from './routes/_authenticated/simuladores/meta-patrimonial'
+import { Route as AuthenticatedSimuladoresConsorcioCNPJRouteImport } from './routes/_authenticated/simuladores/consorcio-cnpj'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
@@ -30,6 +38,9 @@ import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authenticated/admin.suporte'
 import { Route as AuthenticatedAdminFinanceiroRouteImport } from './routes/_authenticated/admin.financeiro'
 import { Route as AuthenticatedAdminAssinaturasRouteImport } from './routes/_authenticated/admin.assinaturas'
+import { Route as AuthenticatedAdminSimuladoresRouteImport } from './routes/_authenticated/admin.simuladores'
+import { Route as AuthenticatedAdminSimuladoresSlugRouteImport } from './routes/_authenticated/admin.simuladores.$slug'
+import { Route as AuthenticatedIndicarRouteImport } from './routes/_authenticated/indicar'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -69,6 +80,54 @@ const AuthenticatedSimuladoresRoute =
   AuthenticatedSimuladoresRouteImport.update({
     id: '/simuladores',
     path: '/simuladores',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSimuladoresLanceRoute =
+  AuthenticatedSimuladoresLanceRouteImport.update({
+    id: '/simuladores/lance',
+    path: '/simuladores/lance',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSimuladoresAluguelVsConsorcioRoute =
+  AuthenticatedSimuladoresAluguelVsConsorcioRouteImport.update({
+    id: '/simuladores/aluguel-vs-consorcio',
+    path: '/simuladores/aluguel-vs-consorcio',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSimuladoresRendaPassivaRoute =
+  AuthenticatedSimuladoresRendaPassivaRouteImport.update({
+    id: '/simuladores/renda-passiva',
+    path: '/simuladores/renda-passiva',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSimuladoresFlipCotaRoute =
+  AuthenticatedSimuladoresFlipCotaRouteImport.update({
+    id: '/simuladores/flip-cota',
+    path: '/simuladores/flip-cota',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSimuladoresEstrategiaSlugRoute =
+  AuthenticatedSimuladoresEstrategiaSlugRouteImport.update({
+    id: '/simuladores/estrategia/$slug',
+    path: '/simuladores/estrategia/$slug',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSimuladoresSaidaFinanciamentoRoute =
+  AuthenticatedSimuladoresSaidaFinanciamentoRouteImport.update({
+    id: '/simuladores/saida-financiamento',
+    path: '/simuladores/saida-financiamento',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSimuladoresMetaPatrimonialRoute =
+  AuthenticatedSimuladoresMetaPatrimonialRouteImport.update({
+    id: '/simuladores/meta-patrimonial',
+    path: '/simuladores/meta-patrimonial',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSimuladoresConsorcioCNPJRoute =
+  AuthenticatedSimuladoresConsorcioCNPJRouteImport.update({
+    id: '/simuladores/consorcio-cnpj',
+    path: '/simuladores/consorcio-cnpj',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedHistoricoRoute = AuthenticatedHistoricoRouteImport.update({
@@ -141,6 +200,23 @@ const AuthenticatedAdminAssinaturasRoute =
     path: '/assinaturas',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminSimuladoresRoute =
+  AuthenticatedAdminSimuladoresRouteImport.update({
+    id: '/_authenticated/admin/simuladores',
+    path: '/admin/simuladores',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedIndicarRoute = AuthenticatedIndicarRouteImport.update({
+  id: '/indicar',
+  path: '/indicar',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAdminSimuladoresSlugRoute =
+  AuthenticatedAdminSimuladoresSlugRouteImport.update({
+    id: '/_authenticated/admin/simuladores/$slug',
+    path: '/admin/simuladores/$slug',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -154,7 +230,16 @@ export interface FileRoutesByFullPath {
   '/clientes': typeof AuthenticatedClientesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/historico': typeof AuthenticatedHistoricoRoute
+  '/indicar': typeof AuthenticatedIndicarRoute
   '/simuladores': typeof AuthenticatedSimuladoresRoute
+  '/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
+  '/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
+  '/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
+  '/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
+  '/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
+  '/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
+  '/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
+  '/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCNPJRoute
   '/suporte': typeof AuthenticatedSuporteRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/admin/assinaturas': typeof AuthenticatedAdminAssinaturasRoute
@@ -163,6 +248,8 @@ export interface FileRoutesByFullPath {
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
+  '/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -175,7 +262,16 @@ export interface FileRoutesByTo {
   '/clientes': typeof AuthenticatedClientesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/historico': typeof AuthenticatedHistoricoRoute
+  '/indicar': typeof AuthenticatedIndicarRoute
   '/simuladores': typeof AuthenticatedSimuladoresRoute
+  '/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
+  '/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
+  '/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
+  '/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
+  '/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
+  '/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
+  '/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
+  '/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCNPJRoute
   '/suporte': typeof AuthenticatedSuporteRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/admin/assinaturas': typeof AuthenticatedAdminAssinaturasRoute
@@ -184,6 +280,8 @@ export interface FileRoutesByTo {
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
+  '/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -199,7 +297,16 @@ export interface FileRoutesById {
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
+  '/_authenticated/indicar': typeof AuthenticatedIndicarRoute
   '/_authenticated/simuladores': typeof AuthenticatedSimuladoresRoute
+  '/_authenticated/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
+  '/_authenticated/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
+  '/_authenticated/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
+  '/_authenticated/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
+  '/_authenticated/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
+  '/_authenticated/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
+  '/_authenticated/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
+  '/_authenticated/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCNPJRoute
   '/_authenticated/suporte': typeof AuthenticatedSuporteRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/admin/assinaturas': typeof AuthenticatedAdminAssinaturasRoute
@@ -208,6 +315,8 @@ export interface FileRoutesById {
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
+  '/_authenticated/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -223,7 +332,16 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/dashboard'
     | '/historico'
+    | '/indicar'
     | '/simuladores'
+    | '/simuladores/lance'
+    | '/simuladores/aluguel-vs-consorcio'
+    | '/simuladores/renda-passiva'
+    | '/simuladores/flip-cota'
+    | '/simuladores/estrategia/$slug'
+    | '/simuladores/saida-financiamento'
+    | '/simuladores/meta-patrimonial'
+    | '/simuladores/consorcio-cnpj'
     | '/suporte'
     | '/templates'
     | '/admin/assinaturas'
@@ -232,6 +350,8 @@ export interface FileRouteTypes {
     | '/admin/usuarios'
     | '/admin/webhooks'
     | '/admin/'
+    | '/admin/simuladores'
+    | '/admin/simuladores/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -244,7 +364,16 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/dashboard'
     | '/historico'
+    | '/indicar'
     | '/simuladores'
+    | '/simuladores/lance'
+    | '/simuladores/aluguel-vs-consorcio'
+    | '/simuladores/renda-passiva'
+    | '/simuladores/flip-cota'
+    | '/simuladores/estrategia/$slug'
+    | '/simuladores/saida-financiamento'
+    | '/simuladores/meta-patrimonial'
+    | '/simuladores/consorcio-cnpj'
     | '/suporte'
     | '/templates'
     | '/admin/assinaturas'
@@ -253,6 +382,8 @@ export interface FileRouteTypes {
     | '/admin/usuarios'
     | '/admin/webhooks'
     | '/admin'
+    | '/admin/simuladores'
+    | '/admin/simuladores/$slug'
   id:
     | '__root__'
     | '/'
@@ -267,7 +398,16 @@ export interface FileRouteTypes {
     | '/_authenticated/clientes'
     | '/_authenticated/dashboard'
     | '/_authenticated/historico'
+    | '/_authenticated/indicar'
     | '/_authenticated/simuladores'
+    | '/_authenticated/simuladores/lance'
+    | '/_authenticated/simuladores/aluguel-vs-consorcio'
+    | '/_authenticated/simuladores/renda-passiva'
+    | '/_authenticated/simuladores/flip-cota'
+    | '/_authenticated/simuladores/estrategia/$slug'
+    | '/_authenticated/simuladores/saida-financiamento'
+    | '/_authenticated/simuladores/meta-patrimonial'
+    | '/_authenticated/simuladores/consorcio-cnpj'
     | '/_authenticated/suporte'
     | '/_authenticated/templates'
     | '/_authenticated/admin/assinaturas'
@@ -276,6 +416,8 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/usuarios'
     | '/_authenticated/admin/webhooks'
     | '/_authenticated/admin/'
+    | '/_authenticated/admin/simuladores'
+    | '/_authenticated/admin/simuladores/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -344,6 +486,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSimuladoresRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/simuladores/lance': {
+      id: '/_authenticated/simuladores/lance'
+      path: '/simuladores/lance'
+      fullPath: '/simuladores/lance'
+      preLoaderRoute: typeof AuthenticatedSimuladoresLanceRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/simuladores/aluguel-vs-consorcio': {
+      id: '/_authenticated/simuladores/aluguel-vs-consorcio'
+      path: '/simuladores/aluguel-vs-consorcio'
+      fullPath: '/simuladores/aluguel-vs-consorcio'
+      preLoaderRoute: typeof AuthenticatedSimuladoresAluguelVsConsorcioRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/simuladores/renda-passiva': {
+      id: '/_authenticated/simuladores/renda-passiva'
+      path: '/simuladores/renda-passiva'
+      fullPath: '/simuladores/renda-passiva'
+      preLoaderRoute: typeof AuthenticatedSimuladoresRendaPassivaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/simuladores/flip-cota': {
+      id: '/_authenticated/simuladores/flip-cota'
+      path: '/simuladores/flip-cota'
+      fullPath: '/simuladores/flip-cota'
+      preLoaderRoute: typeof AuthenticatedSimuladoresFlipCotaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/simuladores/estrategia/$slug': {
+      id: '/_authenticated/simuladores/estrategia/$slug'
+      path: '/simuladores/estrategia/$slug'
+      fullPath: '/simuladores/estrategia/$slug'
+      preLoaderRoute: typeof AuthenticatedSimuladoresEstrategiaSlugRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/simuladores/saida-financiamento': {
+      id: '/_authenticated/simuladores/saida-financiamento'
+      path: '/simuladores/saida-financiamento'
+      fullPath: '/simuladores/saida-financiamento'
+      preLoaderRoute: typeof AuthenticatedSimuladoresSaidaFinanciamentoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/simuladores/meta-patrimonial': {
+      id: '/_authenticated/simuladores/meta-patrimonial'
+      path: '/simuladores/meta-patrimonial'
+      fullPath: '/simuladores/meta-patrimonial'
+      preLoaderRoute: typeof AuthenticatedSimuladoresMetaPatrimonialRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/simuladores/consorcio-cnpj': {
+      id: '/_authenticated/simuladores/consorcio-cnpj'
+      path: '/simuladores/consorcio-cnpj'
+      fullPath: '/simuladores/consorcio-cnpj'
+      preLoaderRoute: typeof AuthenticatedSimuladoresConsorcioCNPJRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/historico': {
       id: '/_authenticated/historico'
       path: '/historico'
@@ -370,6 +568,13 @@ declare module '@tanstack/react-router' {
       path: '/assinatura'
       fullPath: '/assinatura'
       preLoaderRoute: typeof AuthenticatedAssinaturaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/indicar': {
+      id: '/_authenticated/indicar'
+      path: '/indicar'
+      fullPath: '/indicar'
+      preLoaderRoute: typeof AuthenticatedIndicarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/assinar': {
@@ -435,6 +640,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAssinaturasRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/simuladores': {
+      id: '/_authenticated/admin/simuladores'
+      path: '/admin/simuladores'
+      fullPath: '/admin/simuladores'
+      preLoaderRoute: typeof AuthenticatedAdminSimuladoresRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/simuladores/$slug': {
+      id: '/_authenticated/admin/simuladores/$slug'
+      path: '/admin/simuladores/$slug'
+      fullPath: '/admin/simuladores/$slug'
+      preLoaderRoute: typeof AuthenticatedAdminSimuladoresSlugRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -467,9 +686,20 @@ interface AuthenticatedRouteChildren {
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
+  AuthenticatedIndicarRoute: typeof AuthenticatedIndicarRoute
   AuthenticatedSimuladoresRoute: typeof AuthenticatedSimuladoresRoute
+  AuthenticatedSimuladoresLanceRoute: typeof AuthenticatedSimuladoresLanceRoute
+  AuthenticatedSimuladoresAluguelVsConsorcioRoute: typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
+  AuthenticatedSimuladoresRendaPassivaRoute: typeof AuthenticatedSimuladoresRendaPassivaRoute
+  AuthenticatedSimuladoresFlipCotaRoute: typeof AuthenticatedSimuladoresFlipCotaRoute
+  AuthenticatedSimuladoresEstrategiaSlugRoute: typeof AuthenticatedSimuladoresEstrategiaSlugRoute
+  AuthenticatedSimuladoresSaidaFinanciamentoRoute: typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
+  AuthenticatedSimuladoresMetaPatrimonialRoute: typeof AuthenticatedSimuladoresMetaPatrimonialRoute
+  AuthenticatedSimuladoresConsorcioCNPJRoute: typeof AuthenticatedSimuladoresConsorcioCNPJRoute
   AuthenticatedSuporteRoute: typeof AuthenticatedSuporteRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
+  AuthenticatedAdminSimuladoresRoute: typeof AuthenticatedAdminSimuladoresRoute
+  AuthenticatedAdminSimuladoresSlugRoute: typeof AuthenticatedAdminSimuladoresSlugRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -480,9 +710,20 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
+  AuthenticatedIndicarRoute: AuthenticatedIndicarRoute,
   AuthenticatedSimuladoresRoute: AuthenticatedSimuladoresRoute,
+  AuthenticatedSimuladoresLanceRoute: AuthenticatedSimuladoresLanceRoute,
+  AuthenticatedSimuladoresAluguelVsConsorcioRoute: AuthenticatedSimuladoresAluguelVsConsorcioRoute,
+  AuthenticatedSimuladoresRendaPassivaRoute: AuthenticatedSimuladoresRendaPassivaRoute,
+  AuthenticatedSimuladoresFlipCotaRoute: AuthenticatedSimuladoresFlipCotaRoute,
+  AuthenticatedSimuladoresEstrategiaSlugRoute: AuthenticatedSimuladoresEstrategiaSlugRoute,
+  AuthenticatedSimuladoresSaidaFinanciamentoRoute: AuthenticatedSimuladoresSaidaFinanciamentoRoute,
+  AuthenticatedSimuladoresMetaPatrimonialRoute: AuthenticatedSimuladoresMetaPatrimonialRoute,
+  AuthenticatedSimuladoresConsorcioCNPJRoute: AuthenticatedSimuladoresConsorcioCNPJRoute,
   AuthenticatedSuporteRoute: AuthenticatedSuporteRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
+  AuthenticatedAdminSimuladoresRoute: AuthenticatedAdminSimuladoresRoute,
+  AuthenticatedAdminSimuladoresSlugRoute: AuthenticatedAdminSimuladoresSlugRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

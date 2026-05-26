@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, Calculator, Clock, History, Users, FileText, MessageSquare, ArrowRight } from 'lucide-react'
+import { AlertTriangle, Calculator, Clock, History, Users, FileText, MessageSquare, ArrowRight, Gift, Copy } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { useReferralStats } from '@/hooks/useReferralStats'
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: DashboardPage,
@@ -13,6 +15,7 @@ export const Route = createFileRoute('/_authenticated/dashboard')({
 
 function DashboardPage() {
   const { user, subscription } = useAuth()
+  const { stats: referralStats, referralLink, loading: referralLoading } = useReferralStats(user?.id)
   const [simulationCount, setSimulationCount] = useState<number | null>(null)
   const [clientCount, setClientCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -144,6 +147,79 @@ function DashboardPage() {
             </CardHeader>
           </Card>
         ))}
+      </section>
+
+      {/* Referral widget */}
+      <section>
+        <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-primary/3 to-background p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl">
+                🎁
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold">Indique e ganhe 1 mês grátis</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  A cada 2 amigos que assinarem, você ganha 1 mês sem pagar. Até 6 meses grátis.
+                  {(referralStats?.months_credit ?? 0) > 0 && (
+                    <span className="ml-1 font-bold text-green-600 dark:text-green-400">
+                      • {referralStats!.months_credit} {referralStats!.months_credit === 1 ? "mês" : "meses"} disponível!
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/indicar"
+              className="shrink-0 flex items-center gap-1 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-accent transition-colors"
+            >
+              Ver programa <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          {/* Link copiável compacto */}
+          <div className="mt-4 flex gap-2">
+            {referralLoading ? (
+              <div className="h-9 flex-1 rounded-xl bg-muted animate-pulse" />
+            ) : (
+              <div className="flex-1 min-w-0 rounded-xl border border-border bg-background/80 px-3 py-2 flex items-center">
+                <code className="truncate text-[11px] font-mono text-muted-foreground">
+                  {referralLink || "Gerando link…"}
+                </code>
+              </div>
+            )}
+            <button
+              onClick={async () => {
+                if (!referralLink) return;
+                try {
+                  await navigator.clipboard.writeText(referralLink);
+                  toast.success("Link copiado!");
+                } catch {
+                  toast.error("Não foi possível copiar.");
+                }
+              }}
+              disabled={!referralLink}
+              className="shrink-0 flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-extrabold text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-all active:scale-95"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Copiar</span>
+            </button>
+          </div>
+
+          {/* Mini-progresso */}
+          {referralStats && (
+            <div className="mt-3 flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span>{referralStats.total_converted} / 12 conversões</span>
+              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-700"
+                  style={{ width: `${Math.min((referralStats.total_converted / 12) * 100, 100)}%` }}
+                />
+              </div>
+              <span className="font-bold text-primary">{referralStats.months_earned} / 6 meses</span>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Operações — ds-cards-2: 1 col mobile → 2 col sm+ */}

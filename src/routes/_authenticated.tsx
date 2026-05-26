@@ -5,7 +5,7 @@ import {
   Home, Calculator, History, Users, BookCopy, CreditCard,
   LifeBuoy, Radio, LogOut, ChevronRight, ArrowLeft, Menu, X,
   ShieldAlert, Wallet, PanelLeftClose, PanelLeftOpen,
-  LayoutDashboard,
+  LayoutDashboard, Gift,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
@@ -16,13 +16,14 @@ export const Route = createFileRoute("/_authenticated")({ component: AuthLayout 
 // ─────────────────────────────────────────────────────────────────────────────
 
 const USER_NAV = [
-  { to: "/dashboard",   label: "Início",      icon: Home        },
-  { to: "/simuladores", label: "Simuladores", icon: Calculator  },
-  { to: "/historico",   label: "Histórico",   icon: History     },
-  { to: "/clientes",    label: "Clientes",    icon: Users       },
-  { to: "/templates",   label: "Templates",   icon: BookCopy    },
-  { to: "/assinatura",  label: "Assinatura",  icon: CreditCard  },
-  { to: "/suporte",     label: "Suporte",     icon: LifeBuoy    },
+  { to: "/dashboard",   label: "Início",          icon: Home        },
+  { to: "/simuladores", label: "Simuladores",     icon: Calculator  },
+  { to: "/historico",   label: "Histórico",       icon: History     },
+  { to: "/clientes",    label: "Clientes",        icon: Users       },
+  { to: "/templates",   label: "Templates",       icon: BookCopy    },
+  { to: "/indicar",     label: "Indicar & Ganhar", icon: Gift       },
+  { to: "/assinatura",  label: "Assinatura",      icon: CreditCard  },
+  { to: "/suporte",     label: "Suporte",         icon: LifeBuoy    },
 ] as const;
 
 const ADMIN_NAV_SECTIONS = [
@@ -47,10 +48,25 @@ const ADMIN_NAV_SECTIONS = [
       { to: "/admin/webhooks",    label: "Webhooks",    icon: Radio           },
     ],
   },
+  {
+    section: "Produto",
+    items: [
+      { to: "/admin/simuladores", label: "Simuladores", icon: Calculator      },
+    ],
+  },
 ] as const;
 
 // Rotas de simuladores — marcam "Simuladores" como ativo no sidebar
-const SIMULATOR_ROUTES = ["/app"];
+const SIMULATOR_ROUTES = [
+  "/app",
+  "/simuladores/lance",
+  "/simuladores/aluguel-vs-consorcio",
+  "/simuladores/renda-passiva",
+  "/simuladores/flip-cota",
+  "/simuladores/saida-financiamento",
+  "/simuladores/meta-patrimonial",
+  "/simuladores/consorcio-cnpj",
+];
 
 // Bottom nav bar items (mobile only — 5 primary destinations)
 const BOTTOM_NAV = [

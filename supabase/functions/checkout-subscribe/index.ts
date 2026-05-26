@@ -65,12 +65,13 @@ Deno.serve(async (req: Request) => {
     customer: { name: string; email: string; password: string; cpf: string; birthDate: string; phone: string };
     address: { street: string; number: string; complement?: string; neighborhood: string; city: string; state: string; zipCode: string };
     card: { holderName: string; number: string; securityCode: string; expiry: string };
+    referralCode?: string;
   };
 
   try { body = await req.json(); }
   catch { return json({ error: 'Invalid JSON body' }, 400); }
 
-  const { idempotencyKey, billingCycle, customer, address, card } = body;
+  const { idempotencyKey, billingCycle, customer, address, card, referralCode } = body;
 
   if (!idempotencyKey || !billingCycle || !customer || !address || !card) {
     return json({ error: 'Missing required fields' }, 400);
@@ -235,6 +236,20 @@ Deno.serve(async (req: Request) => {
     email:     customer.email,
     updated_at: now.toISOString(),
   }, { onConflict: 'id', ignoreDuplicates: false });
+
+  // ── Apply referral if provided ────────────────────────────────────────────
+  if (referralCode) {
+    try {
+      await supabase.rpc('apply_referral', {
+        p_referral_code:     referralCode.toLowerCase().trim(),
+        p_referred_user_id:  userId,
+      });
+      console.log('[checkout-subscribe] Referral applied:', referralCode, '→', userId);
+    } catch (err) {
+      // Non-blocking — referral failure must not fail the checkout
+      console.error('[checkout-subscribe] Referral apply error (non-fatal):', err);
+    }
+  }
 
   console.log('[checkout-subscribe] Success. SubId:', newSub.id, 'SimplispayId:', simplispaySubId);
   return json({ success: true, subscriptionId: newSub.id, userId }, { headers: CORS_HEADERS });

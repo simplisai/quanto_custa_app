@@ -49,6 +49,7 @@ export type Database = {
           full_name: string | null;
           id: string;
           updated_at: string;
+          referral_code: string | null;
         };
         Insert: {
           created_at?: string;
@@ -56,6 +57,7 @@ export type Database = {
           full_name?: string | null;
           id: string;
           updated_at?: string;
+          referral_code?: string | null;
         };
         Update: {
           created_at?: string;
@@ -63,6 +65,34 @@ export type Database = {
           full_name?: string | null;
           id?: string;
           updated_at?: string;
+          referral_code?: string | null;
+        };
+        Relationships: [];
+      };
+      referrals: {
+        Row: {
+          id: string;
+          referrer_id: string;
+          referred_user_id: string;
+          status: string;
+          created_at: string;
+          converted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          referrer_id: string;
+          referred_user_id: string;
+          status?: string;
+          created_at?: string;
+          converted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          referrer_id?: string;
+          referred_user_id?: string;
+          status?: string;
+          created_at?: string;
+          converted_at?: string | null;
         };
         Relationships: [];
       };
@@ -144,6 +174,7 @@ export type Database = {
           card_last_four: string | null;
           card_brand: string | null;
           metadata: Json;
+          referral_months_credit: number;
           created_at: string;
           updated_at: string;
         };
@@ -164,6 +195,7 @@ export type Database = {
           card_last_four?: string | null;
           card_brand?: string | null;
           metadata?: Json;
+          referral_months_credit?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -184,6 +216,7 @@ export type Database = {
           card_last_four?: string | null;
           card_brand?: string | null;
           metadata?: Json;
+          referral_months_credit?: number;
           created_at?: string;
           updated_at?: string;
         };
