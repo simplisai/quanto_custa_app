@@ -24,14 +24,14 @@ function LoginPage() {
   const planParam = new URLSearchParams(location.search).get("plan") ?? "";
   const planInfo = PLAN_LABELS[planParam] ?? null;
   const emailRedirectTo = typeof window !== "undefined"
-    ? window.location.origin + (planParam ? `/checkout?plan=${planParam}` : "/app")
-    : "/app";
+    ? window.location.origin + (planParam ? `/checkout?plan=${planParam}` : "/dashboard")
+    : "/dashboard";
 
   const goAfterAuth = () => {
     if (planParam) {
       nav({ to: `/checkout?plan=${planParam}` as any });
     } else {
-      nav({ to: "/app" });
+      nav({ to: "/dashboard" });
     }
   };
 

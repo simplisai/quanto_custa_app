@@ -1,13 +1,15 @@
+
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, Calculator, Clock, History, Users, FileText, MessageSquare, ArrowRight, Gift, Copy } from 'lucide-react'
+import { AlertTriangle, Calculator, Clock, History, Users, FileText, MessageSquare, ArrowRight, Gift, Copy, BookOpen } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useReferralStats } from '@/hooks/useReferralStats'
+import { OPERATIONS } from '@/lib/operations'
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: DashboardPage,
@@ -57,15 +59,7 @@ function DashboardPage() {
     { label: 'Plano ativo', value: planName },
   ]
 
-  const operations = [
-    {
-      title: 'Calculadora Patrimonial',
-      description: 'Compare SAC, PRICE e consórcio com simulações completas mês a mês.',
-      icon: Calculator,
-      href: '/app',
-      badge: 'Disponível',
-    },
-  ]
+  const activeSimulators = OPERATIONS.filter((o) => o.isActive)
 
   const shortcuts = [
     { title: 'Histórico', description: 'Simulações salvas', icon: History, href: '/historico' },
@@ -222,30 +216,32 @@ function DashboardPage() {
         </div>
       </section>
 
-      {/* Operações — ds-cards-2: 1 col mobile → 2 col sm+ */}
+      {/* Simuladores — ds-cards-2: 1 col mobile → 2 col sm+ */}
       <section>
-        <h2 className="mb-3 text-base font-semibold">Operações disponíveis</h2>
+        <h2 className="mb-3 text-base font-semibold">Simuladores</h2>
         <div className="ds-cards-2">
-          {operations.map((op) => {
-            const Icon = op.icon
-            return (
-              <Card key={op.title} className="flex flex-col">
-                <CardHeader>
-                  <div className="mb-2 flex items-center justify-between">
-                    <Icon className="h-5 w-5 text-primary" />
-                    <Badge>{op.badge}</Badge>
-                  </div>
-                  <CardTitle className="text-base">{op.title}</CardTitle>
-                  <CardDescription className="text-sm">{op.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="mt-auto pt-0">
-                  <Button asChild className="w-full" size="sm">
-                    <Link to={op.href}>Abrir <ArrowRight className="ml-2 h-4 w-4" /></Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            )
-          })}
+          {activeSimulators.map((op) => (
+            <Card key={op.slug} className="flex flex-col">
+              <CardHeader>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-2xl">{op.icon}</span>
+                  <Badge variant="secondary">Disponível</Badge>
+                </div>
+                <CardTitle className="text-base">{op.name}</CardTitle>
+                <CardDescription className="text-sm">{op.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="mt-auto pt-0 space-y-2">
+                <Button asChild className="w-full" size="sm">
+                  <Link to={op.route}>Abrir</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full" size="sm">
+                  <Link to={`${op.route}/estrategia`}>
+                    <BookOpen className="mr-2 h-4 w-4" />Estratégia
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </section>
 
