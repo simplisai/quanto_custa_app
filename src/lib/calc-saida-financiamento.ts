@@ -2,6 +2,8 @@
 // Responde: "Vale a pena eu vender meu imóvel financiado e migrar para consórcio?"
 // O cliente compara patrimônio líquido, parcela mensal e custo total em ambos os cenários.
 
+export type TipoAbatimento = "prazo" | "parcela";
+
 export interface SaidaFinanciamentoInputs {
   // Imóvel financiado
   valorImovelAtual: number;      // Valor atual de mercado do imóvel (R$)
@@ -14,8 +16,10 @@ export interface SaidaFinanciamentoInputs {
   cartaConsorcio: number;        // Valor da carta do consórcio (R$)
   taxaAdmConsorcio: number;      // Taxa de administração total do consórcio (%)
   prazoConsorcio: number;        // Prazo do grupo consórcio (meses)
-  percLance: number;             // Lance ofertado (% da carta)
+  percLance: number;             // Lance em recursos próprios (% da carta) — vem do capital da venda
+  percLanceEmb: number;          // Lance embutido (% da carta) — sai do crédito recebido
   mesContemplacaoConsorcio: number; // Mês estimado de contemplação com lance
+  tipoAbatimento: TipoAbatimento;  // Como o lance abate: reduz prazo ou parcela
 
   // Premissas de mercado
   valorizacaoAnual: number;      // Valorização anual do imóvel (%)
@@ -37,8 +41,11 @@ export interface SaidaMesData {
 export interface SaidaFinanciamentoResults {
   // Venda do imóvel
   capitalLiquidoVenda: number;   // Valor de venda - saldo devedor - custos
-  lanceEmReaisConsorcio: number; // Quanto do capital vai para lance
-  sobra: number;                 // Capital que sobra após lance
+  lanceEmReaisConsorcio: number; // Lance total (próprio + embutido) em R$
+  lanceProprioR: number;         // Lance com recursos da venda (R$)
+  lanceEmbR: number;             // Lance embutido (R$) — sai do crédito
+  creditoLiquido: number;        // Crédito disponível após lance embutido
+  sobra: number;                 // Capital que sobra da venda após lance próprio
 
   // Financiamento (manter como está)
   totalRestanteFin: number;      // Total a pagar no financiamento (soma parcelas restantes)
@@ -47,6 +54,7 @@ export interface SaidaFinanciamentoResults {
   // Consórcio (migrar)
   parcelaConsorcio: number;      // Parcela mensal do consórcio
   parcelaPosLance: number;       // Parcela após contemplação (saldo reduzido)
+  prazoPosFinal: number;         // Prazo restante após contemplação
   totalConsorcio: number;        // Total desembolsado no consórcio
   patrimonioFinalCons: number;   // Valor carta × valorização
 
@@ -70,7 +78,9 @@ export const defaultSaidaInputs: SaidaFinanciamentoInputs = {
   taxaAdmConsorcio: 18,
   prazoConsorcio: 120,
   percLance: 25,
+  percLanceEmb: 0,
   mesContemplacaoConsorcio: 8,
+  tipoAbatimento: "parcela",
   valorizacaoAnual: 6,
   custosVenda: 6,                // 6% do valor (corretagem 5% + despesas)
 };
@@ -79,7 +89,8 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
   const {
     valorImovelAtual, saldoDevedor, parcelaAtual, prazoRestanteMeses,
     taxaJurosMensal, cartaConsorcio, taxaAdmConsorcio, prazoConsorcio,
-    percLance, mesContemplacaoConsorcio, valorizacaoAnual, custosVenda,
+    percLance, percLanceEmb, mesContemplacaoConsorcio, tipoAbatimento,
+    valorizacaoAnual, custosVenda,
   } = i;
 
   const taxaJurosFrac = taxaJurosMensal / 100;
@@ -99,17 +110,38 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
   const valorPlanoConsorcio = cartaConsorcio * (1 + taxaAdmFrac);
   const parcelaConsorcio = valorPlanoConsorcio / prazoConsorcio;
 
-  const saldoDevedorPosLance = Math.max(cartaConsorcio - lanceEmReaisConsorcio, 0);
-  const prazoPos = prazoConsorcio - mesContemplacaoConsorcio;
-  const parcelaPosLance =
-    prazoPos > 0
-      ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / prazoConsorcio
+  // Lance embutido (% da carta — sai do crédito, não do bolso)
+  const lanceEmbR = cartaConsorcio * ((percLanceEmb || 0) / 100);
+  // Lance próprio (da venda do imóvel)
+  const saldoDevedorPosLance = Math.max(cartaConsorcio - lanceEmReaisConsorcio - lanceEmbR, 0);
+  const creditoLiquido = Math.max(cartaConsorcio - lanceEmbR, 0);
+  const lanceProprioR = lanceEmReaisConsorcio; // alias for clarity
+
+  const prazoPos = Math.max(prazoConsorcio - mesContemplacaoConsorcio, 0);
+  let parcelaPosLance: number;
+  let prazoPosFinal: number;
+
+  if (tipoAbatimento === "prazo") {
+    // Mantém a parcela padrão, reduz o prazo
+    const parcelaPadrao = valorPlanoConsorcio / prazoConsorcio;
+    prazoPosFinal = parcelaPadrao > 0
+      ? Math.ceil((saldoDevedorPosLance * (1 + taxaAdmFrac)) / parcelaPadrao)
       : 0;
+    parcelaPosLance = prazoPosFinal > 0
+      ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / prazoPosFinal
+      : 0;
+  } else {
+    // Mantém o prazo restante, reduz a parcela
+    prazoPosFinal = prazoPos;
+    parcelaPosLance = prazoPos > 0
+      ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / prazoPos
+      : 0;
+  }
 
   const totalConsorcio =
     parcelaConsorcio * mesContemplacaoConsorcio +
     lanceEmReaisConsorcio +
-    parcelaPosLance * prazoPos;
+    parcelaPosLance * prazoPosFinal;
 
   // ── Financiamento — total restante (SAC simplificado) ──────────────────────
   // Para simplicidade: amortização constante sobre saldo atual
@@ -176,11 +208,15 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
   return {
     capitalLiquidoVenda,
     lanceEmReaisConsorcio,
+    lanceProprioR,
+    lanceEmbR,
+    creditoLiquido,
     sobra,
     totalRestanteFin,
     patrimonioFinalFin,
     parcelaConsorcio,
     parcelaPosLance,
+    prazoPosFinal,
     totalConsorcio,
     patrimonioFinalCons,
     economiaParcelaMensal,

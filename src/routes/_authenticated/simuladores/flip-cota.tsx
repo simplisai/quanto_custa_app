@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+import { usePdfExport } from "@/hooks/usePdfExport";
 import {
   calcFlipCota,
   defaultFlipCotaInputs,
@@ -20,6 +20,8 @@ import {
 import { Bar } from "react-chartjs-2";
 import { ArrowLeft, Zap, TrendingUp, Coins, BarChart2, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
+import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -115,6 +117,7 @@ function FlipCotaPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const reportRef = useRef<HTMLDivElement>(null);
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "Flip_Cota_Consorcio.pdf");
 
   const [cartaCredito, setCartaCredito] = useState(maskMoney(String(defaultFlipCotaInputs.cartaCredito * 100)));
   const [prazo, setPrazo] = useState(String(defaultFlipCotaInputs.prazo));
@@ -125,16 +128,39 @@ function FlipCotaPage() {
   const [tipoLance, setTipoLance] = useState<FlipCotaInputs["tipoLance"]>("embutido");
   const [mesContemplacao, setMesContemplacao] = useState(String(defaultFlipCotaInputs.mesContemplacao));
   const [agioVenda, setAgioVenda] = useState(String(defaultFlipCotaInputs.agioVenda));
+  const [taxaAtualiz, setTaxaAtualiz] = useState(String(defaultFlipCotaInputs.taxaAtualizacaoAnual));
 
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [results, setResults] = useState<FlipCotaResults | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  // ── Restore sessionStorage on mount ─────────────────────────────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem("flip-inputs");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved);
+      if (s.cartaCredito) setCartaCredito(s.cartaCredito);
+      if (s.prazo) setPrazo(s.prazo);
+      if (s.meiaParcela !== undefined) setMeiaParcela(s.meiaParcela);
+      if (s.taxaAdm) setTaxaAdm(s.taxaAdm);
+      if (s.fundoReserva) setFundoReserva(s.fundoReserva);
+      if (s.lancePerc) setLancePerc(s.lancePerc);
+      if (s.tipoLance) setTipoLance(s.tipoLance);
+      if (s.mesContemplacao) setMesContemplacao(s.mesContemplacao);
+      if (s.agioVenda) setAgioVenda(s.agioVenda);
+      if (s.taxaAtualiz) setTaxaAtualiz(s.taxaAtualiz);
+    } catch {}
+  }, []);
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const clientPhone = selectedClient?.phone ?? "";
+
   useEffect(() => {
     if (!user) return;
-    supabase.from("clients").select("id, name").eq("user_id", user.id).order("name")
+    supabase.from("clients").select("id, name, phone").eq("user_id", user.id).order("name")
       .then(({ data }) => setClients(data ?? []));
   }, [user]);
 
@@ -172,11 +198,16 @@ function FlipCotaPage() {
     tipoLance,
     mesContemplacao: parseInt(mesContemplacao || "0", 10) || 1,
     agioVenda: parseFloat(agioVenda.replace(",", ".")) || 0,
-  }), [cartaCredito, prazo, meiaParcela, taxaAdm, fundoReserva, lancePerc, tipoLance, mesContemplacao, agioVenda]);
+    taxaAtualizacaoAnual: parseFloat(taxaAtualiz.replace(",", ".")) || 0,
+  }), [cartaCredito, prazo, meiaParcela, taxaAdm, fundoReserva, lancePerc, tipoLance, mesContemplacao, agioVenda, taxaAtualiz]);
 
   const calcular = () => {
     setResults(calcFlipCota(inputs));
     setSavedId(null);
+    sessionStorage.setItem("flip-inputs", JSON.stringify({
+      cartaCredito, prazo, meiaParcela, taxaAdm, fundoReserva,
+      lancePerc, tipoLance, mesContemplacao, agioVenda, taxaAtualiz,
+    }));
   };
 
   const applyTemplate = (p: TemplatePayload) => {
@@ -220,27 +251,6 @@ function FlipCotaPage() {
     }
   };
 
-  const exportPDF = async () => {
-    if (!results) { toast.error("Calcule primeiro."); return; }
-    if (!reportRef.current) return;
-    try {
-      reportRef.current.style.display = "block";
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      );
-      await html2pdf().set({
-        margin: 10,
-        filename: "Flip_Cota_Consorcio.pdf",
-        image: { type: "jpeg", quality: 1 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      }).from(reportRef.current).save();
-    } catch (e: unknown) {
-      toast.error((e as Error).message || "Erro ao exportar PDF.");
-    } finally {
-      if (reportRef.current) reportRef.current.style.display = "none";
-    }
-  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -316,6 +326,7 @@ function FlipCotaPage() {
           <NumInput label="Mês da Contemplação" value={mesContemplacao} onChange={setMesContemplacao} type="int" />
           <NumInput label="Ágio na Venda (% do Crédito Líquido)" value={agioVenda} onChange={setAgioVenda} type="decimal" hint="Prêmio cobrado na venda da cota contemplada" />
         </Grid2>
+        <NumInput label="Correção da Carta (INCC % a.a.)" value={taxaAtualiz} onChange={setTaxaAtualiz} type="decimal" hint="Taxa anual de atualização — INCC corrige a carta até a contemplação (ex: 4%)" />
       </Section>
 
       {/* ── Vincular & Salvar ──────────────────────────────────────── */}
@@ -337,7 +348,7 @@ function FlipCotaPage() {
             </Select>
           </div>
         </div>
-        <div className="grid gap-2.5 sm:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-4">
           <button onClick={calcular}
             className="rounded-xl bg-primary px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-primary-foreground shadow-elegant active:scale-[0.98] hover:opacity-95 transition-all">
             Calcular Rentabilidade
@@ -346,10 +357,16 @@ function FlipCotaPage() {
             className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide active:scale-[0.98] hover:bg-accent disabled:opacity-40 transition-all">
             {saving ? "Salvando…" : "Salvar"}
           </button>
-          <button onClick={exportPDF} disabled={!results}
+          <button onClick={exportPDF} disabled={!results || isExporting}
             className="rounded-xl bg-success px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-success-foreground active:scale-[0.98] hover:opacity-95 disabled:opacity-40 transition-all">
-            Exportar PDF
+            {isExporting ? "Exportando…" : "Exportar PDF"}
           </button>
+          <WhatsAppShareButton
+            onShare={(phone) => shareWhatsApp(phone)}
+            prefilledPhone={clientPhone}
+            disabled={!results}
+            isLoading={isExporting}
+          />
         </div>
         {savedId && (
           <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm">
@@ -493,85 +510,58 @@ function PDFFlip({ r, inputs, clientName }: {
 }) {
   if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  const isProfit = r.lucroLiquido >= 0;
 
   return (
-    <div style={{ padding: "16mm 18mm", width: "210mm", fontFamily: "'Inter', 'Helvetica Neue', sans-serif", color: "#2f3640", background: "#fff", boxSizing: "border-box" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #1a2a6c", paddingBottom: 12, marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 20, color: "#1a2a6c", fontWeight: 900 }}>📈 Alavancagem / Flip de Cota</div>
-          <div style={{ fontSize: 10, color: "#7f8c8d", fontWeight: 700, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.1em" }}>Demonstrativo de Rentabilidade de Consórcio</div>
-        </div>
-        <div style={{ textAlign: "right", fontSize: 10, color: "#7f8c8d" }}>
-          <div style={{ fontWeight: 800, color: "#c0392b", fontSize: 11 }}>CONFIDENCIAL</div>
-          <div style={{ marginTop: 3 }}>{hoje}</div>
-          {clientName && <div style={{ marginTop: 4, background: "#1a2a6c", color: "#fff", padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>Cliente: {clientName}</div>}
-        </div>
-      </div>
+    <PdfPage>
+      <PdfHeader
+        title="Flip de Cota"
+        subtitle="Estratégia de Compra e Venda de Cota — Relatório de Retorno"
+        clientName={clientName}
+        date={hoje}
+      />
+      <PdfPremises items={[
+        ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
+        ["Prazo do grupo", `${inputs.prazo} meses`],
+        ["Lance ofertado", `${inputs.lancePerc}%`],
+        ["Tipo de lance", inputs.tipoLance],
+        ["Contempl. prevista", `Mês ${inputs.mesContemplacao}`],
+        ["Ágio de venda", `${inputs.agioVenda}%`],
+        ["Taxa de atualiz.", `${inputs.taxaAtualizacaoAnual}% a.a.`],
+        ["Meia parcela", inputs.meiaParcela ? "Sim" : "Não"],
+      ]} />
 
-      {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
-        {[
-          ["Capital Alocado", fmtBRL(r.desembolsoTotal), "#1a2a6c"],
-          ["Crédito Líquido", fmtBRL(r.creditoLiquido), "#2980b9"],
-          ["Lucro Líquido", fmtBRL(r.lucroLiquido), isProfit ? "#27ae60" : "#c0392b"],
-          ["TIR Mensal", `${r.tirMensal.toFixed(2)}% a.m.`, isProfit ? "#27ae60" : "#c0392b"],
-        ].map(([l, v, c]) => (
-          <div key={l as string} style={{ padding: "12px 14px", borderRadius: 8, background: c as string, color: "#fff" }}>
-            <div style={{ fontSize: 8.5, opacity: 0.85, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>{l as string}</div>
-            <div style={{ fontSize: 14, fontWeight: 900, marginTop: 5 }}>{v as string}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Premissas */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10 }}>Parâmetros da Operação</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7 }}>
-          {[
-            ["Crédito Original", fmtBRL(inputs.cartaCredito)],
-            ["Prazo do Plano", `${inputs.prazo} meses`],
-            ["Meia Parcela", inputs.meiaParcela ? "Sim (50%)" : "Não"],
-            ["Taxa Adm.", `${inputs.taxaAdm}%`],
-            ["Fundo Reserva", `${inputs.fundoReserva}%`],
-            ["Lance", `${inputs.lancePerc}% (${inputs.tipoLance})`],
-            ["Contempl.", `Mês ${inputs.mesContemplacao}`],
-            ["Ágio Venda", `${inputs.agioVenda}%`],
-          ].map(([l, v]) => (
-            <div key={l} style={{ background: "#f7f8fc", padding: "6px 8px", borderRadius: 5, borderLeft: "3px solid #1a2a6c" }}>
-              <div style={{ fontSize: 8.5, color: "#7f8c8d", fontWeight: 700, textTransform: "uppercase" }}>{l}</div>
-              <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2 }}>{v}</div>
-            </div>
-          ))}
+      <PdfSection title="Resultado do Flip" description="Retorno real da estratégia de compra e revenda de cota contemplada:">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+          <PdfMetric label="Valor de venda da cota" value={fmtBRL(r.precoVendaTotal)} description={`Carta atualizada + ${inputs.agioVenda}% de ágio`} color={C.green} />
+          <PdfMetric label="Custo de aquisição" value={fmtBRL(r.desembolsoTotal)} description="Parcelas pagas + lance próprio" color={C.navy} />
+          <PdfMetric label="Lucro líquido" value={fmtBRL(r.lucroLiquido)} description="Valor de venda menos custo total" color={r.lucroLiquido >= 0 ? C.green : C.red} />
+          <PdfMetric label="ROI no período" value={`${r.roiTotal.toFixed(1)}%`} description={`Em apenas ${inputs.mesContemplacao} meses`} color={r.roiTotal >= 0 ? C.green : C.red} />
         </div>
-      </div>
+      </PdfSection>
 
-      {/* Detalhamento */}
-      <div>
-        <div style={{ fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10 }}>Demonstrativo Financeiro</div>
-        {[
-          ["Parcela cheia", fmtBRL(r.parcelaCheia) + "/mês"],
-          ["Parcela efetiva paga", fmtBRL(r.parcelaEfetiva) + "/mês"],
-          ["Total pago em parcelas", fmtBRL(r.valorPagoParcelas)],
-          ...(r.desembolsoLance > 0 ? [["Lance próprio desembolsado", fmtBRL(r.desembolsoLance)]] : []),
-          ["Desembolso total", fmtBRL(r.desembolsoTotal)],
-          ["Crédito líquido vendido", fmtBRL(r.creditoLiquido)],
-          ["Ágio recebido na venda", fmtBRL(r.valorVenda)],
-          ["Preço total ao comprador", fmtBRL(r.precoVendaTotal)],
-          ["Lucro líquido", fmtBRL(r.lucroLiquido)],
-          ["ROI total", `${r.roiTotal.toFixed(2)}%`],
-          ["TIR mensal", `${r.tirMensal.toFixed(2)}% a.m.`],
-          ["TIR anual", `${r.tirAnual.toFixed(1)}% a.a.`],
-        ].map(([label, value], i) => {
-          const isLast = i >= 8;
-          return (
-            <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f0f1f5", fontSize: 11, fontWeight: isLast ? 700 : 400, color: isLast && isProfit ? "#27ae60" : isLast ? "#c0392b" : "#2f3640" }}>
-              <span style={{ color: "#5d6d7e", fontWeight: isLast ? 700 : 400 }}>{label}</span>
-              <span style={{ fontWeight: 700 }}>{value}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+      <PdfInsight
+        emoji="🔄"
+        title="A lógica do Flip de Cota"
+        body={`Você entra na cota, paga ${inputs.mesContemplacao} meses de parcela (${fmtBRL(r.valorPagoParcelas)} no total) e dá um lance de ${fmtBRL(r.desembolsoLance)}. Após a contemplação, a carta de ${fmtBRL(inputs.cartaCredito)} — corrigida pelo INCC para ${fmtBRL(r.creditoAtualizado)} — é vendida com ${inputs.agioVenda}% de ágio. Resultado: ${fmtBRL(r.lucroLiquido)} de lucro em ${inputs.mesContemplacao} meses, ROI de ${r.roiTotal.toFixed(1)}%.`}
+        variant="primary"
+      />
+
+      <PdfSection title="Detalhamento Financeiro" description="Cada centavo da operação:">
+        <PdfKVList rows={[
+          { label: "Carta de crédito contratada", value: fmtBRL(inputs.cartaCredito) },
+          { label: "Carta corrigida pelo INCC na contemplação", value: fmtBRL(r.creditoAtualizado), color: C.navy },
+          { label: "Lance desembolsado (próprio)", value: fmtBRL(r.desembolsoLance) },
+          { label: "Parcelas pagas até a contemplação", value: fmtBRL(r.valorPagoParcelas), color: C.red },
+          { label: "Custo total de aquisição", value: fmtBRL(r.desembolsoTotal), color: C.red },
+          { label: "Ágio recebido na venda", value: fmtBRL(r.valorVenda), color: C.green },
+          { label: "Preço total ao comprador", value: fmtBRL(r.precoVendaTotal), color: C.green },
+          { label: "Lucro líquido da operação", value: fmtBRL(r.lucroLiquido), color: r.lucroLiquido >= 0 ? C.green : C.red },
+          { label: "ROI da operação", value: `${r.roiTotal.toFixed(1)}%`, color: C.green },
+          { label: "TIR anual", value: `${r.tirAnual.toFixed(1)}% a.a.`, color: C.green },
+        ]} />
+      </PdfSection>
+
+      <PdfFooter note="O flip de cota é uma operação de curto prazo. O lucro depende do ágio praticado no mercado secundário de cotas e das condições da administradora. Consulte as regras do grupo antes de operar." />
+    </PdfPage>
   );
 }

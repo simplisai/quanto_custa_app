@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+import { usePdfExport } from "@/hooks/usePdfExport";
 import {
   calcMetaPatrimonial,
   defaultMetaInputs,
   type MetaPatrimonialResults,
   type ModoMeta,
+  type RegimeTributario,
 } from "@/lib/calc-meta-patrimonial";
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,9 +20,11 @@ import {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import {
-  ArrowLeft, ArrowRight, BookOpen, Trophy, Coins, TrendingUp, Building2,
+  ArrowLeft, ArrowRight, BookOpen, Trophy, Coins, TrendingUp, Building2, Percent,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
+import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -105,6 +108,7 @@ function MetaPatrimonialPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const reportRef = useRef<HTMLDivElement>(null);
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "meta-patrimonial.pdf");
 
   const [modo, setModo] = useState<ModoMeta>("patrimonio");
   const [patrimonioAlvo, setPatrimonioAlvo] = useState(maskMoney(String(defaultMetaInputs.patrimonioAlvoR * 100)));
@@ -116,18 +120,48 @@ function MetaPatrimonialPage() {
   const [taxaAdm, setTaxaAdm] = useState(maskPercent(String(defaultMetaInputs.taxaAdmConsorcio * 100)));
   const [prazoConsorcio, setPrazoConsorcio] = useState(String(defaultMetaInputs.prazoConsorcio));
   const [percLance, setPercLance] = useState(String(defaultMetaInputs.percLance));
+  const [percLanceEmb, setPercLanceEmb] = useState(String(defaultMetaInputs.percLanceEmb));
   const [mesContemplacao, setMesContemplacao] = useState(String(defaultMetaInputs.mesContemplacaoPrimeira));
   const [intervaloCotasMeses, setIntervaloCotasMeses] = useState(String(defaultMetaInputs.intervaloCotasMeses));
+  const [regimeTributario, setRegimeTributario] = useState<RegimeTributario>(defaultMetaInputs.regimeTributario);
+  const [aliquotaEfetiva, setAliquotaEfetiva] = useState(String(defaultMetaInputs.aliquotaEfetiva));
 
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [results, setResults] = useState<MetaPatrimonialResults | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  // Restore inputs from sessionStorage on mount
+  useEffect(() => {
+    const saved = sessionStorage.getItem("mp-inputs");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved);
+      if (s.modo) setModo(s.modo);
+      if (s.patrimonioAlvo) setPatrimonioAlvo(s.patrimonioAlvo);
+      if (s.rendaAlvo) setRendaAlvo(s.rendaAlvo);
+      if (s.yieldAluguel) setYieldAluguel(s.yieldAluguel);
+      if (s.horizonteAnos) setHorizonteAnos(s.horizonteAnos);
+      if (s.valorizacao) setValorizacao(s.valorizacao);
+      if (s.cdi) setCdi(s.cdi);
+      if (s.taxaAdm) setTaxaAdm(s.taxaAdm);
+      if (s.prazoConsorcio) setPrazoConsorcio(s.prazoConsorcio);
+      if (s.percLance) setPercLance(s.percLance);
+      if (s.percLanceEmb) setPercLanceEmb(s.percLanceEmb);
+      if (s.mesContemplacao) setMesContemplacao(s.mesContemplacao);
+      if (s.intervaloCotasMeses) setIntervaloCotasMeses(s.intervaloCotasMeses);
+      if (s.regimeTributario) setRegimeTributario(s.regimeTributario);
+      if (s.aliquotaEfetiva) setAliquotaEfetiva(s.aliquotaEfetiva);
+    } catch {}
+  }, []);
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const clientPhone = selectedClient?.phone ?? "";
+
   useEffect(() => {
     if (!user) return;
-    supabase.from("clients").select("id, name").eq("user_id", user.id).order("name")
+    supabase.from("clients").select("id, name, phone").eq("user_id", user.id).order("name")
       .then(({ data }) => setClients(data ?? []));
   }, [user]);
 
@@ -146,11 +180,22 @@ function MetaPatrimonialPage() {
     taxaAdmConsorcio: unmask(taxaAdm),
     prazoConsorcio: parseInt(prazoConsorcio || "0", 10) || 0,
     percLance: parseInt(percLance || "0", 10) || 0,
+    percLanceEmb: parseInt(percLanceEmb || "0", 10) || 0,
     mesContemplacaoPrimeira: parseInt(mesContemplacao || "0", 10) || 0,
     intervaloCotasMeses: parseInt(intervaloCotasMeses || "0", 10) || 0,
-  }), [modo, patrimonioAlvo, rendaAlvo, yieldAluguel, horizonteAnos, valorizacao, cdi, taxaAdm, prazoConsorcio, percLance, mesContemplacao, intervaloCotasMeses]);
+    regimeTributario,
+    aliquotaEfetiva: parseFloat(aliquotaEfetiva || "0") || 0,
+  }), [modo, patrimonioAlvo, rendaAlvo, yieldAluguel, horizonteAnos, valorizacao, cdi, taxaAdm, prazoConsorcio, percLance, percLanceEmb, mesContemplacao, intervaloCotasMeses, regimeTributario, aliquotaEfetiva]);
 
-  const calcular = () => { setResults(calcMetaPatrimonial(inputs)); setSavedId(null); };
+  const calcular = () => {
+    setResults(calcMetaPatrimonial(inputs));
+    setSavedId(null);
+    sessionStorage.setItem("mp-inputs", JSON.stringify({
+      modo, patrimonioAlvo, rendaAlvo, yieldAluguel, horizonteAnos,
+      valorizacao, cdi, taxaAdm, prazoConsorcio, percLance, percLanceEmb,
+      mesContemplacao, intervaloCotasMeses, regimeTributario, aliquotaEfetiva,
+    }));
+  };
 
   const salvar = async () => {
     if (!results || !user) return;
@@ -175,15 +220,6 @@ function MetaPatrimonialPage() {
     } finally { setSaving(false); }
   };
 
-  const exportPDF = async () => {
-    if (!reportRef.current) return;
-    await html2pdf().set({
-      margin: 8, filename: "meta-patrimonial.pdf",
-      image: { type: "jpeg", quality: 0.96 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    }).from(reportRef.current).save();
-  };
 
   const applyTemplate = (p: TemplatePayload) => {
     if (p.modo) setModo(p.modo as ModoMeta);
@@ -290,10 +326,39 @@ function MetaPatrimonialPage() {
         <Grid2>
           <NumInput label="Taxa de administração (%)" value={taxaAdm} onChange={setTaxaAdm} type="percent" />
           <NumInput label="Prazo do grupo (meses)" value={prazoConsorcio} onChange={setPrazoConsorcio} type="int" />
-          <NumInput label="Lance médio ofertado (%)" value={percLance} onChange={setPercLance} type="int" />
+          <NumInput label="Lance próprio médio (%)" value={percLance} onChange={setPercLance} type="int" hint="% da carta pago do bolso" />
+          <NumInput label="Lance embutido médio (%)" value={percLanceEmb} onChange={setPercLanceEmb} type="int" hint="% da carta como embutido — reduz crédito, não é desembolso real" />
           <NumInput label="Mês da 1ª contemplação" value={mesContemplacao} onChange={setMesContemplacao} type="int" />
           <NumInput label="Intervalo entre contemplações (meses)" value={intervaloCotasMeses} onChange={setIntervaloCotasMeses} type="int" hint="Espaço entre contemplação de cada cota" />
         </Grid2>
+      </Section>
+
+      <Section title="Benefício Fiscal (PJ — opcional)">
+        <div>
+          <p className="mb-2 text-xs font-semibold text-foreground/70">Regime tributário</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {([
+              { value: "nenhum", label: "Nenhum / PF" },
+              { value: "simples", label: "Simples" },
+              { value: "presumido", label: "Presumido" },
+              { value: "real", label: "Lucro Real" },
+            ] as { value: RegimeTributario; label: string }[]).map((r) => (
+              <button key={r.value}
+                onClick={() => {
+                  setRegimeTributario(r.value);
+                  const aliq = r.value === "presumido" ? "13,33" : r.value === "real" ? "34" : "0";
+                  setAliquotaEfetiva(aliq);
+                }}
+                className={`rounded-xl py-2.5 text-xs font-bold transition-colors ${regimeTributario === r.value ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground hover:bg-accent"}`}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {regimeTributario !== "nenhum" && (
+          <NumInput label="Alíquota efetiva (%)" value={aliquotaEfetiva} onChange={setAliquotaEfetiva} type="percent"
+            hint="% do imposto que incidiria sobre as parcelas — editável conforme situação real" />
+        )}
       </Section>
 
       <button onClick={calcular}
@@ -330,6 +395,23 @@ function MetaPatrimonialPage() {
             </div>
           </Section>
 
+          {/* Benefício Fiscal PJ */}
+          {inputs.regimeTributario !== "nenhum" && results.economiaFiscalTotal > 0 && (
+            <Section title="Benefício Fiscal (PJ)">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <KPI icon={Percent} label="Economia fiscal total" value={fmtBRL(results.economiaFiscalTotal)}
+                  sub={`Alíquota ${inputs.aliquotaEfetiva}% sobre parcelas`} variant="success" />
+                <KPI icon={Coins} label="Custo real da operação" value={fmtBRL(results.custoRealTotal)}
+                  sub="Total investido − economia fiscal" variant="primary" />
+                <KPI icon={TrendingUp} label="Patrimônio vs. custo real" value={fmtBRL(results.patrimonioTotalFinal - results.custoRealTotal)}
+                  sub="Retorno líquido de impostos" variant="success" />
+              </div>
+              <div className="rounded-xl bg-success/10 px-4 py-3 text-sm font-semibold text-success">
+                💡 No regime {inputs.regimeTributario === "presumido" ? "Lucro Presumido" : "Lucro Real"}, as parcelas de consórcio são dedutíveis como despesa operacional. O Estado paga {inputs.aliquotaEfetiva}% da sua cota.
+              </div>
+            </Section>
+          )}
+
           {/* Cotas individuais */}
           <Section title="Plano de Cotas">
             <div className="space-y-3">
@@ -362,15 +444,21 @@ function MetaPatrimonialPage() {
           )}
 
           {/* Ações */}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button onClick={salvar} disabled={saving || !!savedId}
               className="flex-1 rounded-2xl border border-border bg-card py-3 text-sm font-bold text-foreground transition-colors hover:bg-accent disabled:opacity-50">
               {saving ? "Salvando…" : savedId ? "✓ Salvo" : "Salvar Simulação"}
             </button>
-            <button onClick={exportPDF}
-              className="flex-1 rounded-2xl bg-primary py-3 text-sm font-extrabold text-primary-foreground transition-opacity hover:opacity-90">
-              Exportar PDF
+            <button onClick={exportPDF} disabled={isExporting}
+              className="flex-1 rounded-2xl bg-primary py-3 text-sm font-extrabold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+              {isExporting ? "Exportando…" : "Exportar PDF"}
             </button>
+            <WhatsAppShareButton
+              onShare={(phone) => shareWhatsApp(phone)}
+              prefilledPhone={clientPhone}
+              disabled={!results}
+              isLoading={isExporting}
+            />
           </div>
           {savedId && (
             <Link to="/historico" className="flex items-center justify-center gap-1.5 text-xs text-primary font-semibold">
@@ -379,36 +467,103 @@ function MetaPatrimonialPage() {
           )}
 
           {/* Relatório PDF */}
-          <div ref={reportRef} style={{ position: "absolute", left: "-9999px", top: 0, width: "800px", padding: "32px", background: "#fff", color: "#111", fontFamily: "sans-serif" }}>
-            <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>🏆 Meta Patrimonial</h1>
-            <p style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>Plano patrimonial reverso via consórcio imobiliário</p>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <tbody>
-                {[
-                  ["Nº de cotas", String(results.numCotas)],
-                  ["Patrimônio total final", fmtBRL(results.patrimonioTotalFinal)],
-                  ["Renda passiva mensal", fmtBRL(results.rendaMensalFinalR)],
-                  ["Investimento mensal total (pico)", fmtBRL(results.investimentoMensalTotal)],
-                  ["Total investido", fmtBRL(results.totalInvestido)],
-                  ["CDB (mesmo aporte)", fmtBRL(results.cdbFinal)],
-                  ["Vantagem vs. CDB", fmtBRL(results.vantageVsCDB)],
-                ].map(([l, v]) => (
-                  <tr key={l} style={{ borderBottom: "1px solid #eee" }}>
-                    <td style={{ padding: "6px 8px", color: "#555" }}>{l}</td>
-                    <td style={{ padding: "6px 8px", fontWeight: 700, textAlign: "right" }}>{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {results.cotas.map((c) => (
-              <div key={c.numero} style={{ marginTop: 16, padding: "12px", background: "#f9f9f9", borderRadius: 8 }}>
-                <p style={{ fontWeight: 700, marginBottom: 8 }}>Cota {c.numero} — contemplada mês {c.mesContemplacaoAbsoluto}</p>
-                <p style={{ fontSize: 11 }}>Carta: {fmtBRL(c.valorCarta)} | Parcela: {fmtBRL(c.parcelaMensal)}/mês | Lance: {fmtBRL(c.lanceR)} | Imóvel final: {fmtBRL(c.valorImovelFinal)}</p>
-              </div>
-            ))}
+          <div ref={reportRef} style={{ display: "none" }}>
+            <PDFMeta r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
           </div>
         </>
       )}
     </div>
+  );
+}
+
+// ─── PDF Component ────────────────────────────────────────────────────────────
+function PDFMeta({ r, inputs, clientName }: {
+  r: MetaPatrimonialResults | null;
+  inputs: {
+    modo: ModoMeta;
+    patrimonioAlvoR: number;
+    rendaMensalAlvoR: number;
+    horizonteAnos: number;
+    valorizacaoAnual: number;
+    cdiAnual: number;
+    taxaAdmConsorcio: number;
+    prazoConsorcio: number;
+    percLance: number;
+    regimeTributario: RegimeTributario;
+    aliquotaEfetiva: number;
+    [key: string]: unknown;
+  };
+  clientName?: string;
+}) {
+  if (!r) return null;
+  const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+
+  return (
+    <PdfPage>
+      <PdfHeader
+        title="Meta Patrimonial"
+        subtitle="Plano de Aquisição de Patrimônio via Consórcio — Cálculo Reverso"
+        clientName={clientName}
+        date={hoje}
+      />
+      <PdfPremises items={[
+        ["Modo", inputs.modo === "patrimonio" ? "Patrimônio" : "Renda Passiva"],
+        ["Meta", inputs.modo === "patrimonio" ? fmtBRL(inputs.patrimonioAlvoR) : `${fmtBRL(inputs.rendaMensalAlvoR)}/mês`],
+        ["Horizonte", `${inputs.horizonteAnos} anos`],
+        ["Nº de cotas", String(r.numCotas)],
+        ["Taxa de adm.", `${inputs.taxaAdmConsorcio}%`],
+        ["Prazo do grupo", `${inputs.prazoConsorcio} meses`],
+        ["Lance próprio", `${inputs.percLance}%`],
+        ["Valorização", `${inputs.valorizacaoAnual}% a.a.`],
+      ]} />
+
+      <PdfSection title="Resultado do Plano Patrimonial" description="O que o consórcio entrega ao final do horizonte planejado:">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+          <PdfMetric label="Nº de cotas necessárias" value={`${r.numCotas} cotas`} description="Quantidade de consórcios para atingir a meta" color={C.navy} />
+          <PdfMetric label="Patrimônio total final" value={fmtBRL(r.patrimonioTotalFinal)} description="Soma do valor de mercado de todos os imóveis" color={C.green} />
+          <PdfMetric label="Renda passiva mensal" value={fmtBRL(r.rendaMensalFinalR)} description="Aluguel potencial com yield aplicado sobre o patrimônio" color={C.green} />
+          <PdfMetric label="Investimento mensal (pico)" value={fmtBRL(r.investimentoMensalTotal)} description="Maior desembolso simultâneo de parcelas" color={C.amber} />
+        </div>
+      </PdfSection>
+
+      <PdfInsight
+        emoji="🏆"
+        title="Por que consórcio para construir patrimônio?"
+        body={`Com ${r.numCotas} cotas de consórcio ao longo de ${inputs.horizonteAnos} anos, você constrói um patrimônio de ${fmtBRL(r.patrimonioTotalFinal)} — contra ${fmtBRL(r.cdbFinal)} que o mesmo capital renderia no CDB. Vantagem patrimonial: ${fmtBRL(r.vantageVsCDB)}. O consórcio combina alavancagem imobiliária (você controla imóveis de valor total maior que o desembolso) com valorização real do ativo.`}
+        variant="primary"
+      />
+
+      <PdfSection title="Comparativo: Consórcio vs. CDB" description="O que acontece com o mesmo dinheiro aplicado em renda fixa:">
+        <PdfKVList rows={[
+          { label: "Total investido no plano", value: fmtBRL(r.totalInvestido) },
+          { label: "Patrimônio final — consórcio", value: fmtBRL(r.patrimonioTotalFinal), color: C.green },
+          { label: `Retorno CDB (${inputs.cdiAnual}% a.a.)`, value: fmtBRL(r.cdbFinal), color: C.red },
+          { label: "Vantagem patrimonial vs. CDB", value: fmtBRL(r.vantageVsCDB), color: r.vantageVsCDB > 0 ? C.green : C.red },
+          { label: "Renda passiva mensal potencial", value: fmtBRL(r.rendaMensalFinalR), color: C.green },
+        ]} />
+      </PdfSection>
+
+      {inputs.regimeTributario !== "nenhum" && r.economiaFiscalTotal > 0 && (
+        <PdfSection title="Benefício Fiscal PJ" description={`Regime ${inputs.regimeTributario} — parcelas dedutíveis como despesa operacional`}>
+          <PdfKVList rows={[
+            { label: "Economia fiscal total", value: fmtBRL(r.economiaFiscalTotal), color: C.green },
+            { label: "Custo real da operação (pós fiscal)", value: fmtBRL(r.custoRealTotal), color: C.navy },
+            { label: "Retorno líquido de impostos", value: fmtBRL(r.patrimonioTotalFinal - r.custoRealTotal), color: C.green },
+          ]} />
+        </PdfSection>
+      )}
+
+      <PdfSection title="Plano de Cotas" description="Cada cota e seu resultado esperado:">
+        {r.cotas.map((c) => (
+          <div key={c.numero} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11 }}>
+            <span style={{ color: C.textSub, flex: 1 }}>Cota {c.numero} — Mês {c.mesContemplacaoAbsoluto}</span>
+            <span style={{ color: C.navy, width: 120, textAlign: "right" as const }}>{fmtBRL(c.valorCarta)}</span>
+            <span style={{ color: C.green, width: 120, textAlign: "right" as const }}>{fmtBRL(c.valorImovelFinal)}</span>
+          </div>
+        ))}
+      </PdfSection>
+
+      <PdfFooter />
+    </PdfPage>
   );
 }

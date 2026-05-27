@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+import { usePdfExport } from "@/hooks/usePdfExport";
 import {
   calcSaidaFinanciamento,
   defaultSaidaInputs,
   type SaidaFinanciamentoResults,
+  type TipoAbatimento,
 } from "@/lib/calc-saida-financiamento";
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,8 @@ import {
   BookOpen,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
+import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -112,6 +115,7 @@ function SaidaFinanciamentoPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const reportRef = useRef<HTMLDivElement>(null);
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "saida-financiamento.pdf");
 
   // Financiamento atual
   const [valorImovel, setValorImovel] = useState(maskMoney(String(defaultSaidaInputs.valorImovelAtual * 100)));
@@ -125,21 +129,49 @@ function SaidaFinanciamentoPage() {
   const [taxaAdm, setTaxaAdm] = useState(maskPercent(String(defaultSaidaInputs.taxaAdmConsorcio * 100)));
   const [prazoConsorcio, setPrazoConsorcio] = useState(String(defaultSaidaInputs.prazoConsorcio));
   const [percLance, setPercLance] = useState(String(defaultSaidaInputs.percLance));
+  const [percLanceEmb, setPercLanceEmb] = useState(String(defaultSaidaInputs.percLanceEmb));
+  const [tipoAbatimento, setTipoAbatimento] = useState<TipoAbatimento>(defaultSaidaInputs.tipoAbatimento);
   const [mesContemplacao, setMesContemplacao] = useState(String(defaultSaidaInputs.mesContemplacaoConsorcio));
 
   // Premissas
   const [valorizacao, setValorizacao] = useState(maskPercent(String(defaultSaidaInputs.valorizacaoAnual * 100)));
   const [custosVenda, setCustosVenda] = useState(maskPercent(String(defaultSaidaInputs.custosVenda * 100)));
 
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [results, setResults] = useState<SaidaFinanciamentoResults | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  // Restore inputs from sessionStorage on mount
+  useEffect(() => {
+    const saved = sessionStorage.getItem("sf-inputs");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved);
+      if (s.valorImovel) setValorImovel(s.valorImovel);
+      if (s.saldoDevedor) setSaldoDevedor(s.saldoDevedor);
+      if (s.parcelaAtual) setParcelaAtual(s.parcelaAtual);
+      if (s.prazoRestante) setPrazoRestante(s.prazoRestante);
+      if (s.taxaJuros) setTaxaJuros(s.taxaJuros);
+      if (s.cartaConsorcio) setCartaConsorcio(s.cartaConsorcio);
+      if (s.taxaAdm) setTaxaAdm(s.taxaAdm);
+      if (s.prazoConsorcio) setPrazoConsorcio(s.prazoConsorcio);
+      if (s.percLance) setPercLance(s.percLance);
+      if (s.percLanceEmb) setPercLanceEmb(s.percLanceEmb);
+      if (s.tipoAbatimento) setTipoAbatimento(s.tipoAbatimento);
+      if (s.mesContemplacao) setMesContemplacao(s.mesContemplacao);
+      if (s.valorizacao) setValorizacao(s.valorizacao);
+      if (s.custosVenda) setCustosVenda(s.custosVenda);
+    } catch {}
+  }, []);
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const clientPhone = selectedClient?.phone ?? "";
+
   useEffect(() => {
     if (!user) return;
-    supabase.from("clients").select("id, name").eq("user_id", user.id).order("name")
+    supabase.from("clients").select("id, name, phone").eq("user_id", user.id).order("name")
       .then(({ data }) => setClients(data ?? []));
   }, [user]);
 
@@ -180,12 +212,22 @@ function SaidaFinanciamentoPage() {
     taxaAdmConsorcio: unmask(taxaAdm),
     prazoConsorcio: parseInt(prazoConsorcio || "0", 10) || 0,
     percLance: parseInt(percLance || "0", 10) || 0,
+    percLanceEmb: parseInt(percLanceEmb || "0", 10) || 0,
     mesContemplacaoConsorcio: parseInt(mesContemplacao || "0", 10) || 0,
+    tipoAbatimento,
     valorizacaoAnual: unmask(valorizacao),
     custosVenda: unmask(custosVenda),
-  }), [valorImovel, saldoDevedor, parcelaAtual, prazoRestante, taxaJuros, cartaConsorcio, taxaAdm, prazoConsorcio, percLance, mesContemplacao, valorizacao, custosVenda]);
+  }), [valorImovel, saldoDevedor, parcelaAtual, prazoRestante, taxaJuros, cartaConsorcio, taxaAdm, prazoConsorcio, percLance, percLanceEmb, mesContemplacao, tipoAbatimento, valorizacao, custosVenda]);
 
-  const calcular = () => { setResults(calcSaidaFinanciamento(inputs)); setSavedId(null); };
+  const calcular = () => {
+    setResults(calcSaidaFinanciamento(inputs));
+    setSavedId(null);
+    sessionStorage.setItem("sf-inputs", JSON.stringify({
+      valorImovel, saldoDevedor, parcelaAtual, prazoRestante, taxaJuros,
+      cartaConsorcio, taxaAdm, prazoConsorcio, percLance, percLanceEmb,
+      tipoAbatimento, mesContemplacao, valorizacao, custosVenda,
+    }));
+  };
 
   const salvar = async () => {
     if (!results || !user) return;
@@ -210,15 +252,6 @@ function SaidaFinanciamentoPage() {
     } finally { setSaving(false); }
   };
 
-  const exportPDF = async () => {
-    if (!reportRef.current) return;
-    await html2pdf().set({
-      margin: 8, filename: "saida-financiamento.pdf",
-      image: { type: "jpeg", quality: 0.96 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    }).from(reportRef.current).save();
-  };
 
   const applyTemplate = (p: TemplatePayload) => {
     if (p.valorImovelAtual) setValorImovel(p.valorImovelAtual);
@@ -316,10 +349,22 @@ function SaidaFinanciamentoPage() {
           <NumInput label="Carta de crédito (R$)" value={cartaConsorcio} onChange={setCartaConsorcio} type="money" />
           <NumInput label="Taxa de administração (%)" value={taxaAdm} onChange={setTaxaAdm} type="percent" />
           <NumInput label="Prazo do grupo (meses)" value={prazoConsorcio} onChange={setPrazoConsorcio} type="int" />
-          <NumInput label="Lance ofertado (%)" value={percLance} onChange={setPercLance} type="int" hint="% da carta usado como lance" />
+          <NumInput label="Lance próprio — % da carta" value={percLance} onChange={setPercLance} type="int" hint="Capital da venda usado como lance (% da carta)" />
+          <NumInput label="Lance embutido — % da carta" value={percLanceEmb} onChange={setPercLanceEmb} type="int" hint="Sai do crédito recebido — não do bolso" />
           <NumInput label="Mês de contemplação" value={mesContemplacao} onChange={setMesContemplacao} type="int" />
           <NumInput label="Valorização anual (%)" value={valorizacao} onChange={setValorizacao} type="percent" />
         </Grid2>
+        <div>
+          <p className="mb-2 text-xs font-semibold text-foreground/70">Lance abate:</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["parcela", "prazo"] as TipoAbatimento[]).map((t) => (
+              <button key={t} onClick={() => setTipoAbatimento(t)}
+                className={`rounded-xl py-2.5 text-sm font-bold transition-colors ${tipoAbatimento === t ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground hover:bg-accent"}`}>
+                {t === "parcela" ? "💸 Parcela (mantém prazo)" : "⏱ Prazo (mantém parcela)"}
+              </button>
+            ))}
+          </div>
+        </div>
       </Section>
 
       <button onClick={calcular}
@@ -335,10 +380,23 @@ function SaidaFinanciamentoPage() {
             <div className="grid gap-3 sm:grid-cols-3">
               <KPI icon={Home} label="Capital líquido da venda" value={fmtBRL(results.capitalLiquidoVenda)}
                 sub="Após pagar banco e custos" variant="primary" />
-              <KPI icon={Wallet} label="Lance no consórcio" value={fmtBRL(results.lanceEmReaisConsorcio)}
+              <KPI icon={Wallet} label="Lance próprio (da venda)" value={fmtBRL(results.lanceProprioR)}
                 sub={`${inputs.percLance}% da carta`} variant="primary" />
               <KPI icon={TrendingUp} label="Capital que sobra" value={fmtBRL(results.sobra)}
-                sub="Reserva de caixa" variant="success" />
+                sub="Reserva de caixa após o lance" variant="success" />
+            </div>
+          </Section>
+
+          {/* Resumo pós-contemplação */}
+          <Section title="Resumo Pós-Contemplação">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <KPI icon={Home} label="Crédito disponível" value={fmtBRL(results.creditoLiquido)}
+                sub={results.lanceEmbR > 0 ? `Carta − lance embutido ${fmtBRL(results.lanceEmbR)}` : "Carta cheia disponível"}
+                variant="success" />
+              <KPI icon={Wallet} label="Saldo devedor residual" value={fmtBRL(results.lanceEmReaisConsorcio > 0 || results.lanceEmbR > 0 ? Math.max(inputs.cartaConsorcio - results.lanceEmReaisConsorcio - results.lanceEmbR, 0) : inputs.cartaConsorcio)}
+                sub="Parcelas restantes a pagar" variant="default" />
+              <KPI icon={ArrowRight} label="Prazo restante" value={`${results.prazoPosFinal} meses`}
+                sub={inputs.tipoAbatimento === "prazo" ? "Prazo reduzido pelo lance" : "Prazo original mantido"} variant="default" />
             </div>
           </Section>
 
@@ -390,15 +448,21 @@ function SaidaFinanciamentoPage() {
           )}
 
           {/* Ações */}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button onClick={salvar} disabled={saving || !!savedId}
               className="flex-1 rounded-2xl border border-border bg-card py-3 text-sm font-bold text-foreground transition-colors hover:bg-accent disabled:opacity-50">
               {saving ? "Salvando…" : savedId ? "✓ Salvo" : "Salvar Simulação"}
             </button>
-            <button onClick={exportPDF}
-              className="flex-1 rounded-2xl bg-primary py-3 text-sm font-extrabold text-primary-foreground transition-opacity hover:opacity-90">
-              Exportar PDF
+            <button onClick={exportPDF} disabled={isExporting}
+              className="flex-1 rounded-2xl bg-primary py-3 text-sm font-extrabold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+              {isExporting ? "Exportando…" : "Exportar PDF"}
             </button>
+            <WhatsAppShareButton
+              onShare={(phone) => shareWhatsApp(phone)}
+              prefilledPhone={clientPhone}
+              disabled={!results}
+              isLoading={isExporting}
+            />
           </div>
           {savedId && (
             <Link to="/historico" className="flex items-center justify-center gap-1.5 text-xs text-primary font-semibold">
@@ -407,34 +471,87 @@ function SaidaFinanciamentoPage() {
           )}
 
           {/* Relatório oculto para PDF */}
-          <div ref={reportRef} style={{ position: "absolute", left: "-9999px", top: 0, width: "800px", padding: "32px", background: "#fff", color: "#111", fontFamily: "sans-serif" }}>
-            <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>🔴 Saída do Financiamento</h1>
-            <p style={{ fontSize: 12, color: "#666", marginBottom: 24 }}>Simulação de migração do financiamento bancário para consórcio</p>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <tbody>
-                {[
-                  ["Capital líquido da venda", fmtBRL(results.capitalLiquidoVenda)],
-                  ["Lance no consórcio", fmtBRL(results.lanceEmReaisConsorcio)],
-                  ["Capital restante (sobra)", fmtBRL(results.sobra)],
-                  ["Parcela atual — financiamento", fmtBRL(inputs.parcelaAtual)],
-                  ["Parcela pós-lance — consórcio", fmtBRL(results.parcelaPosLance)],
-                  ["Economia mensal", fmtBRL(results.economiaParcelaMensal)],
-                  ["Total restante financiamento", fmtBRL(results.totalRestanteFin)],
-                  ["Total consórcio", fmtBRL(results.totalConsorcio)],
-                  ["Economia total", fmtBRL(results.economiaTotalCusto)],
-                  ["Patrimônio final — financiamento", fmtBRL(results.patrimonioFinalFin)],
-                  ["Patrimônio final — consórcio", fmtBRL(results.patrimonioFinalCons)],
-                ].map(([l, v]) => (
-                  <tr key={l} style={{ borderBottom: "1px solid #eee" }}>
-                    <td style={{ padding: "6px 8px", color: "#555" }}>{l}</td>
-                    <td style={{ padding: "6px 8px", fontWeight: 700, textAlign: "right" }}>{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div ref={reportRef} style={{ display: "none" }}>
+            <PDFSaida r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
           </div>
         </>
       )}
     </div>
+  );
+}
+
+// ─── PDF Component ────────────────────────────────────────────────────────────
+function PDFSaida({ r, inputs, clientName }: {
+  r: SaidaFinanciamentoResults | null;
+  inputs: {
+    valorImovelAtual: number;
+    saldoDevedor: number;
+    parcelaAtual: number;
+    prazoRestanteMeses: number;
+    cartaConsorcio: number;
+    taxaAdmConsorcio: number;
+    prazoConsorcio: number;
+    percLance: number;
+    mesContemplacaoConsorcio: number;
+    valorizacaoAnual: number;
+    [key: string]: unknown;
+  };
+  clientName?: string;
+}) {
+  if (!r) return null;
+  const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+
+  return (
+    <PdfPage>
+      <PdfHeader
+        title="Saída do Financiamento"
+        subtitle="Migração do Financiamento Bancário para Consórcio — Análise de Viabilidade"
+        clientName={clientName}
+        date={hoje}
+      />
+      <PdfPremises items={[
+        ["Valor do imóvel", fmtBRL(inputs.valorImovelAtual)],
+        ["Saldo devedor", fmtBRL(inputs.saldoDevedor)],
+        ["Parcela atual", fmtBRL(inputs.parcelaAtual)],
+        ["Prazo restante", `${inputs.prazoRestanteMeses} meses`],
+        ["Carta de crédito", fmtBRL(inputs.cartaConsorcio)],
+        ["Taxa de adm.", `${inputs.taxaAdmConsorcio}%`],
+        ["Lance próprio", `${inputs.percLance}%`],
+        ["Contemplação", `Mês ${inputs.mesContemplacaoConsorcio}`],
+      ]} />
+
+      <PdfSection title="Resultado da Migração" description="O que acontece quando você vende o imóvel financiado e migra para o consórcio:">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+          <PdfMetric label="Capital líquido da venda" value={fmtBRL(r.capitalLiquidoVenda)} description="Após pagar o banco e custos de venda" color={C.navy} />
+          <PdfMetric label="Parcela pós-lance (consórcio)" value={fmtBRL(r.parcelaPosLance)} description={`vs. financiamento: ${fmtBRL(inputs.parcelaAtual)}`} color={C.green} />
+          <PdfMetric label="Economia mensal" value={fmtBRL(r.economiaParcelaMensal)} description="Diferença de parcela por mês após contemplação" color={r.economiaParcelaMensal > 0 ? C.green : C.red} />
+          <PdfMetric label="Vantagem total" value={fmtBRL(r.economiaTotalCusto)} description="Economia total vs. manter o financiamento" color={C.green} />
+        </div>
+      </PdfSection>
+
+      <PdfInsight
+        emoji="🔄"
+        title="Por que sair do financiamento?"
+        body={`Você vende o imóvel financiado, quita o banco (${fmtBRL(inputs.saldoDevedor)}), e usa o capital líquido de ${fmtBRL(r.capitalLiquidoVenda)} como lance no consórcio. A partir da contemplação no mês ${inputs.mesContemplacaoConsorcio}, sua parcela cai de ${fmtBRL(inputs.parcelaAtual)} para ${fmtBRL(r.parcelaPosLance)} — economizando ${fmtBRL(r.economiaParcelaMensal)}/mês. No total, a operação economiza ${fmtBRL(r.economiaTotalCusto)} comparado a manter o financiamento.`}
+        variant="primary"
+      />
+
+      <PdfSection title="Comparativo: Financiamento vs. Consórcio" description="Dois caminhos, resultados completamente diferentes:">
+        <PdfKVList rows={[
+          { label: "Parcela atual — financiamento", value: fmtBRL(inputs.parcelaAtual), color: C.red },
+          { label: "Parcela pós-lance — consórcio", value: fmtBRL(r.parcelaPosLance), color: C.green },
+          { label: "Economia mensal de parcela", value: fmtBRL(r.economiaParcelaMensal), color: C.green },
+          { label: "Total a pagar — financiamento", value: fmtBRL(r.totalRestanteFin), color: C.red },
+          { label: "Total — consórcio", value: fmtBRL(r.totalConsorcio), color: C.navy },
+          { label: "Vantagem total do consórcio", value: fmtBRL(r.economiaTotalCusto), color: C.green },
+          { label: "Patrimônio final — financiamento", value: fmtBRL(r.patrimonioFinalFin), color: C.navy },
+          { label: "Patrimônio final — consórcio", value: fmtBRL(r.patrimonioFinalCons), color: C.green },
+          { label: "Capital que sobra após o lance", value: fmtBRL(r.sobra), color: C.navy },
+          { label: "Crédito disponível após contemplação", value: fmtBRL(r.creditoLiquido), color: C.green },
+        ]} />
+      </PdfSection>
+
+      <PdfFooter />
+    </PdfPage>
   );
 }

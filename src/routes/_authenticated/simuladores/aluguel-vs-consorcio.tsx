@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+import { usePdfExport } from "@/hooks/usePdfExport";
 import {
   calcAluguelVsConsorcio,
   defaultAluguelInputs,
@@ -20,6 +20,8 @@ import {
 import { Line } from "react-chartjs-2";
 import { ArrowLeft, Home, TrendingUp, Scale, Clock, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
+import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -112,6 +114,7 @@ function AluguelVsConsorcioPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const reportRef = useRef<HTMLDivElement>(null);
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "Aluguel_vs_Consorcio.pdf");
 
   const [aluguel, setAluguel] = useState(maskMoney(String(defaultAluguelInputs.aluguelAtual * 100)));
   const [reajuste, setReajuste] = useState(maskPercent(String(defaultAluguelInputs.reajusteAluguelAnual * 100)));
@@ -123,16 +126,40 @@ function AluguelVsConsorcioPage() {
   const [lanceProprioR, setLanceProprioR] = useState(maskMoney("0"));
   const [mesContemp, setMesContemp] = useState(String(defaultAluguelInputs.mesContemplacao));
   const [valorizacao, setValorizacao] = useState(maskPercent(String(defaultAluguelInputs.valorizacaoAnual * 100)));
+  const [taxaAtualiz, setTaxaAtualiz] = useState(String(defaultAluguelInputs.taxaAtualizacaoAnual));
 
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [results, setResults] = useState<AluguelResults | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  // ── Restore sessionStorage on mount ─────────────────────────────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem("avc-inputs");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved);
+      if (s.aluguel) setAluguel(s.aluguel);
+      if (s.reajuste) setReajuste(s.reajuste);
+      if (s.horizonte) setHorizonte(s.horizonte);
+      if (s.carta) setCarta(s.carta);
+      if (s.taxaAdm) setTaxaAdm(s.taxaAdm);
+      if (s.prazo) setPrazo(s.prazo);
+      if (s.percLance) setPercLance(s.percLance);
+      if (s.lanceProprioR) setLanceProprioR(s.lanceProprioR);
+      if (s.mesContemp) setMesContemp(s.mesContemp);
+      if (s.valorizacao) setValorizacao(s.valorizacao);
+      if (s.taxaAtualiz) setTaxaAtualiz(s.taxaAtualiz);
+    } catch {}
+  }, []);
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const clientPhone = selectedClient?.phone ?? "";
+
   useEffect(() => {
     if (!user) return;
-    supabase.from("clients").select("id, name").eq("user_id", user.id).order("name")
+    supabase.from("clients").select("id, name, phone").eq("user_id", user.id).order("name")
       .then(({ data }) => setClients(data ?? []));
   }, [user]);
 
@@ -172,11 +199,16 @@ function AluguelVsConsorcioPage() {
     lanceProprioR: unmask(lanceProprioR),
     mesContemplacao: parseInt(mesContemp || "0", 10) || 1,
     valorizacaoAnual: unmask(valorizacao),
-  }), [aluguel, reajuste, horizonte, carta, taxaAdm, prazo, percLance, lanceProprioR, mesContemp, valorizacao]);
+    taxaAtualizacaoAnual: parseFloat(taxaAtualiz || "0") || 0,
+  }), [aluguel, reajuste, horizonte, carta, taxaAdm, prazo, percLance, lanceProprioR, mesContemp, valorizacao, taxaAtualiz]);
 
   const calcular = () => {
     setResults(calcAluguelVsConsorcio(inputs));
     setSavedId(null);
+    sessionStorage.setItem("avc-inputs", JSON.stringify({
+      aluguel, reajuste, horizonte, carta, taxaAdm, prazo,
+      percLance, lanceProprioR, mesContemp, valorizacao, taxaAtualiz,
+    }));
   };
 
   const applyTemplate = (p: TemplatePayload) => {
@@ -221,27 +253,6 @@ function AluguelVsConsorcioPage() {
     }
   };
 
-  const exportPDF = async () => {
-    if (!results) { toast.error("Calcule primeiro."); return; }
-    if (!reportRef.current) return;
-    try {
-      reportRef.current.style.display = "block";
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      );
-      await html2pdf().set({
-        margin: 10,
-        filename: "Aluguel_vs_Consorcio.pdf",
-        image: { type: "jpeg", quality: 1 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      }).from(reportRef.current).save();
-    } catch (e: unknown) {
-      toast.error((e as Error).message || "Erro ao exportar PDF.");
-    } finally {
-      if (reportRef.current) reportRef.current.style.display = "none";
-    }
-  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -288,7 +299,10 @@ function AluguelVsConsorcioPage() {
       </Section>
 
       <Section title="Premissas de Valorização" accent>
-        <NumInput label="Valorização Anual do Imóvel (%)" value={valorizacao} onChange={setValorizacao} type="percent" hint="Média histórica: 5-8% a.a." />
+        <Grid2>
+          <NumInput label="Valorização Anual do Imóvel (%)" value={valorizacao} onChange={setValorizacao} type="percent" hint="Média histórica: 5-8% a.a." />
+          <NumInput label="Correção da Carta (INCC % a.a.)" value={taxaAtualiz} onChange={setTaxaAtualiz} type="int" hint="Atualização anual da carta pelo INCC — padrão 4%" />
+        </Grid2>
       </Section>
 
       <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4">
@@ -309,7 +323,7 @@ function AluguelVsConsorcioPage() {
             </Select>
           </div>
         </div>
-        <div className="grid gap-2.5 sm:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-4">
           <button onClick={calcular}
             className="rounded-xl bg-primary px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-primary-foreground shadow-elegant active:scale-[0.98] hover:opacity-95 transition-all">
             Comparar Cenários
@@ -318,10 +332,16 @@ function AluguelVsConsorcioPage() {
             className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide active:scale-[0.98] hover:bg-accent disabled:opacity-40 transition-all">
             {saving ? "Salvando…" : "Salvar"}
           </button>
-          <button onClick={exportPDF} disabled={!results}
+          <button onClick={exportPDF} disabled={!results || isExporting}
             className="rounded-xl bg-success px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-success-foreground active:scale-[0.98] hover:opacity-95 disabled:opacity-40 transition-all">
-            Exportar PDF
+            {isExporting ? "Exportando…" : "Exportar PDF"}
           </button>
+          <WhatsAppShareButton
+            onShare={(phone) => shareWhatsApp(phone)}
+            prefilledPhone={clientPhone}
+            disabled={!results}
+            isLoading={isExporting}
+          />
         </div>
         {savedId && (
           <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm">
@@ -472,82 +492,79 @@ function PDFAluguel({ r, inputs, clientName }: {
 }) {
   if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  const anosHorizonte = inputs.horizonte;
 
   return (
-    <div style={{ padding: "16mm 18mm", width: "210mm", fontFamily: "'Inter', 'Helvetica Neue', sans-serif", color: "#2f3640", background: "#fff", boxSizing: "border-box" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #1a2a6c", paddingBottom: 12, marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 20, color: "#1a2a6c", fontWeight: 900 }}>⚖️ Aluguel vs Consórcio</div>
-          <div style={{ fontSize: 10, color: "#7f8c8d", fontWeight: 700, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.1em" }}>Análise Comparativa de Patrimônio</div>
-        </div>
-        <div style={{ textAlign: "right", fontSize: 10, color: "#7f8c8d" }}>
-          <div style={{ fontWeight: 800, color: "#c0392b", fontSize: 11 }}>CONFIDENCIAL</div>
-          <div style={{ marginTop: 3 }}>{hoje}</div>
-          {clientName && <div style={{ marginTop: 4, background: "#1a2a6c", color: "#fff", padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>Cliente: {clientName}</div>}
-        </div>
-      </div>
+    <PdfPage>
+      <PdfHeader
+        title="Aluguel vs. Consórcio"
+        subtitle="Análise Patrimonial — O Custo Real de Continuar Alugando"
+        clientName={clientName}
+        date={hoje}
+      />
+      <PdfPremises items={[
+        ["Aluguel atual", fmtBRL(inputs.aluguelAtual)],
+        ["Reajuste anual", `${inputs.reajusteAluguelAnual}%`],
+        ["Horizonte de análise", `${anosHorizonte} anos`],
+        ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
+        ["Taxa de adm.", `${inputs.taxaAdmTotal}%`],
+        ["Prazo do grupo", `${inputs.prazoMeses} meses`],
+        ["Lance ofertado", `${inputs.percLance}%`],
+        ["Contempl. prevista", `Mês ${inputs.mesContemplacao}`],
+      ]} />
 
-      {/* Headline */}
-      <div style={{ background: "#fdecea", border: "2px solid #e74c3c", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
-        <div style={{ fontSize: 14, color: "#c0392b", fontWeight: 800 }}>
-          Em {inputs.horizonte} anos pagando aluguel: {fmtBRL(r.totalAluguel)} gastos. Patrimônio: R$ 0,00.
+      <PdfSection title="O Veredicto em Números" description="Em exatamente o mesmo período de tempo — pagando aluguel ou construindo patrimônio:">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <PdfMetric
+            label={`Total gasto no aluguel (${anosHorizonte} anos)`}
+            value={fmtBRL(r.totalAluguel)}
+            description="Valor desembolsado sem gerar nenhum ativo. Patrimônio final: R$ 0,00."
+            color={C.red}
+          />
+          <PdfMetric
+            label="Total pago no consórcio"
+            value={fmtBRL(r.totalConsorcio)}
+            description={`Incluindo parcelas e lance. Patrimônio final: ${fmtBRL(r.valorImovelFinal)}`}
+            color={C.navy}
+          />
+          <PdfMetric
+            label="Diferença patrimonial"
+            value={fmtBRL(r.vantagemPatrimonial)}
+            description={`Vantagem real de escolher o consórcio em vez de continuar alugando`}
+            color={C.green}
+          />
         </div>
-      </div>
+      </PdfSection>
 
-      {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
-        {[
-          ["Total aluguel", fmtBRL(r.totalAluguel), "#c0392b"],
-          ["Total consórcio", fmtBRL(r.totalConsorcio), "#1a2a6c"],
-          ["Imóvel no futuro", fmtBRL(r.valorImovelFinal), "#27ae60"],
-          ["Vantagem patrimonial", fmtBRL(r.vantagemPatrimonial), "#27ae60"],
-        ].map(([l, v, c]) => (
-          <div key={l as string} style={{ padding: "12px 14px", borderRadius: 8, background: c as string, color: "#fff" }}>
-            <div style={{ fontSize: 8.5, opacity: 0.85, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>{l as string}</div>
-            <div style={{ fontSize: 14, fontWeight: 900, marginTop: 5 }}>{v as string}</div>
-          </div>
-        ))}
-      </div>
+      <PdfInsight
+        emoji="🏠"
+        title={`Em ${anosHorizonte} anos de aluguel: ${fmtBRL(r.totalAluguel)} pagos. Patrimônio: R$ 0,00.`}
+        body={`Cada mês de aluguel pago é dinheiro que vai embora — sem construir ativo, sem valorização, sem herança. No mesmo período, com o consórcio, você paga ${fmtBRL(r.totalConsorcio)} e tem um imóvel avaliado em ${fmtBRL(r.valorImovelFinal)}. A diferença patrimonial é de ${fmtBRL(r.vantagemPatrimonial)}. Não é uma questão de opinião — é matemática.`}
+        variant="primary"
+      />
 
-      {/* Premissas */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10 }}>Premissas</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7 }}>
-          {[
-            ["Aluguel Atual", fmtBRL(inputs.aluguelAtual) + "/mês"],
-            ["Reajuste Anual", `${inputs.reajusteAluguelAnual}%`],
-            ["Horizonte", `${inputs.horizonte} anos`],
-            ["Carta de Crédito", fmtBRL(inputs.cartaCredito)],
-            ["Taxa Adm.", `${inputs.taxaAdmTotal}%`],
-            ["Prazo", `${inputs.prazoMeses} meses`],
-            ["Lance", `${inputs.percLance}%`],
-            ["Valorização", `${inputs.valorizacaoAnual}% a.a.`],
-          ].map(([l, v]) => (
-            <div key={l} style={{ background: "#f7f8fc", padding: "6px 8px", borderRadius: 5, borderLeft: "3px solid #1a2a6c" }}>
-              <div style={{ fontSize: 8.5, color: "#7f8c8d", fontWeight: 700, textTransform: "uppercase" }}>{l}</div>
-              <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2 }}>{v}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <PdfSection title="Análise Mês a Mês" description="Como a decisão impacta seu patrimônio ao longo do tempo:">
+        <PdfKVList rows={[
+          { label: "Aluguel atual (mês 1)", value: fmtBRL(inputs.aluguelAtual) },
+          { label: `Aluguel projetado (mês ${anosHorizonte * 12})`, value: fmtBRL(inputs.aluguelAtual * Math.pow(1 + inputs.reajusteAluguelAnual / 100, anosHorizonte)), color: C.red },
+          { label: "Parcela do consórcio (pré-contempl.)", value: fmtBRL(r.parcelaPadrao) },
+          { label: `Contemplação prevista`, value: `Mês ${inputs.mesContemplacao}`, color: C.navy },
+          { label: "Parcela após contemplação (pós-lance)", value: fmtBRL(r.parcelaPosLance) },
+          { label: "Valor do imóvel hoje", value: fmtBRL(inputs.cartaCredito), color: C.navy },
+          { label: `Valor do imóvel em ${anosHorizonte} anos (valoriz. ${inputs.valorizacaoAnual}% a.a.)`, value: fmtBRL(r.valorImovelFinal), color: C.green },
+          { label: "Riqueza acumulada com aluguel", value: "R$ 0,00", color: C.red },
+          { label: "Patrimônio acumulado com consórcio", value: fmtBRL(r.vantagemPatrimonial), color: C.green },
+        ]} />
+      </PdfSection>
 
-      {/* Comparativo */}
-      <div>
-        <div style={{ fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10 }}>Comparativo</div>
-        {[
-          ["Desembolso mensal inicial", fmtBRL(inputs.aluguelAtual), fmtBRL(r.parcelaPadrao)],
-          [`Total em ${inputs.horizonte} anos`, fmtBRL(r.totalAluguel), fmtBRL(r.totalConsorcio)],
-          ["Patrimônio gerado", fmtBRL(0), fmtBRL(r.valorImovelFinal)],
-          ["Imóvel ao final", "Não tem", fmtBRL(r.valorImovelFinal)],
-          ["VANTAGEM PATRIMONIAL", "—", fmtBRL(r.vantagemPatrimonial)],
-        ].map(([label, al, co], i) => (
-          <div key={label as string} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f0f1f5", fontSize: 11, fontWeight: i === 4 ? 800 : 400, background: i === 4 ? "#eafaf1" : "transparent" }}>
-            <span style={{ color: "#5d6d7e", flex: 1 }}>{label as string}</span>
-            <span style={{ color: "#c0392b", width: 140, textAlign: "right" }}>{al as string}</span>
-            <span style={{ color: i === 4 ? "#27ae60" : "#2f3640", width: 140, textAlign: "right", fontWeight: 700 }}>{co as string}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+      <PdfInsight
+        emoji="📊"
+        title="O aluguel certo vs. o imóvel certo"
+        body={`Você paga aluguel porque parece "mais seguro" — mas a certeza do aluguel é a certeza de não ter patrimônio. O consórcio tem uma incerteza de timing, mas a certeza do resultado: ao final de ${anosHorizonte} anos, você tem um imóvel. Com aluguel, você tem o recibo do último mês.`}
+        variant="warning"
+      />
+
+      <PdfFooter note="Valores do aluguel projetados com reajuste composto anual. Valor do imóvel projetado com valorização anual. Resultados reais podem variar conforme condições de mercado." />
+    </PdfPage>
   );
 }

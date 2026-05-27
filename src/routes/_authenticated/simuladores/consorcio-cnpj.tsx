@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+import { usePdfExport } from "@/hooks/usePdfExport";
 import {
   calcConsorcioCNPJ,
   defaultCNPJInputs,
@@ -22,6 +22,8 @@ import {
   ArrowLeft, ArrowRight, BookOpen, Building2, Coins, TrendingDown, TrendingUp,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
+import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -104,6 +106,7 @@ function ConsorcioCNPJPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const reportRef = useRef<HTMLDivElement>(null);
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "consorcio-cnpj.pdf");
 
   // Consórcio PJ
   const [cartaCredito, setCartaCredito] = useState(maskMoney(String(defaultCNPJInputs.cartaCredito * 100)));
@@ -122,15 +125,38 @@ function ConsorcioCNPJPage() {
   const [aliquotaCSLL, setAliquotaCSLL] = useState(String(defaultCNPJInputs.aliquotaCSLL));
   const [valorizacao, setValorizacao] = useState(maskPercent(String(defaultCNPJInputs.valorizacaoAnual * 100)));
 
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [results, setResults] = useState<ConsorcioCNPJResults | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  // ── Restore sessionStorage on mount ─────────────────────────────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem("cnpj-inputs");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved);
+      if (s.cartaCredito) setCartaCredito(s.cartaCredito);
+      if (s.taxaAdm) setTaxaAdm(s.taxaAdm);
+      if (s.prazoConsorcio) setPrazoConsorcio(s.prazoConsorcio);
+      if (s.percLance) setPercLance(s.percLance);
+      if (s.mesContemplacao) setMesContemplacao(s.mesContemplacao);
+      if (s.taxaJurosFin) setTaxaJurosFin(s.taxaJurosFin);
+      if (s.prazoFin) setPrazoFin(s.prazoFin);
+      if (s.regime) setRegime(s.regime);
+      if (s.aliquotaIRPJ) setAliquotaIRPJ(s.aliquotaIRPJ);
+      if (s.aliquotaCSLL) setAliquotaCSLL(s.aliquotaCSLL);
+      if (s.valorizacao) setValorizacao(s.valorizacao);
+    } catch {}
+  }, []);
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const clientPhone = selectedClient?.phone ?? "";
+
   useEffect(() => {
     if (!user) return;
-    supabase.from("clients").select("id, name").eq("user_id", user.id).order("name")
+    supabase.from("clients").select("id, name, phone").eq("user_id", user.id).order("name")
       .then(({ data }) => setClients(data ?? []));
   }, [user]);
 
@@ -153,7 +179,14 @@ function ConsorcioCNPJPage() {
     valorizacaoAnual: unmask(valorizacao),
   }), [cartaCredito, taxaAdm, prazoConsorcio, percLance, mesContemplacao, taxaJurosFin, prazoFin, regime, aliquotaIRPJ, aliquotaCSLL, valorizacao]);
 
-  const calcular = () => { setResults(calcConsorcioCNPJ(inputs)); setSavedId(null); };
+  const calcular = () => {
+    setResults(calcConsorcioCNPJ(inputs));
+    setSavedId(null);
+    sessionStorage.setItem("cnpj-inputs", JSON.stringify({
+      cartaCredito, taxaAdm, prazoConsorcio, percLance, mesContemplacao,
+      taxaJurosFin, prazoFin, regime, aliquotaIRPJ, aliquotaCSLL, valorizacao,
+    }));
+  };
 
   const salvar = async () => {
     if (!results || !user) return;
@@ -178,15 +211,6 @@ function ConsorcioCNPJPage() {
     } finally { setSaving(false); }
   };
 
-  const exportPDF = async () => {
-    if (!reportRef.current) return;
-    await html2pdf().set({
-      margin: 8, filename: "consorcio-cnpj.pdf",
-      image: { type: "jpeg", quality: 0.96 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    }).from(reportRef.current).save();
-  };
 
   const applyTemplate = (p: TemplatePayload) => {
     if (p.cartaCredito) setCartaCredito(p.cartaCredito);
@@ -377,15 +401,21 @@ function ConsorcioCNPJPage() {
           )}
 
           {/* Ações */}
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button onClick={salvar} disabled={saving || !!savedId}
               className="flex-1 rounded-2xl border border-border bg-card py-3 text-sm font-bold text-foreground transition-colors hover:bg-accent disabled:opacity-50">
               {saving ? "Salvando…" : savedId ? "✓ Salvo" : "Salvar Simulação"}
             </button>
-            <button onClick={exportPDF}
-              className="flex-1 rounded-2xl bg-primary py-3 text-sm font-extrabold text-primary-foreground transition-opacity hover:opacity-90">
-              Exportar PDF
+            <button onClick={exportPDF} disabled={isExporting}
+              className="flex-1 rounded-2xl bg-primary py-3 text-sm font-extrabold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+              {isExporting ? "Exportando…" : "Exportar PDF"}
             </button>
+            <WhatsAppShareButton
+              onShare={(phone) => shareWhatsApp(phone)}
+              prefilledPhone={clientPhone}
+              disabled={!results}
+              isLoading={isExporting}
+            />
           </div>
           {savedId && (
             <Link to="/historico" className="flex items-center justify-center gap-1.5 text-xs text-primary font-semibold">
@@ -394,35 +424,95 @@ function ConsorcioCNPJPage() {
           )}
 
           {/* Relatório PDF */}
-          <div ref={reportRef} style={{ position: "absolute", left: "-9999px", top: 0, width: "800px", padding: "32px", background: "#fff", color: "#111", fontFamily: "sans-serif" }}>
-            <h1 style={{ fontSize: 22, fontWeight: 900, marginBottom: 4 }}>🏢 Consórcio para CNPJ</h1>
-            <p style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>Benefício fiscal PJ — parcelas dedutíveis</p>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <tbody>
-                {[
-                  ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
-                  ["Parcela bruta consórcio", fmtBRL(results.parcelaBrutaConsorcio)],
-                  ["Economia fiscal mensal", fmtBRL(results.economiaFiscalMensal)],
-                  ["Parcela líquida (custo real)", fmtBRL(results.parcelaLiquidaConsorcio)],
-                  ["Total bruto consórcio", fmtBRL(results.totalBrutoConsorcio)],
-                  ["Economia fiscal total", fmtBRL(results.totalEconomiaFiscalConsorcio)],
-                  ["Custo líquido total", fmtBRL(results.totalLiquidoConsorcio)],
-                  ["Parcela financiamento PJ", fmtBRL(results.parcelaFinanciamento)],
-                  ["Total financiamento PJ", fmtBRL(results.totalFinanciamento)],
-                  ["Juros totais financiamento", fmtBRL(results.totalJurosFinanciamento)],
-                  ["Economia total vs. financiamento", fmtBRL(results.economiaTotalVsFinanciamento)],
-                  [`Percentual de economia`, `${results.percentualEconomia.toFixed(1)}%`],
-                ].map(([l, v]) => (
-                  <tr key={l} style={{ borderBottom: "1px solid #eee" }}>
-                    <td style={{ padding: "6px 8px", color: "#555" }}>{l}</td>
-                    <td style={{ padding: "6px 8px", fontWeight: 700, textAlign: "right" }}>{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div ref={reportRef} style={{ display: "none" }}>
+            <PDFCnpj r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
           </div>
         </>
       )}
     </div>
+  );
+}
+
+// ─── PDF Component ────────────────────────────────────────────────────────────
+function PDFCnpj({ r, inputs, clientName }: {
+  r: ConsorcioCNPJResults | null;
+  inputs: {
+    cartaCredito: number;
+    taxaAdmConsorcio: number;
+    prazoConsorcio: number;
+    percLance: number;
+    mesContemplacaoConsorcio: number;
+    taxaJurosMensalFin: number;
+    prazoFinanciamentoMeses: number;
+    regimeTributario: RegimeTributario;
+    aliquotaIRPJ: number;
+    aliquotaCSLL: number;
+    valorizacaoAnual: number;
+    [key: string]: unknown;
+  };
+  clientName?: string;
+}) {
+  if (!r) return null;
+  const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  const aliquotaTotal = inputs.aliquotaIRPJ + inputs.aliquotaCSLL;
+
+  return (
+    <PdfPage>
+      <PdfHeader
+        title="Consórcio para CNPJ"
+        subtitle="Benefício Fiscal PJ — Parcelas Dedutíveis como Despesa Operacional"
+        clientName={clientName}
+        date={hoje}
+      />
+      <PdfPremises items={[
+        ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
+        ["Taxa de adm.", `${inputs.taxaAdmConsorcio}%`],
+        ["Prazo do grupo", `${inputs.prazoConsorcio} meses`],
+        ["Lance ofertado", `${inputs.percLance}%`],
+        ["Contemplação", `Mês ${inputs.mesContemplacaoConsorcio}`],
+        ["Regime tributário", inputs.regimeTributario === "presumido" ? "Lucro Presumido" : "Lucro Real"],
+        ["Alíquota efetiva total", `${aliquotaTotal}%`],
+        ["Valorização do bem", `${inputs.valorizacaoAnual}% a.a.`],
+      ]} />
+
+      <PdfSection title="Benefício Fiscal Mensal" description="O que o consórcio custa de verdade para a empresa, depois do abatimento fiscal:">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <PdfMetric label="Parcela bruta" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Valor nominal da parcela antes do benefício fiscal" color={C.navy} />
+          <PdfMetric label="Economia fiscal mensal" value={fmtBRL(r.economiaFiscalMensal)} description={`${aliquotaTotal}% sobre a parcela — imposto que não é pago`} color={C.green} />
+          <PdfMetric label="Parcela líquida (custo real)" value={fmtBRL(r.parcelaLiquidaConsorcio)} description="O que a empresa realmente desembolsa por mês" color={C.amber} />
+        </div>
+      </PdfSection>
+
+      <PdfInsight
+        emoji="🏢"
+        title="O Estado financia parte do seu consórcio"
+        body={`No ${inputs.regimeTributario === "presumido" ? "Lucro Presumido" : "Lucro Real"}, as parcelas de consórcio são dedutíveis como despesa operacional. Isso significa que ${aliquotaTotal}% de cada parcela é subsidiado pelo imposto que você deixa de pagar. Resultado: parcela bruta de ${fmtBRL(r.parcelaBrutaConsorcio)} vira custo real de ${fmtBRL(r.parcelaLiquidaConsorcio)} — economia fiscal de ${fmtBRL(r.economiaFiscalMensal)}/mês.`}
+        variant="primary"
+      />
+
+      <PdfSection title="Consórcio PJ vs. Financiamento PJ" description="Comparativo de custo total entre as duas alternativas:">
+        <PdfKVList rows={[
+          { label: "Parcela bruta consórcio", value: fmtBRL(r.parcelaBrutaConsorcio) },
+          { label: "Parcela líquida consórcio (pós fiscal)", value: fmtBRL(r.parcelaLiquidaConsorcio), color: C.green },
+          { label: "Parcela financiamento PJ", value: fmtBRL(r.parcelaFinanciamento), color: C.red },
+          { label: "Total bruto consórcio", value: fmtBRL(r.totalBrutoConsorcio) },
+          { label: "Economia fiscal acumulada", value: fmtBRL(r.totalEconomiaFiscalConsorcio), color: C.green },
+          { label: "Custo líquido total — consórcio", value: fmtBRL(r.totalLiquidoConsorcio), color: C.green },
+          { label: "Total financiamento PJ", value: fmtBRL(r.totalFinanciamento), color: C.red },
+          { label: "Juros totais do financiamento", value: fmtBRL(r.totalJurosFinanciamento), color: C.red },
+          { label: "Economia total vs. financiamento", value: fmtBRL(r.economiaTotalVsFinanciamento), color: C.green },
+          { label: "Percentual de economia", value: `${r.percentualEconomia.toFixed(1)}%`, color: C.green },
+        ]} />
+      </PdfSection>
+
+      <PdfInsight
+        emoji="📊"
+        title={`Consórcio é ${r.percentualEconomia.toFixed(1)}% mais barato que o financiamento PJ`}
+        body={`O financiamento PJ cobra juros sobre o saldo devedor — quanto mais você deve, mais você paga. O consórcio não tem juros: você paga apenas a taxa de administração diluída nas parcelas, e ainda deduz tudo do imposto. A combinação de ausência de juros + benefício fiscal resulta em ${fmtBRL(r.economiaTotalVsFinanciamento)} a mais no caixa da empresa.`}
+        variant="success"
+      />
+
+      <PdfFooter note="Benefício fiscal calculado com base na dedutibilidade das parcelas como despesa operacional nos regimes de Lucro Presumido e Lucro Real. Consulte o contador da empresa para validar o enquadramento específico." />
+    </PdfPage>
   );
 }

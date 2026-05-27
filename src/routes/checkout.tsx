@@ -4,6 +4,11 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Logo } from "@/components/Logo";
+import {
+  readReferralCode,
+  saveReferralCode,
+  clearReferralCode,
+} from "@/routes/\$referralCode";
 
 export const Route = createFileRoute("/checkout")({ component: CheckoutPage });
 
@@ -109,11 +114,11 @@ function CheckoutPage() {
     ?? "monthly";
   const initialCycle: "monthly" | "annual" = planParam === "annual" ? "annual" : "monthly";
 
-  // Capture referral code from URL (?ref=ABCD1234) and persist in sessionStorage
+  // Captura código de indicação de ?ref= (fallback — normalmente chega via /{code} que já salva no localStorage)
   useEffect(() => {
     const refCode = new URLSearchParams(location.search).get("ref");
-    if (refCode && typeof sessionStorage !== "undefined") {
-      sessionStorage.setItem("referral_code", refCode.toLowerCase().trim());
+    if (refCode?.trim()) {
+      saveReferralCode(refCode.trim()); // sobrescreve se ainda não expirado
     }
   }, [location.search]);
 
@@ -302,9 +307,7 @@ function CheckoutPage() {
             body: JSON.stringify({
               idempotencyKey: idempotencyKey.current,
               billingCycle: cycle,
-              referralCode: typeof sessionStorage !== "undefined"
-                ? (sessionStorage.getItem("referral_code") ?? undefined)
-                : undefined,
+              referralCode: readReferralCode() ?? undefined,
               customer: {
                 name: name.trim(),
                 email: email.trim(),
@@ -362,7 +365,7 @@ function CheckoutPage() {
         }
 
         // Limpa o código de indicação após uso bem-sucedido
-        if (typeof sessionStorage !== "undefined") sessionStorage.removeItem("referral_code");
+        clearReferralCode();
         toast.success("Trial iniciado! 14 dias grátis. Bem-vindo ao Quanto Custa!");
         nav({ to: "/assinatura" });
       }

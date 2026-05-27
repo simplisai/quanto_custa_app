@@ -5,7 +5,7 @@ import {
   Home, Calculator, History, Users, BookCopy, CreditCard,
   LifeBuoy, Radio, LogOut, ChevronRight, ArrowLeft, Menu, X,
   ShieldAlert, Wallet, PanelLeftClose, PanelLeftOpen,
-  LayoutDashboard, Gift,
+  LayoutDashboard, Gift, ClipboardList,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
@@ -21,8 +21,9 @@ const USER_NAV = [
   { to: "/historico",   label: "Histórico",       icon: History     },
   { to: "/clientes",    label: "Clientes",        icon: Users       },
   { to: "/templates",   label: "Templates",       icon: BookCopy    },
-  { to: "/indicar",     label: "Indicar & Ganhar", icon: Gift       },
-  { to: "/assinatura",  label: "Assinatura",      icon: CreditCard  },
+  { to: "/indicar",     label: "Indicar & Ganhar", icon: Gift            },
+  { to: "/formularios", label: "Formulários",     icon: ClipboardList  },
+  { to: "/assinatura",  label: "Assinatura",      icon: CreditCard      },
   { to: "/suporte",     label: "Suporte",         icon: LifeBuoy    },
 ] as const;
 

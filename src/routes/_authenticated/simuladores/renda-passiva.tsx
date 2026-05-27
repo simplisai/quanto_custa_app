@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+import { usePdfExport } from "@/hooks/usePdfExport";
 import {
   calcRendaPassiva,
   defaultRendaPassivaInputs,
   type RendaPassivaInputs,
   type RendaPassivaResults,
+  type UsoCreditoContemplado,
 } from "@/lib/calc-renda-passiva";
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,8 @@ import {
 import { Bar, Line } from "react-chartjs-2";
 import { ArrowLeft, Banknote, TrendingUp, BarChart2, Zap, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
+import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -112,6 +115,7 @@ function RendaPassivaPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const reportRef = useRef<HTMLDivElement>(null);
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "Renda_Passiva_Consorcio.pdf");
 
   const [carta, setCarta] = useState(maskMoney(String(defaultRendaPassivaInputs.cartaCredito * 100)));
   const [taxaAdm, setTaxaAdm] = useState(maskPercent(String(defaultRendaPassivaInputs.taxaAdmTotal * 100)));
@@ -123,16 +127,42 @@ function RendaPassivaPage() {
   const [reajuste, setReajuste] = useState(maskPercent(String(defaultRendaPassivaInputs.reajusteAluguelAnual * 100)));
   const [valorizacao, setValorizacao] = useState(maskPercent(String(defaultRendaPassivaInputs.valorizacaoAnual * 100)));
   const [cdi, setCdi] = useState(maskPercent(String(defaultRendaPassivaInputs.taxaCDIAnual * 100)));
+  const [taxaAtualiz, setTaxaAtualiz] = useState(String(defaultRendaPassivaInputs.taxaAtualizacaoAnual));
+  const [usoCredito, setUsoCredito] = useState<UsoCreditoContemplado>(defaultRendaPassivaInputs.usoCreditoContemplado);
 
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [results, setResults] = useState<RendaPassivaResults | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  // ── Restore sessionStorage on mount ─────────────────────────────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem("rp-inputs");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved);
+      if (s.carta) setCarta(s.carta);
+      if (s.taxaAdm) setTaxaAdm(s.taxaAdm);
+      if (s.prazo) setPrazo(s.prazo);
+      if (s.percLance) setPercLance(s.percLance);
+      if (s.lanceProprioR) setLanceProprioR(s.lanceProprioR);
+      if (s.mesContemp) setMesContemp(s.mesContemp);
+      if (s.rendaAluguel) setRendaAluguel(s.rendaAluguel);
+      if (s.reajuste) setReajuste(s.reajuste);
+      if (s.valorizacao) setValorizacao(s.valorizacao);
+      if (s.cdi) setCdi(s.cdi);
+      if (s.taxaAtualiz) setTaxaAtualiz(s.taxaAtualiz);
+      if (s.usoCredito) setUsoCredito(s.usoCredito);
+    } catch {}
+  }, []);
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const clientPhone = selectedClient?.phone ?? "";
+
   useEffect(() => {
     if (!user) return;
-    supabase.from("clients").select("id, name").eq("user_id", user.id).order("name")
+    supabase.from("clients").select("id, name, phone").eq("user_id", user.id).order("name")
       .then(({ data }) => setClients(data ?? []));
   }, [user]);
 
@@ -172,11 +202,17 @@ function RendaPassivaPage() {
     reajusteAluguelAnual: unmask(reajuste),
     valorizacaoAnual: unmask(valorizacao),
     taxaCDIAnual: unmask(cdi),
-  }), [carta, taxaAdm, prazo, percLance, lanceProprioR, mesContemp, rendaAluguel, reajuste, valorizacao, cdi]);
+    taxaAtualizacaoAnual: parseFloat(taxaAtualiz || "0") || 0,
+    usoCreditoContemplado: usoCredito,
+  }), [carta, taxaAdm, prazo, percLance, lanceProprioR, mesContemp, rendaAluguel, reajuste, valorizacao, cdi, taxaAtualiz, usoCredito]);
 
   const calcular = () => {
     setResults(calcRendaPassiva(inputs));
     setSavedId(null);
+    sessionStorage.setItem("rp-inputs", JSON.stringify({
+      carta, taxaAdm, prazo, percLance, lanceProprioR,
+      mesContemp, rendaAluguel, reajuste, valorizacao, cdi, taxaAtualiz, usoCredito,
+    }));
   };
 
   const applyTemplate = (p: TemplatePayload) => {
@@ -222,27 +258,6 @@ function RendaPassivaPage() {
     }
   };
 
-  const exportPDF = async () => {
-    if (!results) { toast.error("Calcule primeiro."); return; }
-    if (!reportRef.current) return;
-    try {
-      reportRef.current.style.display = "block";
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      );
-      await html2pdf().set({
-        margin: 10,
-        filename: "Renda_Passiva_Consorcio.pdf",
-        image: { type: "jpeg", quality: 1 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      }).from(reportRef.current).save();
-    } catch (e: unknown) {
-      toast.error((e as Error).message || "Erro ao exportar PDF.");
-    } finally {
-      if (reportRef.current) reportRef.current.style.display = "none";
-    }
-  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -292,6 +307,23 @@ function RendaPassivaPage() {
           <NumInput label="Valorização Anual do Imóvel (%)" value={valorizacao} onChange={setValorizacao} type="percent" />
           <NumInput label="Taxa CDI Anual (% — comparativo)" value={cdi} onChange={setCdi} type="percent" hint="Para comparar com investimento em renda fixa" />
         </Grid2>
+        <NumInput label="Correção da Carta (INCC % a.a.)" value={taxaAtualiz} onChange={setTaxaAtualiz} type="int" hint="Taxa anual de atualização da carta pelo INCC — padrão 4%" />
+        <div>
+          <p className="mb-2 text-xs font-semibold text-foreground/70">Estratégia pós-contemplação:</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setUsoCredito("compra_imovel")}
+              className={`rounded-xl py-2.5 text-sm font-bold transition-colors ${usoCredito === "compra_imovel" ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground hover:bg-accent"}`}>
+              🏠 Comprar imóvel
+            </button>
+            <button onClick={() => setUsoCredito("credito_rende_cdi")}
+              className={`rounded-xl py-2.5 text-sm font-bold transition-colors ${usoCredito === "credito_rende_cdi" ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground hover:bg-accent"}`}>
+              💰 Crédito rende CDI
+            </button>
+          </div>
+          {usoCredito === "credito_rende_cdi" && (
+            <p className="mt-2 text-xs text-muted-foreground">O crédito é aplicado no CDI enquanto as parcelas continuam com reajuste INCC. Mostra o spread da operação.</p>
+          )}
+        </div>
       </Section>
 
       <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4">
@@ -312,7 +344,7 @@ function RendaPassivaPage() {
             </Select>
           </div>
         </div>
-        <div className="grid gap-2.5 sm:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-4">
           <button onClick={calcular}
             className="rounded-xl bg-primary px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-primary-foreground shadow-elegant active:scale-[0.98] hover:opacity-95 transition-all">
             Calcular ROI
@@ -321,10 +353,16 @@ function RendaPassivaPage() {
             className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide active:scale-[0.98] hover:bg-accent disabled:opacity-40 transition-all">
             {saving ? "Salvando…" : "Salvar"}
           </button>
-          <button onClick={exportPDF} disabled={!results}
+          <button onClick={exportPDF} disabled={!results || isExporting}
             className="rounded-xl bg-success px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-success-foreground active:scale-[0.98] hover:opacity-95 disabled:opacity-40 transition-all">
-            Exportar PDF
+            {isExporting ? "Exportando…" : "Exportar PDF"}
           </button>
+          <WhatsAppShareButton
+            onShare={(phone) => shareWhatsApp(phone)}
+            prefilledPhone={clientPhone}
+            disabled={!results}
+            isLoading={isExporting}
+          />
         </div>
         {savedId && (
           <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm">
@@ -523,6 +561,26 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
           </table>
         </div>
       </Section>
+
+      {/* ── Cenário CDI ────────────────────────────────────────────── */}
+      {inputs.usoCreditoContemplado === "credito_rende_cdi" && r.creditoFinalComCDI > 0 && (
+        <Section title="Estratégia: Crédito Rende CDI vs. Parcelas INCC" accent>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <KPI icon={Zap} label="Crédito acumulado (CDI)" value={fmtBRL(r.creditoFinalComCDI)}
+              sub={`Carta de R${fmtBRL(inputs.cartaCredito)} rendendo ${inputs.taxaCDIAnual}% a.a.`} variant="success" />
+            <KPI icon={Banknote} label="Total pago em parcelas (INCC)" value={fmtBRL(r.totalParcelasComINCC)}
+              sub={`Parcelas corrigidas por ${inputs.taxaAtualizacaoAnual}% a.a.`} variant="primary" />
+            <KPI icon={TrendingUp} label="Lucro da estratégia" value={fmtBRL(r.lucroEstrategiaCDI)}
+              sub="CDI acumulado − parcelas − lance" variant={r.lucroEstrategiaCDI > 0 ? "success" : "warning"} />
+          </div>
+          <div className={`rounded-xl p-3 text-sm font-semibold ${r.lucroEstrategiaCDI > 0 ? "bg-success/10 text-success" : "bg-warning/10 text-warning-foreground"}`}>
+            {r.lucroEstrategiaCDI > 0
+              ? `✅ Spread CDI−INCC positivo: ${fmtBRL(r.spreadCDIvsINCC)} — O crédito rende mais do que as parcelas custam.`
+              : `⚠️ Spread CDI−INCC negativo: as parcelas crescem mais rápido que o CDI rende. Avalie aumentar o lance.`
+            }
+          </div>
+        </Section>
+      )}
     </div>
   );
 }
@@ -532,88 +590,73 @@ function PDFRenda({ r, inputs, clientName }: {
 }) {
   if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  const roiCDB = r.cdbFuturo > 0 ? ((r.cdbFuturo / r.totalInvestido - 1) * 100).toFixed(1) : "0";
+  const anos = inputs.prazoMeses / 12;
 
   return (
-    <div style={{ padding: "16mm 18mm", width: "210mm", fontFamily: "'Inter', 'Helvetica Neue', sans-serif", color: "#2f3640", background: "#fff", boxSizing: "border-box" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #1a2a6c", paddingBottom: 12, marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 20, color: "#1a2a6c", fontWeight: 900 }}>💰 Renda Passiva com Consórcio</div>
-          <div style={{ fontSize: 10, color: "#7f8c8d", fontWeight: 700, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.1em" }}>Análise de Investimento Imobiliário via Consórcio</div>
-        </div>
-        <div style={{ textAlign: "right", fontSize: 10, color: "#7f8c8d" }}>
-          <div style={{ fontWeight: 800, color: "#c0392b", fontSize: 11 }}>CONFIDENCIAL</div>
-          <div style={{ marginTop: 3 }}>{hoje}</div>
-          {clientName && <div style={{ marginTop: 4, background: "#1a2a6c", color: "#fff", padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>Cliente: {clientName}</div>}
-        </div>
-      </div>
+    <PdfPage>
+      <PdfHeader
+        title="Renda Passiva com Consórcio"
+        subtitle="Consórcio como Investimento — Relatório de Viabilidade"
+        clientName={clientName}
+        date={hoje}
+      />
+      <PdfPremises items={[
+        ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
+        ["Prazo do grupo", `${inputs.prazoMeses} meses`],
+        ["Taxa de adm.", `${inputs.taxaAdmTotal}%`],
+        ["Lance ofertado", `${inputs.percLance}%`],
+        ["Contempl. prevista", `Mês ${inputs.mesContemplacao}`],
+        ["Aluguel inicial", fmtBRL(inputs.rendaAluguelMensal)],
+        ["Valorização do imóvel", `${inputs.valorizacaoAnual}% a.a.`],
+        ["CDI comparativo", `${inputs.taxaCDIAnual}% a.a.`],
+      ]} />
 
-      {/* Headline */}
-      <div style={{ background: "#eafaf1", border: "2px solid #27ae60", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
-        <div style={{ fontSize: 14, color: "#1e8449", fontWeight: 800 }}>
-          Seu consórcio pode se pagar sozinho.
-          {r.mesFluxoNeutro && ` A partir do mês ${r.mesFluxoNeutro}, a renda do aluguel cobre a parcela.`}
+      <PdfSection title="Resultados da Estratégia de Renda Passiva" description="Quanto rende o consórcio como veículo de investimento imobiliário:">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+          <PdfMetric label="Total investido" value={fmtBRL(r.totalInvestido)} description="Parcelas + lance próprio desembolsado" color={C.navy} />
+          <PdfMetric label="Renda gerada no período" value={fmtBRL(r.totalRendaGerada)} description={`Aluguéis recebidos em ${anos.toFixed(0)} anos`} color={C.green} />
+          <PdfMetric label="Valor do imóvel no final" value={fmtBRL(r.valorImovelFinal)} description={`Valorização de ${inputs.valorizacaoAnual}% a.a. sobre ${fmtBRL(inputs.cartaCredito)}`} color={C.navy} />
+          <PdfMetric label="ROI anual" value={`${r.roiAnual.toFixed(1)}% a.a.`} description={`vs. CDI de ${inputs.taxaCDIAnual}% a.a.`} color={r.roiAnual >= inputs.taxaCDIAnual ? C.green : C.amber} />
         </div>
-        <div style={{ fontSize: 11, color: "#5d6d7e", marginTop: 5 }}>
-          ROI anual estimado: {r.roiAnual.toFixed(2)}% a.a. vs. CDI: {inputs.taxaCDIAnual}% a.a.
-        </div>
-      </div>
+      </PdfSection>
 
-      {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
-        {[
-          ["Total Investido", fmtBRL(r.totalInvestido), "#1a2a6c"],
-          ["Renda Gerada", fmtBRL(r.totalRendaGerada), "#27ae60"],
-          ["Patrimônio Final", fmtBRL(r.patrimonioFinal), "#27ae60"],
-          ["ROI Anual", `${r.roiAnual.toFixed(2)}%`, r.roiAnual > inputs.taxaCDIAnual ? "#27ae60" : "#f39c12"],
-        ].map(([l, v, c]) => (
-          <div key={l as string} style={{ padding: "12px 14px", borderRadius: 8, background: c as string, color: "#fff" }}>
-            <div style={{ fontSize: 8.5, opacity: 0.85, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>{l as string}</div>
-            <div style={{ fontSize: 14, fontWeight: 900, marginTop: 5 }}>{v as string}</div>
-          </div>
-        ))}
-      </div>
+      <PdfInsight
+        emoji="🏦"
+        title="O consórcio pode se pagar sozinho"
+        body={`Após a contemplação no mês ${inputs.mesContemplacao}, o imóvel gera ${fmtBRL(inputs.rendaAluguelMensal)}/mês de aluguel${r.mesFluxoNeutro ? ` — e a partir do mês ${r.mesFluxoNeutro}, o aluguel já supera a parcela do consórcio. Isso significa que o próprio inquilino paga sua cota` : ""}. Ao final de ${anos.toFixed(0)} anos, você tem um imóvel avaliado em ${fmtBRL(r.valorImovelFinal)} + ${fmtBRL(r.totalRendaGerada)} em renda acumulada — com um ROI anual de ${r.roiAnual.toFixed(1)}%.`}
+        variant="primary"
+      />
 
-      {/* Premissas */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10 }}>Premissas</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7 }}>
-          {[
-            ["Carta de Crédito", fmtBRL(inputs.cartaCredito)],
-            ["Prazo", `${inputs.prazoMeses} meses`],
-            ["Lance", `${inputs.percLance}%`],
-            ["Contempl.", `Mês ${inputs.mesContemplacao}`],
-            ["Aluguel Esperado", fmtBRL(inputs.rendaAluguelMensal) + "/mês"],
-            ["Valorização", `${inputs.valorizacaoAnual}% a.a.`],
-            ["CDI comparativo", `${inputs.taxaCDIAnual}% a.a.`],
-            ["Taxa Adm.", `${inputs.taxaAdmTotal}%`],
-          ].map(([l, v]) => (
-            <div key={l} style={{ background: "#f7f8fc", padding: "6px 8px", borderRadius: 5, borderLeft: "3px solid #1a2a6c" }}>
-              <div style={{ fontSize: 8.5, color: "#7f8c8d", fontWeight: 700, textTransform: "uppercase" }}>{l}</div>
-              <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2 }}>{v}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <PdfSection title="Comparativo: Consórcio vs. CDB/Selic" description="Se você investisse o mesmo valor em renda fixa em vez de usar no consórcio:">
+        <PdfKVList rows={[
+          { label: "Total investido (parcelas + lance)", value: fmtBRL(r.totalInvestido) },
+          { label: "Patrimônio final (imóvel + fluxo)", value: fmtBRL(r.patrimonioFinal), color: C.green },
+          { label: `Projeção CDB/Selic (${inputs.taxaCDIAnual}% a.a.)`, value: fmtBRL(r.cdbFuturo), color: C.red },
+          { label: "Vantagem do consórcio vs. CDB", value: fmtBRL(r.vantagemVsCDB), color: r.vantagemVsCDB >= 0 ? C.green : C.red },
+          { label: "ROI total no período", value: `${r.roiPercentual.toFixed(1)}%`, color: C.green },
+          { label: "ROI anual equivalente", value: `${r.roiAnual.toFixed(1)}% a.a.`, color: C.green },
+          ...(r.mesFluxoNeutro ? [{ label: "Mês em que aluguel paga a parcela", value: `Mês ${r.mesFluxoNeutro}`, color: C.navy }] : []),
+        ]} />
+      </PdfSection>
 
-      {/* Comparativo */}
-      <div>
-        <div style={{ fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10 }}>Consórcio + Aluguel vs. CDB</div>
-        {[
-          ["Total investido", fmtBRL(r.totalInvestido), fmtBRL(r.totalInvestido)],
-          ["Renda gerada", fmtBRL(r.totalRendaGerada), "—"],
-          ["Patrimônio final", fmtBRL(r.patrimonioFinal), fmtBRL(r.cdbFuturo)],
-          ["ROI total", `${r.roiPercentual.toFixed(1)}%`, `${roiCDB}%`],
-          ["ROI anual", `${r.roiAnual.toFixed(2)}% a.a.`, `${inputs.taxaCDIAnual}% a.a.`],
-          [r.vantagemVsCDB >= 0 ? "VANTAGEM vs. CDB" : "DESVANTAGEM vs. CDB", "—", (r.vantagemVsCDB >= 0 ? "+" : "") + fmtBRL(r.vantagemVsCDB)],
-        ].map(([label, cons, cdb], i) => (
-          <div key={label as string} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f0f1f5", fontSize: 11, fontWeight: i === 5 ? 800 : 400, background: i === 5 ? "#eafaf1" : "transparent" }}>
-            <span style={{ color: "#5d6d7e", flex: 1 }}>{label as string}</span>
-            <span style={{ color: "#1a2a6c", width: 140, textAlign: "right", fontWeight: 700 }}>{cons as string}</span>
-            <span style={{ color: i === 5 && r.vantagemVsCDB >= 0 ? "#27ae60" : "#2f3640", width: 140, textAlign: "right", fontWeight: 700 }}>{cdb as string}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+      {inputs.usoCreditoContemplado === "credito_rende_cdi" && r.creditoFinalComCDI > 0 && (
+        <PdfSection title="Estratégia Alternativa: Crédito Rende CDI" description="E se, em vez de comprar um imóvel, você deixar o crédito render CDI enquanto paga as parcelas com INCC?">
+          <PdfKVList rows={[
+            { label: "Crédito acumulado com CDI", value: fmtBRL(r.creditoFinalComCDI), color: C.green },
+            { label: "Total pago em parcelas (INCC)", value: fmtBRL(r.totalParcelasComINCC), color: C.red },
+            { label: "Lucro líquido da estratégia CDI", value: fmtBRL(r.lucroEstrategiaCDI), color: r.lucroEstrategiaCDI >= 0 ? C.green : C.red },
+          ]} />
+        </PdfSection>
+      )}
+
+      <PdfInsight
+        emoji="📈"
+        title="Por que consórcio bate a renda fixa neste cenário?"
+        body={`O consórcio combina alavancagem (você controla um imóvel de ${fmtBRL(inputs.cartaCredito)} com desembolso fracionado), renda (aluguel mensal crescente), e valorização (imóvel sobe ${inputs.valorizacaoAnual}% a.a. sobre o valor total, não sobre o que você pagou). Renda fixa só rende sobre o que você investiu — sem alavancagem, sem valorização de ativo real.`}
+        variant="success"
+      />
+
+      <PdfFooter />
+    </PdfPage>
   );
 }

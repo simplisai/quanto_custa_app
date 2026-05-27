@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+import { usePdfExport } from "@/hooks/usePdfExport";
 import { calcular, defaultInputs, type CalcInputs, type CalcResults } from "@/lib/calculator";
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -111,12 +111,26 @@ function CalculatorPage() {
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
+  const { exportPDF, isExporting } = usePdfExport(reportRef, "Relatorio_Inteligencia_Imobiliaria.pdf");
 
   // Context state
   const [clients, setClients] = useState<ClientOpt[]>([]);
   const [templates, setTemplates] = useState<TemplateOpt[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [loadingContext, setLoadingContext] = useState(true);
+
+  // ── Restore sessionStorage on mount ─────────────────────────────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem("calc-inputs");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved);
+      if (s.raws && typeof s.raws === "object") setRaws(s.raws);
+      if (s.baseLance) setBaseLance(s.baseLance);
+      if (s.usoCredito) setUsoCredito(s.usoCredito);
+      if (s.amortTipo) setAmortTipo(s.amortTipo);
+    } catch {}
+  }, []);
 
   // Load clients and templates
   useEffect(() => {
@@ -203,7 +217,11 @@ function CalculatorPage() {
     return { sug: sug > 0 ? sug : inputs.valorImovel, embR, percTotal, lanceTotalR: embR + inputs.lanceProprio };
   }, [inputs, baseLance]);
 
-  const calcular_ = () => { setResults(calcular(inputs)); setSavedId(null); };
+  const calcular_ = () => {
+    setResults(calcular(inputs));
+    setSavedId(null);
+    sessionStorage.setItem("calc-inputs", JSON.stringify({ raws, baseLance, usoCredito, amortTipo }));
+  };
 
   const salvar = async () => {
     if (!results || !user) return;
@@ -230,27 +248,6 @@ function CalculatorPage() {
     }
   };
 
-  const exportPDF = async () => {
-    if (!results) { toast.error("Calcule primeiro."); return; }
-    if (!reportRef.current) return;
-    try {
-      reportRef.current.style.display = "block";
-      // Dois frames de animação garantem que o browser renderize o elemento antes do html2canvas capturar
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      );
-      await html2pdf().set({
-        margin: 10, filename: "Relatorio_Inteligencia_Imobiliaria.pdf",
-        image: { type: "jpeg", quality: 1 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      }).from(reportRef.current).save();
-    } catch (e: unknown) {
-      toast.error((e as Error).message || "Erro ao exportar PDF.");
-    } finally {
-      if (reportRef.current) reportRef.current.style.display = "none";
-    }
-  };
 
   const set = (k: string, v: string) => setRaws((prev) => ({ ...prev, [k]: v }));
 
@@ -389,9 +386,9 @@ function CalculatorPage() {
             className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide active:scale-[0.98] hover:bg-accent disabled:opacity-40 transition-all">
             {saving ? "Salvando…" : "Salvar"}
           </button>
-          <button onClick={exportPDF} disabled={!results}
+          <button onClick={exportPDF} disabled={!results || isExporting}
             className="rounded-xl bg-success px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-success-foreground active:scale-[0.98] hover:opacity-95 disabled:opacity-40 transition-all">
-            Exportar PDF
+            {isExporting ? "Exportando…" : "Exportar PDF"}
           </button>
         </div>
         {savedId && (
@@ -454,8 +451,14 @@ function ResultsView({ r, usoCredito, valorImovel, entrada, credito }: {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card title="Financiamento SAC" value={fmtBRL(r.tSAC)} className="from-danger to-destructive" />
         <Card title="Financiamento PRICE" value={fmtBRL(r.tPrice)} className="from-warning to-[oklch(0.55_0.18_45)]" />
-        <Card title="Estratégia Consórcio" value={fmtBRL(r.tCons)} className="from-primary to-primary-glow" />
+        <Card title="Custo Bruto Consórcio" value={fmtBRL(r.tCons)} className="from-primary to-primary-glow" />
       </div>
+      {r.valorEmbVisual > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-center justify-between gap-4 text-sm">
+          <span className="text-foreground/70">Lance embutido ({fmtBRL(r.valorEmbVisual)}) sai do crédito — não do bolso. Custo real desembolsado:</span>
+          <span className="font-extrabold text-primary whitespace-nowrap">{fmtBRL(r.tCons - r.valorEmbVisual)}</span>
+        </div>
+      )}
       <ChartParcelas r={r} />
       <ChartAlavancagem r={r} />
       <Section title="Quadro Analítico de Patrimônio">
@@ -518,22 +521,43 @@ function Analytic({ title, rows }: { title: string; rows: [string, string, strin
 function ChartParcelas({ r }: { r: CalcResults }) {
   const maxLen = Math.max(r.parcelasSAC.length, r.parcelasPrice.length, r.parcelasCons.length, 1);
   const labels = Array.from({ length: maxLen }, (_, i) => i + 1);
+
+  // Saldo devedor consórcio: reverse cumulative sum of remaining installments
+  // This represents "how much more you'll pay" = effective remaining debt
+  const saldoDevedorCons = r.parcelasCons.map((_, idx) =>
+    r.parcelasCons.slice(idx).reduce((a, b) => a + b, 0)
+  );
+
   const data = {
     labels,
     datasets: [
       { label: "Financiamento SAC", data: r.parcelasSAC, borderColor: "#b21f1f", borderWidth: 2, fill: false, pointRadius: 0 },
       { label: "Financiamento PRICE", data: r.parcelasPrice, borderColor: "#f39c12", borderWidth: 2, fill: false, pointRadius: 0 },
-      { label: "Estratégia Consórcio", data: r.parcelasCons, borderColor: "#1a2a6c", borderWidth: 3, fill: false, pointRadius: 2 },
+      { label: "Parcela — Consórcio", data: r.parcelasCons, borderColor: "#1a2a6c", borderWidth: 3, fill: false, pointRadius: 2 },
+      {
+        label: "Saldo Devedor — Consórcio",
+        data: saldoDevedorCons,
+        borderColor: "#6366f1",
+        borderWidth: 2,
+        borderDash: [6, 4],
+        fill: false,
+        pointRadius: 0,
+        yAxisID: "y1",
+      },
     ],
   };
   const options = {
     responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
     interaction: { mode: "index" as const, intersect: false },
-    scales: { x: { grid: { display: false } }, y: { ticks: { callback: (v: unknown) => `R$ ${(Number(v) / 1000).toFixed(0)}k` } } },
+    scales: {
+      x: { grid: { display: false } },
+      y: { ticks: { callback: (v: unknown) => `R$ ${(Number(v) / 1000).toFixed(0)}k` } },
+      y1: { position: "right" as const, grid: { drawOnChartArea: false }, ticks: { callback: (v: unknown) => `R$ ${(Number(v) / 1000).toFixed(0)}k` } },
+    },
     plugins: { tooltip: { callbacks: { label: (ctx: unknown) => { const c = ctx as { dataset: { label: string }; parsed: { y: number } }; return c.dataset.label + ": " + fmtBRL(c.parsed.y); } } } },
   };
   return (
-    <Section title="Evolução das Parcelas ao Longo do Tempo">
+    <Section title="Parcelas + Saldo Devedor do Consórcio ao Longo do Tempo">
       <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
         <div className="h-48 sm:h-72 w-full"><Line data={data} options={options} /></div>
       </div>

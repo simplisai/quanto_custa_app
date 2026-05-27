@@ -327,6 +327,7 @@ export type Database = {
           email: string | null;
           phone: string | null;
           notes: string | null;
+          profile_data: Json;
           created_at: string;
           updated_at: string;
         };
@@ -338,6 +339,7 @@ export type Database = {
           email?: string | null;
           phone?: string | null;
           notes?: string | null;
+          profile_data?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -349,8 +351,78 @@ export type Database = {
           email?: string | null;
           phone?: string | null;
           notes?: string | null;
+          profile_data?: Json;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      form_templates: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          description: string | null;
+          slug: string;
+          fields: Json;
+          theme_color: string;
+          is_active: boolean;
+          submission_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          description?: string | null;
+          slug: string;
+          fields?: Json;
+          theme_color?: string;
+          is_active?: boolean;
+          submission_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          description?: string | null;
+          slug?: string;
+          fields?: Json;
+          theme_color?: string;
+          is_active?: boolean;
+          submission_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      form_submissions: {
+        Row: {
+          id: string;
+          form_id: string;
+          owner_user_id: string;
+          client_id: string | null;
+          responses: Json;
+          submitted_at: string;
+        };
+        Insert: {
+          id?: string;
+          form_id: string;
+          owner_user_id: string;
+          client_id?: string | null;
+          responses: Json;
+          submitted_at?: string;
+        };
+        Update: {
+          id?: string;
+          form_id?: string;
+          owner_user_id?: string;
+          client_id?: string | null;
+          responses?: Json;
+          submitted_at?: string;
         };
         Relationships: [];
       };

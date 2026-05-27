@@ -2,6 +2,8 @@
 // Responde: "O consórcio pode se pagar sozinho com a renda do aluguel?"
 // Calcula fluxo de caixa mês a mês, ROI e compara com CDB/Selic.
 
+export type UsoCreditoContemplado = "compra_imovel" | "credito_rende_cdi";
+
 export interface RendaPassivaInputs {
   cartaCredito: number;          // Valor da carta de crédito (R$)
   taxaAdmTotal: number;          // Taxa de administração total (%)
@@ -13,6 +15,8 @@ export interface RendaPassivaInputs {
   reajusteAluguelAnual: number;  // Reajuste anual do aluguel (% — ex: 5)
   valorizacaoAnual: number;      // Valorização anual do imóvel (% — ex: 6)
   taxaCDIAnual: number;          // Taxa CDI anual comparativa (% — ex: 13)
+  taxaAtualizacaoAnual: number;  // Taxa de atualização anual da carta (INCC, % a.a.)
+  usoCreditoContemplado: UsoCreditoContemplado; // "compra_imovel" | "credito_rende_cdi"
 }
 
 export interface MesRenda {
@@ -49,8 +53,17 @@ export interface RendaPassivaResults {
   cdbFuturo: number;             // Se tivesse investido o mesmo em CDB
   vantagemVsCDB: number;
 
+  // ── Taxa de atualização ──────────────────────────────────────────────────
+  cartaAtualizada: number;       // Carta corrigida pelo INCC na contemplação
+
   // ── Ponto de equilíbrio de fluxo ─────────────────────────────────────────
   mesFluxoNeutro: number | null; // Primeiro mês em que aluguel ≥ parcela
+
+  // ── Cenário CDI (crédito rende CDI, parcela sobe com INCC) ───────────────
+  creditoFinalComCDI: number;    // Crédito acumulado com CDI ao final
+  totalParcelasComINCC: number;  // Total de parcelas pagas corrigidas pelo INCC
+  spreadCDIvsINCC: number;       // creditoFinalComCDI - totalParcelasComINCC - lanceProprio
+  lucroEstrategiaCDI: number;    // Lucro líquido do esquema CDI vs INCC
 
   // ── Timeline ────────────────────────────────────────────────────────────
   timeline: MesRenda[];
@@ -68,6 +81,8 @@ export const defaultRendaPassivaInputs: RendaPassivaInputs = {
   reajusteAluguelAnual: 5,
   valorizacaoAnual: 6,
   taxaCDIAnual: 13,
+  taxaAtualizacaoAnual: 4,
+  usoCreditoContemplado: "compra_imovel",
 };
 
 export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
@@ -82,7 +97,12 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
     reajusteAluguelAnual,
     valorizacaoAnual,
     taxaCDIAnual,
+    taxaAtualizacaoAnual,
+    usoCreditoContemplado,
   } = i;
+
+  // Carta corrigida pelo INCC no mês da contemplação
+  const cartaAtualizada = cartaCredito * Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemplacao / 12);
 
   const prazo = Math.max(prazoMeses, 1);
   const mesContemp = Math.min(Math.max(mesContemplacao, 1), prazo);
@@ -187,6 +207,28 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
   const cdbFuturo = totalInvestido * Math.pow(1 + cdiMensal, prazo);
   const vantagemVsCDB = patrimonioFinal - cdbFuturo;
 
+  // ── Cenário CDI: crédito contemplado rende CDI, parcelas sobem com INCC ──
+  const inccMensal = Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, 1 / 12) - 1;
+  let creditoFinalComCDI = 0;
+  let totalParcelasComINCC = 0;
+
+  if (usoCreditoContemplado === "credito_rende_cdi") {
+    // O crédito da contemplação rende CDI pelos meses restantes
+    const mesesPosContemp = Math.max(prazo - mesContemp, 0);
+    creditoFinalComCDI = cartaCredito * Math.pow(1 + cdiMensal, mesesPosContemp);
+
+    // As parcelas pós-contemplação sobem com INCC mês a mês
+    for (let m = 1; m <= mesesPosContemp; m++) {
+      const parcelaCorrigida = parcelaPosLance * Math.pow(1 + inccMensal, m);
+      totalParcelasComINCC += parcelaCorrigida;
+    }
+    // Parcelas pré-contemplação (sem correção)
+    totalParcelasComINCC += parcelaPadrao * mesContemp;
+  }
+
+  const lucroEstrategiaCDI = creditoFinalComCDI - totalParcelasComINCC - lanceProprio;
+  const spreadCDIvsINCC = creditoFinalComCDI - totalParcelasComINCC;
+
   return {
     parcelaPadrao,
     parcelaPosLance,
@@ -202,7 +244,12 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
     roiAnual,
     cdbFuturo,
     vantagemVsCDB,
+    cartaAtualizada,
     mesFluxoNeutro,
+    creditoFinalComCDI,
+    totalParcelasComINCC,
+    spreadCDIvsINCC,
+    lucroEstrategiaCDI,
     timeline,
     prazoMeses: prazo,
   };

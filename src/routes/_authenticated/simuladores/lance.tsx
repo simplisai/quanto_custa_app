@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import html2pdf from "html2pdf.js";
+import { usePdfExport } from "@/hooks/usePdfExport";
 import { calcLance, defaultLanceInputs, type LanceInputs, type LanceResults } from "@/lib/calc-lance";
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,8 @@ import {
 import { Bar } from "react-chartjs-2";
 import { ArrowLeft, Target, TrendingDown, Coins, CalendarCheck, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
+import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfFooter, C } from "@/components/PdfShell";
+import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -107,6 +109,7 @@ function SimuladorLancePage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const reportRef = useRef<HTMLDivElement>(null);
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "Simulador_Lance_Consorcio.pdf");
 
   // ── Raws (string state para inputs mascarados) ──────────────────────────
   const [cartaCredito, setCartaCredito] = useState(maskMoney(String(defaultLanceInputs.cartaCredito * 100)));
@@ -117,17 +120,41 @@ function SimuladorLancePage() {
   const [tipoLance, setTipoLance] = useState<LanceInputs["tipoLance"]>("embutido");
   const [mesContemplacao, setMesContemplacao] = useState(String(defaultLanceInputs.mesContemplacaoLance));
   const [mesSemLance, setMesSemLance] = useState(String(defaultLanceInputs.mesSemLance));
+  const [tipoAbatimento, setTipoAbatimento] = useState<LanceInputs["tipoAbatimentoLance"]>("saldoDevedor");
+  const [taxaAtualiz, setTaxaAtualiz] = useState(String(defaultLanceInputs.taxaAtualizacaoAnual));
 
   // ── Context ────────────────────────────────────────────────────────────
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [results, setResults] = useState<LanceResults | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  // ── Restore sessionStorage on mount ─────────────────────────────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem("lance-inputs");
+    if (!saved) return;
+    try {
+      const s = JSON.parse(saved);
+      if (s.cartaCredito) setCartaCredito(s.cartaCredito);
+      if (s.taxaAdm) setTaxaAdm(s.taxaAdm);
+      if (s.prazo) setPrazo(s.prazo);
+      if (s.percEmb) setPercEmb(s.percEmb);
+      if (s.lanceProprioR) setLanceProprioR(s.lanceProprioR);
+      if (s.tipoLance) setTipoLance(s.tipoLance);
+      if (s.mesContemplacao) setMesContemplacao(s.mesContemplacao);
+      if (s.mesSemLance) setMesSemLance(s.mesSemLance);
+      if (s.tipoAbatimento) setTipoAbatimento(s.tipoAbatimento);
+      if (s.taxaAtualiz) setTaxaAtualiz(s.taxaAtualiz);
+    } catch {}
+  }, []);
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const clientPhone = selectedClient?.phone ?? "";
+
   useEffect(() => {
     if (!user) return;
-    supabase.from("clients").select("id, name").eq("user_id", user.id).order("name")
+    supabase.from("clients").select("id, name, phone").eq("user_id", user.id).order("name")
       .then(({ data }) => setClients(data ?? []));
   }, [user]);
 
@@ -165,11 +192,17 @@ function SimuladorLancePage() {
     tipoLance,
     mesContemplacaoLance: parseInt(mesContemplacao || "0", 10) || 0,
     mesSemLance: parseInt(mesSemLance || "0", 10) || 0,
-  }), [cartaCredito, taxaAdm, prazo, percEmb, lanceProprioR, tipoLance, mesContemplacao, mesSemLance]);
+    tipoAbatimentoLance: tipoAbatimento,
+    taxaAtualizacaoAnual: parseFloat(taxaAtualiz || "0") || 0,
+  }), [cartaCredito, taxaAdm, prazo, percEmb, lanceProprioR, tipoLance, mesContemplacao, mesSemLance, tipoAbatimento, taxaAtualiz]);
 
   const calcular = () => {
     setResults(calcLance(inputs));
     setSavedId(null);
+    sessionStorage.setItem("lance-inputs", JSON.stringify({
+      cartaCredito, taxaAdm, prazo, percEmb, lanceProprioR,
+      tipoLance, mesContemplacao, mesSemLance, tipoAbatimento, taxaAtualiz,
+    }));
   };
 
   const applyTemplate = (p: TemplatePayload) => {
@@ -214,27 +247,6 @@ function SimuladorLancePage() {
     }
   };
 
-  const exportPDF = async () => {
-    if (!results) { toast.error("Calcule primeiro."); return; }
-    if (!reportRef.current) return;
-    try {
-      reportRef.current.style.display = "block";
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      );
-      await html2pdf().set({
-        margin: 10,
-        filename: "Simulador_Lance_Consorcio.pdf",
-        image: { type: "jpeg", quality: 1 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      }).from(reportRef.current).save();
-    } catch (e: unknown) {
-      toast.error((e as Error).message || "Erro ao exportar PDF.");
-    } finally {
-      if (reportRef.current) reportRef.current.style.display = "none";
-    }
-  };
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -301,6 +313,23 @@ function SimuladorLancePage() {
           <NumInput label="Mês-alvo de contemplação com lance" value={mesContemplacao} onChange={setMesContemplacao} type="int" hint="Mês em que o lance garante a contemplação" />
           <NumInput label="Mês médio sem lance (referência)" value={mesSemLance} onChange={setMesSemLance} type="int" hint="Contemplação aleatória média do grupo" />
         </Grid2>
+        <Grid2>
+          <NumInput label="Correção da carta (INCC % a.a.)" value={taxaAtualiz} onChange={setTaxaAtualiz} type="int" hint="Taxa anual de atualização da carta pelo INCC" />
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-foreground/80">Lance abate o quê?</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["saldoDevedor", "credito"] as const).map((t) => (
+                <button key={t} onClick={() => setTipoAbatimento(t)}
+                  className={`rounded-lg border-2 px-2 py-2.5 text-xs font-bold transition ${tipoAbatimento === t ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-muted-foreground hover:border-primary/40"}`}>
+                  {t === "saldoDevedor" ? "Saldo devedor" : "Crédito recebido"}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {tipoAbatimento === "saldoDevedor" ? "Cliente recebe a carta cheia, mas deve menos." : "Cliente recebe menos crédito (carta é reduzida)."}
+            </p>
+          </div>
+        </Grid2>
       </Section>
 
       {/* ── Vincular & Salvar ──────────────────────────────────────────── */}
@@ -322,7 +351,7 @@ function SimuladorLancePage() {
             </Select>
           </div>
         </div>
-        <div className="grid gap-2.5 sm:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-4">
           <button onClick={calcular}
             className="rounded-xl bg-primary px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-primary-foreground shadow-elegant active:scale-[0.98] hover:opacity-95 transition-all">
             Simular Lance
@@ -331,10 +360,16 @@ function SimuladorLancePage() {
             className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide active:scale-[0.98] hover:bg-accent disabled:opacity-40 transition-all">
             {saving ? "Salvando…" : "Salvar"}
           </button>
-          <button onClick={exportPDF} disabled={!results}
+          <button onClick={exportPDF} disabled={!results || isExporting}
             className="rounded-xl bg-success px-4 py-3.5 text-sm font-extrabold uppercase tracking-wide text-success-foreground active:scale-[0.98] hover:opacity-95 disabled:opacity-40 transition-all">
-            Exportar PDF
+            {isExporting ? "Exportando…" : "Exportar PDF"}
           </button>
+          <WhatsAppShareButton
+            onShare={(phone) => shareWhatsApp(phone)}
+            prefilledPhone={clientPhone}
+            disabled={!results}
+            isLoading={isExporting}
+          />
         </div>
         {savedId && (
           <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm">
@@ -500,6 +535,8 @@ function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
                 ["Parcela mensal (pós-contempl.)", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPosLance)],
                 ["Mês de contemplação", `Mês ${inputs.mesSemLance}`, `Mês ${inputs.mesContemplacaoLance}`],
                 ["Lance desembolsado", "R$ 0", fmtBRL(r.lanceProprio > 0 ? r.lanceProprio : r.lanceEmbR)],
+                ["Crédito disponível ao cliente", fmtBRL(inputs.cartaCredito), fmtBRL(r.creditoLiquido)],
+                ...(r.cartaAtualizada !== inputs.cartaCredito ? [["Carta corrigida pelo INCC (contempl.)", "—", fmtBRL(r.cartaAtualizada)]] : []),
                 ["Saldo devedor pós-lance", fmtBRL(inputs.cartaCredito), fmtBRL(r.saldoDevedorPosLance)],
                 ["Total pago no período", fmtBRL(r.totalSemLance), fmtBRL(r.totalComLance)],
               ].map(([label, sem, com]) => (
@@ -528,85 +565,82 @@ function PDFLance({ r, inputs, clientName }: {
 }) {
   if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  const reducaoParcela = r.parcelaPadrao - r.parcelaPosLance;
+  const mesesRestantes = Math.max(inputs.prazoMeses - inputs.mesContemplacaoLance, 1);
+  const espera = Math.max(inputs.mesSemLance - inputs.mesContemplacaoLance, 0);
 
   return (
-    <div style={{ padding: "16mm 18mm", width: "210mm", fontFamily: "'Inter', 'Helvetica Neue', sans-serif", color: "#2f3640", background: "#fff", boxSizing: "border-box" }}>
-      {/* Cabeçalho */}
-      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "3px solid #1a2a6c", paddingBottom: 12, marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 20, color: "#1a2a6c", fontWeight: 900 }}>🎯 Simulador de Lance</div>
-          <div style={{ fontSize: 10, color: "#7f8c8d", fontWeight: 700, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.1em" }}>Relatório de Estratégia de Consórcio</div>
-        </div>
-        <div style={{ textAlign: "right", fontSize: 10, color: "#7f8c8d" }}>
-          <div style={{ fontWeight: 800, color: "#c0392b", fontSize: 11 }}>CONFIDENCIAL</div>
-          <div style={{ marginTop: 3 }}>{hoje}</div>
-          {clientName && <div style={{ marginTop: 4, background: "#1a2a6c", color: "#fff", padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>Cliente: {clientName}</div>}
-        </div>
-      </div>
+    <PdfPage>
+      <PdfHeader
+        title="Simulador de Lance"
+        subtitle="Estratégia de Contemplação — Relatório Personalizado"
+        clientName={clientName}
+        date={hoje}
+      />
+      <PdfPremises items={[
+        ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
+        ["Prazo do grupo", `${inputs.prazoMeses} meses`],
+        ["Taxa de adm.", `${inputs.taxaAdmTotal}%`],
+        ["Tipo de lance", inputs.tipoLance === "embutido" ? "Embutido" : inputs.tipoLance === "proprio" ? "Próprio" : "Combinado"],
+        ["Lance total", fmtBRL(r.lanceTotalR)],
+        ["Contempl. com lance", `Mês ${inputs.mesContemplacaoLance}`],
+        ["Contempl. sem lance (média)", `Mês ${inputs.mesSemLance}`],
+        ["Meses antecipados", `${espera} meses`],
+      ]} />
 
-      {/* Premissas */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10 }}>Premissas</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7 }}>
-          {[
-            ["Carta de Crédito", fmtBRL(inputs.cartaCredito)],
-            ["Taxa de Adm.", `${inputs.taxaAdmTotal}%`],
-            ["Prazo", `${inputs.prazoMeses} meses`],
-            ["Tipo de Lance", inputs.tipoLance],
-          ].map(([l, v]) => (
-            <div key={l} style={{ background: "#f7f8fc", padding: "6px 8px", borderRadius: 5, borderLeft: "3px solid #1a2a6c" }}>
-              <div style={{ fontSize: 8.5, color: "#7f8c8d", fontWeight: 700, textTransform: "uppercase" }}>{l}</div>
-              <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2 }}>{v}</div>
-            </div>
-          ))}
+      <PdfSection title="Resultados do Lance Estratégico" description="O que muda na sua vida financeira ao dar o lance — números reais, sem interpretação:">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+          <PdfMetric label="Contemplação garantida" value={`Mês ${inputs.mesContemplacaoLance}`} description={espera > 0 ? `${espera} meses antes da média sem lance` : "Contemplação antecipada"} color={C.navy} />
+          <PdfMetric label="Nova parcela mensal" value={fmtBRL(r.parcelaPosLance)} description={`Queda de ${fmtBRL(r.parcelaPadrao)} — ${((reducaoParcela / (r.parcelaPadrao || 1)) * 100).toFixed(0)}% a menos por mês`} color={C.green} />
+          <PdfMetric label="Lance desembolsado" value={fmtBRL(r.lanceTotalR)} description={`${r.percLanceTotalSobreCarta.toFixed(1)}% da carta — abate o saldo devedor`} color={C.amber} />
+          <PdfMetric label="Economia total no contrato" value={fmtBRL(r.economia)} description="Valor que você deixa de pagar vs. não dar lance" color={C.green} />
         </div>
-      </div>
+      </PdfSection>
 
-      {/* Resumo executivo */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
+      <PdfInsight
+        emoji="💡"
+        title="Por que o lance é um investimento, não um gasto?"
+        body={`Com o lance de ${fmtBRL(r.lanceTotalR)}, a parcela cai ${fmtBRL(reducaoParcela)}/mês durante os ${mesesRestantes} meses restantes — isso são ${fmtBRL(reducaoParcela * mesesRestantes)} em economia de parcelas. Em outras palavras: cada real dado no lance retorna ${r.lanceTotalR > 0 ? (r.economia / r.lanceTotalR).toFixed(1) : "0"}x ao longo do contrato. Além disso, você elimina a incerteza da contemplação aleatória: ao invés de esperar até o mês ${inputs.mesSemLance}, você garante o crédito já no mês ${inputs.mesContemplacaoLance}.`}
+        variant="primary"
+      />
+
+      <PdfSection title="Comparativo Direto: Sem Lance vs. Com Lance" description="Cada linha é um fato concreto — sem suposições, sem margem para dúvida:">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: C.textSub, textTransform: "uppercase" as const }}>Item</div>
+          <div style={{ fontSize: 9, fontWeight: 800, color: C.red, textAlign: "center" as const, textTransform: "uppercase" as const }}>Sem Lance</div>
+          <div style={{ fontSize: 9, fontWeight: 800, color: C.green, textAlign: "center" as const, textTransform: "uppercase" as const }}>Com Lance ✓</div>
+        </div>
         {[
-          ["Mês de contempl. com lance", `Mês ${inputs.mesContemplacaoLance}`, "#1a2a6c"],
-          ["Parcela pós-lance", fmtBRL(r.parcelaPosLance), "#27ae60"],
-          ["Lance total", fmtBRL(r.lanceTotalR), "#f39c12"],
-          ["Economia total", fmtBRL(r.economia), "#27ae60"],
-        ].map(([l, v, c]) => (
-          <div key={l as string} style={{ padding: "12px 14px", borderRadius: 8, background: c as string, color: "#fff" }}>
-            <div style={{ fontSize: 8.5, opacity: 0.85, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>{l as string}</div>
-            <div style={{ fontSize: 15, fontWeight: 900, marginTop: 5 }}>{v as string}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Comparativo */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10 }}>Comparativo</div>
-        {[
-          ["Parcela mensal antes da contemplação", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPadrao)],
-          ["Parcela mensal após contemplação", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPosLance)],
+          ["Parcela antes da contemplação", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPadrao)],
+          ["Parcela após a contemplação", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPosLance)],
           ["Mês de contemplação", `Mês ${inputs.mesSemLance}`, `Mês ${inputs.mesContemplacaoLance}`],
+          ["Crédito disponível", fmtBRL(inputs.cartaCredito), fmtBRL(r.creditoLiquido)],
           ["Saldo devedor pós-lance", fmtBRL(inputs.cartaCredito), fmtBRL(r.saldoDevedorPosLance)],
-          ["Total pago", fmtBRL(r.totalSemLance), fmtBRL(r.totalComLance)],
-          ["ECONOMIA", "—", fmtBRL(r.economia)],
+          ["Total pago no contrato", fmtBRL(r.totalSemLance), fmtBRL(r.totalComLance)],
         ].map(([label, sem, com], i) => (
-          <div key={label as string} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid #f0f1f5", fontSize: 11, fontWeight: i === 5 ? 800 : 400 }}>
-            <span style={{ color: "#5d6d7e", flex: 1 }}>{label as string}</span>
-            <span style={{ color: "#c0392b", width: 120, textAlign: "right" }}>{sem as string}</span>
-            <span style={{ color: i === 5 ? "#27ae60" : "#2f3640", width: 120, textAlign: "right", fontWeight: 700 }}>{com as string}</span>
+          <div key={i} style={{ display: "flex", padding: "5px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11 }}>
+            <span style={{ flex: 1, color: C.textSub }}>{label as string}</span>
+            <span style={{ width: 120, textAlign: "center" as const, color: C.red, fontWeight: 600 }}>{sem as string}</span>
+            <span style={{ width: 120, textAlign: "center" as const, color: C.green, fontWeight: 700 }}>{com as string}</span>
           </div>
         ))}
-      </div>
-
-      {/* Destaque */}
-      <div style={{ background: "#ebf5fb", border: "2px solid #1a2a6c", borderRadius: 8, padding: "12px 16px" }}>
-        <div style={{ fontSize: 13, color: "#1a2a6c", fontWeight: 800 }}>
-          Com lance de {fmtBRL(r.lanceTotalR)}, a parcela cai de {fmtBRL(r.parcelaPadrao)} para {fmtBRL(r.parcelaPosLance)} — economia total de {fmtBRL(r.economia)}.
+        <div style={{ display: "flex", padding: "8px 8px", background: "#f0fdf4", borderRadius: 6, marginTop: 4, fontSize: 12, fontWeight: 800 }}>
+          <span style={{ flex: 1, color: C.green }}>✅ ECONOMIA TOTAL COM O LANCE</span>
+          <span style={{ width: 120, textAlign: "center" as const }}></span>
+          <span style={{ width: 120, textAlign: "center" as const, color: C.green }}>{fmtBRL(r.economia)}</span>
         </div>
-        {r.breakEvenMes && (
-          <div style={{ fontSize: 10, color: "#5d6d7e", marginTop: 6 }}>
-            O investimento do lance próprio se recupera no mês {r.breakEvenMes} pela redução das parcelas.
-          </div>
-        )}
-      </div>
-    </div>
+      </PdfSection>
+
+      {r.breakEvenMes && (
+        <PdfInsight
+          emoji="📅"
+          title={`Ponto de retorno: Mês ${r.breakEvenMes}`}
+          body={`A partir do mês ${r.breakEvenMes}, o lance próprio já foi completamente recuperado pela redução de parcelas. Cada mês seguinte, você economiza ${fmtBRL(reducaoParcela)} — puro ganho financeiro.`}
+          variant="success"
+        />
+      )}
+
+      <PdfFooter />
+    </PdfPage>
   );
 }

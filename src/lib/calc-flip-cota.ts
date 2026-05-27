@@ -16,22 +16,25 @@ export interface FlipCotaInputs {
   tipoLance: "embutido" | "proprio";
   mesContemplacao: number;      // Mês estimado de contemplação
   agioVenda: number;            // Ágio cobrado na venda (% do crédito líquido)
+  taxaAtualizacaoAnual: number; // Taxa de atualização anual da carta (INCC, % a.a.)
 }
 
 export interface FlipCotaResults {
   parcelaCheia: number;         // Parcela 100%
   parcelaEfetiva: number;       // Parcela paga (100% ou 50%)
-  creditoLiquido: number;       // Crédito após desconto do lance embutido
+  creditoLiquido: number;       // Crédito após desconto do lance embutido (nominal)
+  creditoAtualizado: number;    // Crédito líquido corrigido pelo INCC na contemplação
   desembolsoLance: number;      // Lance em recursos próprios desembolsado
   valorPagoParcelas: number;    // Total pago em parcelas
   desembolsoTotal: number;      // Total investido (parcelas + lance próprio)
-  valorVenda: number;           // Ágio recebido na venda (R$)
-  precoVendaTotal: number;      // Preço total que o comprador paga (crédito líquido + ágio)
+  valorVenda: number;           // Ágio recebido na venda (R$) sobre crédito atualizado
+  precoVendaTotal: number;      // Preço total que o comprador paga (crédito atualizado + ágio)
   lucroLiquido: number;         // Lucro líquido da operação
   tirMensal: number;            // TIR mensal (%)
   tirAnual: number;             // TIR anual (%)
   roiTotal: number;             // ROI total (%)
   paybackMes: number;           // Mês estimado de payback (= mesContemplacao, pois recebe tudo na venda)
+  multAtualizacao: number;      // Multiplicador INCC aplicado
 }
 
 export const defaultFlipCotaInputs: FlipCotaInputs = {
@@ -44,6 +47,7 @@ export const defaultFlipCotaInputs: FlipCotaInputs = {
   tipoLance: "embutido",
   mesContemplacao: 36,
   agioVenda: 20,
+  taxaAtualizacaoAnual: 4,
 };
 
 export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
@@ -57,7 +61,11 @@ export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
     tipoLance,
     mesContemplacao,
     agioVenda,
+    taxaAtualizacaoAnual,
   } = i;
+
+  // Taxa de atualização anual (INCC) — corrige a carta no momento da contemplação
+  const multAtualizacao = Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemplacao / 12);
 
   const prazoSafe = Math.max(prazo, 1);
   const mesContemp = Math.min(Math.max(mesContemplacao, 1), prazoSafe);
@@ -87,9 +95,11 @@ export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
   const desembolsoTotal = valorPagoParcelas + desembolsoLance;
 
   // ── Venda com ágio ───────────────────────────────────────────────────────
-  // O ágio é a % sobre o crédito LÍQUIDO que o comprador paga como prêmio
-  const valorVenda = creditoLiquido * (agioVenda / 100);
-  const precoVendaTotal = creditoLiquido + valorVenda; // total que o comprador paga
+  // A carta é corrigida pelo INCC no momento da contemplação
+  const creditoAtualizado = creditoLiquido * multAtualizacao;
+  // O ágio é a % sobre o crédito ATUALIZADO que o comprador paga como prêmio
+  const valorVenda = creditoAtualizado * (agioVenda / 100);
+  const precoVendaTotal = creditoAtualizado + valorVenda; // total que o comprador paga
   const lucroLiquido = valorVenda - desembolsoTotal;
 
   // ── TIR mensal ───────────────────────────────────────────────────────────
@@ -105,6 +115,7 @@ export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
     parcelaCheia,
     parcelaEfetiva,
     creditoLiquido,
+    creditoAtualizado,
     desembolsoLance,
     valorPagoParcelas,
     desembolsoTotal,
@@ -115,5 +126,6 @@ export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
     tirAnual,
     roiTotal,
     paybackMes: mesContemp,
+    multAtualizacao,
   };
 }

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ReferralCodeRouteImport } from './routes/$referralCode'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CheckoutRouteImport } from './routes/checkout'
@@ -41,7 +42,15 @@ import { Route as AuthenticatedAdminAssinaturasRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminSimuladoresRouteImport } from './routes/_authenticated/admin.simuladores'
 import { Route as AuthenticatedAdminSimuladoresSlugRouteImport } from './routes/_authenticated/admin.simuladores.$slug'
 import { Route as AuthenticatedIndicarRouteImport } from './routes/_authenticated/indicar'
+import { Route as AuthenticatedFormulariosRouteImport } from './routes/_authenticated/formularios'
+import { Route as AuthenticatedFormulariosIdRouteImport } from './routes/_authenticated/formularios.$id'
+import { Route as FSlugRouteImport } from './routes/f.$slug'
 
+const ReferralCodeRoute = ReferralCodeRouteImport.update({
+  id: '/$referralCode',
+  path: '/$referralCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -211,6 +220,21 @@ const AuthenticatedIndicarRoute = AuthenticatedIndicarRouteImport.update({
   path: '/indicar',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFormulariosRoute = AuthenticatedFormulariosRouteImport.update({
+  id: '/formularios',
+  path: '/formularios',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedFormulariosIdRoute = AuthenticatedFormulariosIdRouteImport.update({
+  id: '/formularios/$id',
+  path: '/formularios/$id',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const FSlugRoute = FSlugRouteImport.update({
+  id: '/f/$slug',
+  path: '/f/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminSimuladoresSlugRoute =
   AuthenticatedAdminSimuladoresSlugRouteImport.update({
     id: '/_authenticated/admin/simuladores/$slug',
@@ -223,12 +247,16 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/$referralCode': typeof ReferralCodeRoute
+  '/f/$slug': typeof FSlugRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/app': typeof AuthenticatedAppRoute
   '/assinar': typeof AuthenticatedAssinarRoute
   '/assinatura': typeof AuthenticatedAssinaturaRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/formularios': typeof AuthenticatedFormulariosRoute
+  '/formularios/$id': typeof AuthenticatedFormulariosIdRoute
   '/historico': typeof AuthenticatedHistoricoRoute
   '/indicar': typeof AuthenticatedIndicarRoute
   '/simuladores': typeof AuthenticatedSimuladoresRoute
@@ -256,11 +284,15 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/$referralCode': typeof ReferralCodeRoute
+  '/f/$slug': typeof FSlugRoute
   '/app': typeof AuthenticatedAppRoute
   '/assinar': typeof AuthenticatedAssinarRoute
   '/assinatura': typeof AuthenticatedAssinaturaRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/formularios': typeof AuthenticatedFormulariosRoute
+  '/formularios/$id': typeof AuthenticatedFormulariosIdRoute
   '/historico': typeof AuthenticatedHistoricoRoute
   '/indicar': typeof AuthenticatedIndicarRoute
   '/simuladores': typeof AuthenticatedSimuladoresRoute
@@ -289,7 +321,11 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
+  '/f/$slug': typeof FSlugRoute
+  '/_authenticated/formularios': typeof AuthenticatedFormulariosRoute
+  '/_authenticated/formularios/$id': typeof AuthenticatedFormulariosIdRoute
   '/signup': typeof SignupRoute
+  '/$referralCode': typeof ReferralCodeRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/assinar': typeof AuthenticatedAssinarRoute
@@ -325,12 +361,16 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/login'
     | '/signup'
+    | '/$referralCode'
+    | '/f/$slug'
     | '/admin'
     | '/app'
     | '/assinar'
     | '/assinatura'
     | '/clientes'
     | '/dashboard'
+    | '/formularios'
+    | '/formularios/$id'
     | '/historico'
     | '/indicar'
     | '/simuladores'
@@ -358,11 +398,15 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/login'
     | '/signup'
+    | '/$referralCode'
+    | '/f/$slug'
     | '/app'
     | '/assinar'
     | '/assinatura'
     | '/clientes'
     | '/dashboard'
+    | '/formularios'
+    | '/formularios/$id'
     | '/historico'
     | '/indicar'
     | '/simuladores'
@@ -391,6 +435,10 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/login'
     | '/signup'
+    | '/$referralCode'
+    | '/f/$slug'
+    | '/_authenticated/formularios'
+    | '/_authenticated/formularios/$id'
     | '/_authenticated/admin'
     | '/_authenticated/app'
     | '/_authenticated/assinar'
@@ -426,10 +474,19 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  ReferralCodeRoute: typeof ReferralCodeRoute
+  FSlugRoute: typeof FSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/$referralCode': {
+      id: '/$referralCode'
+      path: '/$referralCode'
+      fullPath: '/$referralCode'
+      preLoaderRoute: typeof ReferralCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -577,6 +634,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndicarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/formularios': {
+      id: '/_authenticated/formularios'
+      path: '/formularios'
+      fullPath: '/formularios'
+      preLoaderRoute: typeof AuthenticatedFormulariosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/formularios/$id': {
+      id: '/_authenticated/formularios/$id'
+      path: '/formularios/$id'
+      fullPath: '/formularios/$id'
+      preLoaderRoute: typeof AuthenticatedFormulariosIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/f/$slug': {
+      id: '/f/$slug'
+      path: '/f/$slug'
+      fullPath: '/f/$slug'
+      preLoaderRoute: typeof FSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/assinar': {
       id: '/_authenticated/assinar'
       path: '/assinar'
@@ -685,6 +763,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAssinaturaRoute: typeof AuthenticatedAssinaturaRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFormulariosRoute: typeof AuthenticatedFormulariosRoute
+  AuthenticatedFormulariosIdRoute: typeof AuthenticatedFormulariosIdRoute
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
   AuthenticatedIndicarRoute: typeof AuthenticatedIndicarRoute
   AuthenticatedSimuladoresRoute: typeof AuthenticatedSimuladoresRoute
@@ -709,6 +789,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAssinaturaRoute: AuthenticatedAssinaturaRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFormulariosRoute: AuthenticatedFormulariosRoute,
+  AuthenticatedFormulariosIdRoute: AuthenticatedFormulariosIdRoute,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
   AuthenticatedIndicarRoute: AuthenticatedIndicarRoute,
   AuthenticatedSimuladoresRoute: AuthenticatedSimuladoresRoute,
@@ -736,6 +818,8 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  ReferralCodeRoute: ReferralCodeRoute,
+  FSlugRoute: FSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

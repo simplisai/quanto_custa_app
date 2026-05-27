@@ -130,7 +130,7 @@ function IndicarPage() {
         )}
 
         <p className="text-[11px] text-muted-foreground">
-          Quando seu amigo acessar este link, o código de indicação será aplicado automaticamente no checkout.
+          Quando seu amigo acessar este link ele é redirecionado para o site e o código fica salvo por 30 dias — mesmo que ele demore para assinar, a indicação vai contar.
         </p>
       </div>
 

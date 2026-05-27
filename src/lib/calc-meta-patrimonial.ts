@@ -3,6 +3,7 @@
 // mostra quantas cotas, de qual valor e prazo o cliente precisa contratar.
 
 export type ModoMeta = "patrimonio" | "renda";
+export type RegimeTributario = "nenhum" | "simples" | "presumido" | "real";
 
 export interface MetaPatrimonialInputs {
   modo: ModoMeta;
@@ -21,8 +22,13 @@ export interface MetaPatrimonialInputs {
   taxaAdmConsorcio: number;      // Taxa de administração total (%)
   prazoConsorcio: number;        // Prazo do grupo (meses)
   percLance: number;             // Lance médio ofertado (% da carta)
+  percLanceEmb: number;          // Lance embutido (% da carta) — não sai do bolso
   mesContemplacaoPrimeira: number; // Mês de contemplação da 1ª cota
   intervaloCotasMeses: number;   // Intervalo entre contemplações de cotas adicionais (meses)
+
+  // Benefício fiscal (PJ)
+  regimeTributario: RegimeTributario;
+  aliquotaEfetiva: number;       // % efetivo de imposto sobre as parcelas
 }
 
 export interface CotaPlano {
@@ -52,6 +58,10 @@ export interface MetaPatrimonialResults {
   cdbFinal: number;
   vantageVsCDB: number;
 
+  // Benefício fiscal (PJ)
+  economiaFiscalTotal: number;  // aliquota × totalInvestido (parcelas dedutíveis)
+  custoRealTotal: number;       // totalInvestido - economiaFiscalTotal
+
   // Meta atingida?
   metaAtingida: boolean;
   deficitR: number;             // 0 se meta atingida
@@ -68,16 +78,20 @@ export const defaultMetaInputs: MetaPatrimonialInputs = {
   taxaAdmConsorcio: 18,
   prazoConsorcio: 120,
   percLance: 20,
+  percLanceEmb: 0,
   mesContemplacaoPrimeira: 12,
   intervaloCotasMeses: 24,
+  regimeTributario: "nenhum",
+  aliquotaEfetiva: 0,
 };
 
 export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialResults {
   const {
     modo, patrimonioAlvoR, rendaMensalAlvoR, yeildAluguelPerc,
     horizonteAnos, valorizacaoAnual, cdiAnual,
-    taxaAdmConsorcio, prazoConsorcio, percLance,
+    taxaAdmConsorcio, prazoConsorcio, percLance, percLanceEmb,
     mesContemplacaoPrimeira, intervaloCotasMeses,
+    aliquotaEfetiva,
   } = i;
 
   const horizonteMeses = horizonteAnos * 12;
@@ -129,14 +143,15 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
       // Carta necessária para entregar partePatrimonio no final
       const cartaNec = partePatrimonio / Math.pow(1 + valorizMensal, mesesDesdeContemplacao);
 
-      const lanceR = cartaNec * (percLance / 100);
-      const saldoPosLance = Math.max(cartaNec - lanceR, 0);
+      const lanceEmbR = cartaNec * ((percLanceEmb || 0) / 100);
+      const lanceR = cartaNec * (percLance / 100); // próprio (desembolso real)
+      const saldoPosLance = Math.max(cartaNec - lanceR - lanceEmbR, 0);
       const valorPlano = cartaNec * (1 + taxaAdmFrac);
       const parcelaMensal = valorPlano / prazoConsorcio;
       const parcelasPos = prazoConsorcio - mesContemplacao;
       const parcelaPosLance =
         parcelasPos > 0
-          ? (saldoPosLance * (1 + taxaAdmFrac)) / prazoConsorcio
+          ? (saldoPosLance * (1 + taxaAdmFrac)) / Math.max(parcelasPos, 1)
           : 0;
 
       const totalNaCota =
@@ -182,6 +197,10 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
   const metaAtingida = patrimonioResultante >= patrimonioAlvo;
   const deficitR = metaAtingida ? 0 : patrimonioAlvo - patrimonioResultante;
 
+  // Benefício fiscal: parcelas são dedutíveis como despesa operacional (PJ)
+  const economiaFiscalTotal = totalInvestido * ((aliquotaEfetiva || 0) / 100);
+  const custoRealTotal = Math.max(totalInvestido - economiaFiscalTotal, 0);
+
   return {
     numCotas: cotasPlano.length,
     valorCadaCarta,
@@ -192,6 +211,8 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
     cotas: cotasPlano,
     cdbFinal,
     vantageVsCDB,
+    economiaFiscalTotal,
+    custoRealTotal,
     metaAtingida,
     deficitR,
   };

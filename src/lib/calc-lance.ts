@@ -11,6 +11,8 @@ export interface LanceInputs {
   tipoLance: "embutido" | "proprio" | "combinado";
   mesContemplacaoLance: number; // Mês-alvo de contemplação com lance
   mesSemLance: number;         // Mês médio de contemplação sem lance (ex: prazo * 0.6)
+  tipoAbatimentoLance: "credito" | "saldoDevedor"; // Lance abate crédito recebido ou saldo devedor
+  taxaAtualizacaoAnual: number; // Taxa de atualização anual da carta (INCC, % a.a.)
 }
 
 export interface MesData {
@@ -30,6 +32,10 @@ export interface LanceResults {
   lanceEmbR: number;           // Lance embutido em R$
   lanceTotalR: number;         // Lance total = emb + próprio
   percLanceTotalSobreCarta: number; // % total sobre a carta
+
+  // Crédito
+  creditoLiquido: number;      // Crédito disponível após lance (depende do tipoAbatimento)
+  cartaAtualizada: number;     // Carta de crédito corrigida pelo INCC na contemplação
 
   // Totais
   totalSemLance: number;
@@ -57,6 +63,8 @@ export const defaultLanceInputs: LanceInputs = {
   tipoLance: "embutido",
   mesContemplacaoLance: 12,
   mesSemLance: 72,
+  tipoAbatimentoLance: "saldoDevedor",
+  taxaAtualizacaoAnual: 4,
 };
 
 export function calcLance(i: LanceInputs): LanceResults {
@@ -69,7 +77,12 @@ export function calcLance(i: LanceInputs): LanceResults {
     tipoLance,
     mesContemplacaoLance,
     mesSemLance,
+    tipoAbatimentoLance,
+    taxaAtualizacaoAnual,
   } = i;
+
+  // Carta corrigida pelo INCC no mês da contemplação
+  const cartaAtualizada = cartaCredito * Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemplacaoLance / 12);
 
   const prazo = Math.max(prazoMeses, 1);
   const mesLance = Math.min(Math.max(mesContemplacaoLance, 1), prazo);
@@ -101,15 +114,26 @@ export function calcLance(i: LanceInputs): LanceResults {
   const lanceTotalR = lanceEmbR + lanceProprio;
   const percLanceTotalSobreCarta = cartaCredito > 0 ? (lanceTotalR / cartaCredito) * 100 : 0;
 
-  // Saldo devedor após lance
-  // Lance embutido abate direto do crédito; lance próprio também abate
-  const saldoDevedorPosLance = Math.max(cartaCredito - lanceTotalR, 0);
+  // Crédito líquido e saldo devedor dependem do tipo de abatimento:
+  //   "credito"       → lance embutido reduz o crédito recebido (o cliente recebe menos)
+  //   "saldoDevedor"  → o cliente recebe a carta cheia, mas o saldo devedor é menor
+  let creditoLiquido: number;
+  let saldoDevedorPosLance: number;
 
-  // Parcela pós-contemplação (recalculada sobre saldo menor)
+  if (tipoAbatimentoLance === "credito") {
+    creditoLiquido = Math.max(cartaCredito - lanceEmbR, 0);
+    saldoDevedorPosLance = Math.max(creditoLiquido - lanceProprio, 0);
+  } else {
+    // saldoDevedor (padrão)
+    creditoLiquido = cartaCredito; // recebe a carta cheia
+    saldoDevedorPosLance = Math.max(cartaCredito - lanceTotalR, 0);
+  }
+
+  // Parcela pós-contemplação (recalculada sobre saldo menor, dividida pelo prazo restante)
   const parcelasRestantes = prazo - mesLance;
   const parcelaPosLance =
     parcelasRestantes > 0
-      ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / prazo
+      ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / parcelasRestantes
       : 0;
 
   // ── Totais ───────────────────────────────────────────────────────────────
@@ -178,6 +202,8 @@ export function calcLance(i: LanceInputs): LanceResults {
     lanceEmbR,
     lanceTotalR,
     percLanceTotalSobreCarta,
+    creditoLiquido,
+    cartaAtualizada,
     totalSemLance,
     totalComLance,
     economia,

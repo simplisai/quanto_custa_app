@@ -269,11 +269,11 @@ const ESTRATEGIAS: Record<string, StrategyData> = {
       ],
     },
     momentoIdeal: [
-      "No primeiro contato com qualquer inquilino",
-      "Quando o cliente diz 'estou pagando aluguel e não consigo juntar dinheiro'",
-      "Quando o cliente diz 'não tenho entrada para financiamento'",
-      "Quando o cliente diz 'consórcio é caro demais para mim'",
-      "Em visitas a imóveis alugados — o cliente já está no ambiente da dor",
+      "🏠 Inquilino há 2+ anos — SEMPRE apresentar na primeira visita, sem exceção",
+      "💬 Cliente que diz 'não tenho dinheiro para dar entrada' — este simulador é a resposta",
+      "📊 Comparação direta: aluguel atual ≈ parcela do consórcio — o argumento se fecha sozinho",
+      "🤔 Prospect que questiona 'por que não continuar alugando?' — mostre o total perdido em 20 anos",
+      "🚫 Após objeção 'consórcio é muito incerto' — o aluguel certo vs. o consórcio incerto: compare patrimônios",
     ],
     passos: [
       { numero: 1, acao: "Calcule o passado antes do futuro", detalhe: "Pergunte há quanto tempo paga aluguel e qual o valor inicial. Some o total retroativo. Esse número dói — e deve doer." },
@@ -454,7 +454,7 @@ const ESTRATEGIAS: Record<string, StrategyData> = {
     title: "Alavancagem / Flip de Cota",
     subtitle: "Operação de Alta Rentabilidade — Manual de Uso Estratégico",
     quickSummary: "O simulador mais sofisticado do arsenal. Apresenta uma operação de investimento de curto prazo com TIR de 2% a 5% ao mês — números que poucos investimentos convencionais alcançam. Para clientes que entendem de negócio.",
-    objetivo: "Mostrar ao investidor ativo que o consórcio pode ser um veículo de alavancagem financeira: compra-se uma cota, contempla-se com lance e vende-se a cota contemplada com ágio, gerando lucro em 24 a 48 meses com capital investido relativamente baixo em relação ao crédito controlado.",
+    objetivo: "Mostrar ao investidor ativo que o consórcio pode ser um veículo de alavancagem financeira: compra-se uma cota, contempla-se com lance e vende-se a cota contemplada com ágio, gerando lucro em 24 a 48 meses com capital investido relativamente baixo em relação ao crédito CONTRATADO.",
     perfilIdeal: {
       titulo: "Cliente Ideal para Este Simulador",
       items: [
@@ -462,7 +462,6 @@ const ESTRATEGIAS: Record<string, StrategyData> = {
         "Já opera ou operou em renda variável, imóveis ou negócios",
         "Aceita liquidez reduzida por 24-48 meses em troca de retorno maior",
         "Perfil empreendedor — entende o conceito de 'comprar e vender com lucro'",
-        "Tem relacionamento com imobiliária ou rede de compradores de cotas",
         "Busca ROI superior ao CDB sem a complexidade de um imóvel físico para gerir",
       ],
     },

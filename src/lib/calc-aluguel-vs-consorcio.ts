@@ -13,6 +13,7 @@ export interface AluguelInputs {
   lanceProprioR: number;         // Lance em recursos próprios (R$)
   mesContemplacao: number;       // Mês de contemplação estimado
   valorizacaoAnual: number;      // Valorização anual esperada do imóvel (% — ex: 6)
+  taxaAtualizacaoAnual: number;  // Atualização anual da carta pelo INCC (% a.a. — ex: 4)
 }
 
 export interface MesAluguel {
@@ -45,6 +46,7 @@ export interface AluguelResults {
   vantagemPatrimonial: number;   // patrimonioConsorcio - 0
   custoCons: number;             // totalConsorcio (custo líquido do consórcio)
   diferencaCusto: number;        // totalAluguel - totalConsorcio
+  cartaAtualizada: number;       // Carta corrigida pelo INCC na contemplação
 
   // ── Break-even ──────────────────────────────────────────────────────────
   breakEvenMes: number | null;   // Mês em que patrimônio consórcio > acumulado aluguel
@@ -67,6 +69,7 @@ export const defaultAluguelInputs: AluguelInputs = {
   lanceProprioR: 0,
   mesContemplacao: 12,
   valorizacaoAnual: 6,
+  taxaAtualizacaoAnual: 4,
 };
 
 export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
@@ -81,7 +84,11 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
     lanceProprioR,
     mesContemplacao,
     valorizacaoAnual,
+    taxaAtualizacaoAnual,
   } = i;
+
+  // Carta corrigida pelo INCC no mês da contemplação
+  const cartaAtualizada = cartaCredito * Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemplacao / 12);
 
   const horizonteMeses = Math.max(horizonte, 1) * 12;
   const prazo = Math.max(prazoMeses, 1);
@@ -183,6 +190,7 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
     vantagemPatrimonial: patrimonioConsorcio,
     custoCons: totalConsorcio,
     diferencaCusto: totalAluguel - totalConsorcio,
+    cartaAtualizada,
     breakEvenMes,
     timeline,
     horizonteMeses,
