@@ -450,7 +450,7 @@ function ResultsFlip({ r, inputs }: { r: FlipCotaResults; inputs: FlipCotaInputs
             : `Operação deficitária no cenário atual. Ajuste o ágio ou reduza o lance para melhorar o resultado.`}
         </p>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Crédito líquido: <strong>{fmtBRL(r.creditoLiquido)}</strong> · Preço total ao comprador: <strong>{fmtBRL(r.precoVendaTotal)}</strong> ·
+          Crédito corrigido (INCC): <strong>{fmtBRL(r.creditoAtualizado)}</strong> · Preço total ao comprador: <strong>{fmtBRL(r.precoVendaTotal)}</strong> ·
           Parcela {inputs.meiaParcela ? "(meia)" : "(cheia)"}: <strong>{fmtBRL(r.parcelaEfetiva)}/mês</strong>
         </p>
       </div>
@@ -470,7 +470,8 @@ function ResultsFlip({ r, inputs }: { r: FlipCotaResults; inputs: FlipCotaInputs
               {[
                 ["Crédito Original", fmtBRL(inputs.cartaCredito), ""],
                 ["Lance Ofertado", `${inputs.lancePerc}% (${inputs.tipoLance === "embutido" ? "embutido" : "recurso próprio"})`, ""],
-                ["Crédito Líquido", fmtBRL(r.creditoLiquido), "info"],
+                ["Crédito Líquido (nominal)", fmtBRL(r.creditoLiquido), ""],
+                ["Crédito Corrigido pelo INCC", fmtBRL(r.creditoAtualizado), "info"],
                 ["Parcela Cheia", fmtBRL(r.parcelaCheia) + "/mês", ""],
                 ["Parcela Efetiva (paga)", fmtBRL(r.parcelaEfetiva) + "/mês", inputs.meiaParcela ? "success" : ""],
                 ["Valor Pago em Parcelas", fmtBRL(r.valorPagoParcelas), ""],

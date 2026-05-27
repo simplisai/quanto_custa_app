@@ -248,7 +248,7 @@ export function PdfPage({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
       padding: "14mm 16mm",
-      width: "210mm",
+      width: "794px",
       fontFamily: "'Helvetica Neue', 'Arial', sans-serif",
       color: C.text,
       background: C.white,

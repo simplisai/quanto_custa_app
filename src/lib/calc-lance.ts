@@ -114,27 +114,29 @@ export function calcLance(i: LanceInputs): LanceResults {
   const lanceTotalR = lanceEmbR + lanceProprio;
   const percLanceTotalSobreCarta = cartaCredito > 0 ? (lanceTotalR / cartaCredito) * 100 : 0;
 
-  // Crédito líquido e saldo devedor dependem do tipo de abatimento:
-  //   "credito"       → lance embutido reduz o crédito recebido (o cliente recebe menos)
-  //   "saldoDevedor"  → o cliente recebe a carta cheia, mas o saldo devedor é menor
+  // Crédito líquido depende do tipo de abatimento:
+  //   "credito"       → lance embutido reduz o crédito recebido (o cliente recebe menos carta)
+  //   "saldoDevedor"  → o cliente recebe a carta cheia, o lance só reduz o saldo devedor
   let creditoLiquido: number;
-  let saldoDevedorPosLance: number;
 
   if (tipoAbatimentoLance === "credito") {
     creditoLiquido = Math.max(cartaCredito - lanceEmbR, 0);
-    saldoDevedorPosLance = Math.max(creditoLiquido - lanceProprio, 0);
   } else {
-    // saldoDevedor (padrão)
     creditoLiquido = cartaCredito; // recebe a carta cheia
-    saldoDevedorPosLance = Math.max(cartaCredito - lanceTotalR, 0);
   }
 
-  // Parcela pós-contemplação (recalculada sobre saldo menor, dividida pelo prazo restante)
+  // ── Parcela pós-contemplação (saldo do plano) ────────────────────────────
+  // O valor total do plano = carta × (1 + taxaAdm). As parcelas já pagas reduzem
+  // esse saldo. O lance é deduzido do saldo restante no plano.
+  // Não re-aplicamos taxaAdm — ela já está embutida no saldo do plano.
   const parcelasRestantes = prazo - mesLance;
-  const parcelaPosLance =
-    parcelasRestantes > 0
-      ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / parcelasRestantes
-      : 0;
+  const saldoPlanoContemplacaoRaw = valorPlano - parcelaPadrao * mesLance;
+  const saldoPlanoNaContemplacao = Math.max(saldoPlanoContemplacaoRaw, 0);
+  const saldoAposLance = Math.max(saldoPlanoNaContemplacao - lanceTotalR, 0);
+  const parcelaPosLance = parcelasRestantes > 0 ? saldoAposLance / parcelasRestantes : 0;
+
+  // saldoDevedorPosLance = saldo do plano após o lance (em termos de plano, não de carta)
+  const saldoDevedorPosLance = saldoAposLance;
 
   // ── Totais ───────────────────────────────────────────────────────────────
   // Sem lance: paga parcela padrão por todo o prazo

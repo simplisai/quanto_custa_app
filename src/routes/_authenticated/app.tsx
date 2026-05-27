@@ -522,11 +522,8 @@ function ChartParcelas({ r }: { r: CalcResults }) {
   const maxLen = Math.max(r.parcelasSAC.length, r.parcelasPrice.length, r.parcelasCons.length, 1);
   const labels = Array.from({ length: maxLen }, (_, i) => i + 1);
 
-  // Saldo devedor consórcio: reverse cumulative sum of remaining installments
-  // This represents "how much more you'll pay" = effective remaining debt
-  const saldoDevedorCons = r.parcelasCons.map((_, idx) =>
-    r.parcelasCons.slice(idx).reduce((a, b) => a + b, 0)
-  );
+  // Saldo devedor consórcio: real balance tracked mês a mês (inclui queda do lance)
+  const saldoDevedorCons = r.saldoConsMes;
 
   const data = {
     labels,

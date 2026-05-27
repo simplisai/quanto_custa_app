@@ -145,14 +145,14 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
 
       const lanceEmbR = cartaNec * ((percLanceEmb || 0) / 100);
       const lanceR = cartaNec * (percLance / 100); // próprio (desembolso real)
-      const saldoPosLance = Math.max(cartaNec - lanceR - lanceEmbR, 0);
+      const lanceTotalNaCota = lanceR + lanceEmbR;
       const valorPlano = cartaNec * (1 + taxaAdmFrac);
       const parcelaMensal = valorPlano / prazoConsorcio;
-      const parcelasPos = prazoConsorcio - mesContemplacao;
-      const parcelaPosLance =
-        parcelasPos > 0
-          ? (saldoPosLance * (1 + taxaAdmFrac)) / Math.max(parcelasPos, 1)
-          : 0;
+      const parcelasPos = Math.max(prazoConsorcio - mesContemplacao, 0);
+      // Saldo do plano na contemplação (não re-aplica taxaAdm — já está embutida no plano)
+      const saldoPlanoContemp = Math.max(valorPlano - parcelaMensal * mesContemplacao, 0);
+      const saldoPosLance = Math.max(saldoPlanoContemp - lanceTotalNaCota, 0);
+      const parcelaPosLance = parcelasPos > 0 ? saldoPosLance / parcelasPos : 0;
 
       const totalNaCota =
         parcelaMensal * Math.min(mesContemplacao, prazoConsorcio) +

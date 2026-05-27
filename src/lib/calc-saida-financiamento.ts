@@ -113,29 +113,30 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
   // Lance embutido (% da carta — sai do crédito, não do bolso)
   const lanceEmbR = cartaConsorcio * ((percLanceEmb || 0) / 100);
   // Lance próprio (da venda do imóvel)
-  const saldoDevedorPosLance = Math.max(cartaConsorcio - lanceEmReaisConsorcio - lanceEmbR, 0);
   const creditoLiquido = Math.max(cartaConsorcio - lanceEmbR, 0);
   const lanceProprioR = lanceEmReaisConsorcio; // alias for clarity
+  const lanceTotalConsorcio = lanceEmReaisConsorcio + lanceEmbR;
 
+  // Saldo do plano na contemplação (não re-aplica taxaAdm — já está embutida no plano)
   const prazoPos = Math.max(prazoConsorcio - mesContemplacaoConsorcio, 0);
+  const saldoPlanoContemp = Math.max(valorPlanoConsorcio - parcelaConsorcio * mesContemplacaoConsorcio, 0);
+  const saldoPlanoPosLance = Math.max(saldoPlanoContemp - lanceTotalConsorcio, 0);
+  // saldoDevedorPosLance para display (em termos do plano)
+  const saldoDevedorPosLance = saldoPlanoPosLance;
+
   let parcelaPosLance: number;
   let prazoPosFinal: number;
 
   if (tipoAbatimento === "prazo") {
     // Mantém a parcela padrão, reduz o prazo
-    const parcelaPadrao = valorPlanoConsorcio / prazoConsorcio;
-    prazoPosFinal = parcelaPadrao > 0
-      ? Math.ceil((saldoDevedorPosLance * (1 + taxaAdmFrac)) / parcelaPadrao)
+    prazoPosFinal = parcelaConsorcio > 0
+      ? Math.ceil(saldoPlanoPosLance / parcelaConsorcio)
       : 0;
-    parcelaPosLance = prazoPosFinal > 0
-      ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / prazoPosFinal
-      : 0;
+    parcelaPosLance = prazoPosFinal > 0 ? saldoPlanoPosLance / prazoPosFinal : 0;
   } else {
     // Mantém o prazo restante, reduz a parcela
     prazoPosFinal = prazoPos;
-    parcelaPosLance = prazoPos > 0
-      ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / prazoPos
-      : 0;
+    parcelaPosLance = prazoPos > 0 ? saldoPlanoPosLance / prazoPos : 0;
   }
 
   const totalConsorcio =

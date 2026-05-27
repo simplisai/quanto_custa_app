@@ -44,6 +44,7 @@ export interface CalcResults {
   parcelasSAC: number[];
   parcelasPrice: number[];
   parcelasCons: number[];
+  saldoConsMes: number[];   // Saldo devedor do consórcio mês a mês (para curva de dívida)
   desembolsoCons: number[];
   patrimonioCons: number[];
 }
@@ -79,7 +80,8 @@ export function calcular(i: CalcInputs): CalcResults {
     pPrice: number[] = [],
     pCons: number[] = [];
   const arrDesembolsoCons: number[] = [],
-    arrPatrimonioCons: number[] = [];
+    arrPatrimonioCons: number[] = [],
+    arrSaldoCons: number[] = [];
 
   let tSAC = entradaDisponivel + custoItbiFinanciamento;
   let tPrice = entradaDisponivel + custoItbiFinanciamento;
@@ -170,9 +172,11 @@ export function calcular(i: CalcInputs): CalcResults {
       if (usoCredito === "patrimonio" && m > mContemplacao)
         valorCreditoRentabilizado *= 1 + rOportunidade;
       pCons.push(parcelaConsDoMes);
+      arrSaldoCons.push(Math.max(saldoCons, 0));
       tCons += parcelaConsDoMes;
     } else {
       pCons.push(0);
+      arrSaldoCons.push(0);
       if (usoCredito === "patrimonio" && m > mContemplacao)
         valorCreditoRentabilizado *= 1 + rOportunidade;
     }
@@ -213,6 +217,7 @@ export function calcular(i: CalcInputs): CalcResults {
     parcelasSAC: pSAC,
     parcelasPrice: pPrice,
     parcelasCons: pCons,
+    saldoConsMes: arrSaldoCons,
     desembolsoCons: arrDesembolsoCons,
     patrimonioCons: arrPatrimonioCons,
   };

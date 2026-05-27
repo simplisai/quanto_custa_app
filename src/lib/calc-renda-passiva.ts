@@ -110,15 +110,19 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
   // ── Lance ────────────────────────────────────────────────────────────────
   const lanceEmbR = cartaCredito * (percLance / 100);
   const lanceProprio = lanceProprioR;
-  const saldoDevedorPosLance = Math.max(cartaCredito - lanceEmbR - lanceProprio, 0);
+  const lanceTotalR = lanceEmbR + lanceProprio;
 
   // ── Parcelas ────────────────────────────────────────────────────────────
   const taxaAdmFrac = taxaAdmTotal / 100;
   const valorPlano = cartaCredito * (1 + taxaAdmFrac);
   const parcelaPadrao = valorPlano / prazo;
-  const parcelaPosLance = prazo > mesContemp
-    ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / prazo
-    : 0;
+
+  // Saldo do plano na contemplação (não re-aplica taxaAdm — já está embutida no plano)
+  const parcelasRestantes = Math.max(prazo - mesContemp, 0);
+  const saldoPlanoContemp = Math.max(valorPlano - parcelaPadrao * mesContemp, 0);
+  const saldoPlanoPosLance = Math.max(saldoPlanoContemp - lanceTotalR, 0);
+  const parcelaPosLance = parcelasRestantes > 0 ? saldoPlanoPosLance / parcelasRestantes : 0;
+  const saldoDevedorPosLance = saldoPlanoPosLance;
 
   // ── Taxas mensais ────────────────────────────────────────────────────────
   const reajusteMensal = Math.pow(1 + reajusteAluguelAnual / 100, 1 / 12) - 1;

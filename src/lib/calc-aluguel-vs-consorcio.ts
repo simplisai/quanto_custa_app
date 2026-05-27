@@ -98,15 +98,21 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
   // ── Lance ────────────────────────────────────────────────────────────────
   const lanceEmbR = cartaCredito * (percLance / 100);
   const lanceProprio = lanceProprioR;
-  const saldoDevedorPosLance = Math.max(cartaCredito - lanceEmbR - lanceProprio, 0);
+  const lanceTotalR = lanceEmbR + lanceProprio;
 
   // ── Parcelas do consórcio ────────────────────────────────────────────────
   const taxaAdmFrac = taxaAdmTotal / 100;
   const valorPlano = cartaCredito * (1 + taxaAdmFrac);
   const parcelaPadrao = valorPlano / prazo;
-  const parcelaPosLance = prazo > mesContemp
-    ? (saldoDevedorPosLance * (1 + taxaAdmFrac)) / prazo
-    : 0;
+
+  // Saldo do plano na contemplação (não re-aplica taxaAdm — ela já está no plano)
+  const parcelasRestantes = Math.max(prazo - mesContemp, 0);
+  const saldoPlanoContemp = Math.max(valorPlano - parcelaPadrao * mesContemp, 0);
+  const saldoPlanoPosLance = Math.max(saldoPlanoContemp - lanceTotalR, 0);
+  const parcelaPosLance = parcelasRestantes > 0 ? saldoPlanoPosLance / parcelasRestantes : 0;
+
+  // Para display: crédito disponível após lance embutido
+  const saldoDevedorPosLance = saldoPlanoPosLance;
 
   // ── Totais ───────────────────────────────────────────────────────────────
   // Aluguel: soma acumulada com reajuste anual ao longo do horizonte
