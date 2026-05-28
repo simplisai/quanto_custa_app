@@ -1,117 +1,113 @@
-import { type RefObject, useState } from 'react'
-import { toast } from 'sonner'
-import html2pdf from 'html2pdf.js'
-
-const PDF_OPTIONS = {
-  margin: 8,
-  image: { type: 'jpeg', quality: 0.96 },
-  html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-}
-
 /**
- * Shared hook for PDF export across all simulators.
- * - exportPDF(): downloads the PDF directly
- * - exportBlob(): returns the PDF as a Blob (for sharing)
- * - shareWhatsApp(phone): generates PDF then shares via WhatsApp
- *   • Mobile: uses navigator.share() with PDF file attachment (native share sheet)
- *   • Desktop: downloads PDF + opens WhatsApp Web with pre-filled message
+ * usePdfExport — PDF generation via @react-pdf/renderer.
+ *
+ * Accepts a factory function that returns a react-pdf Document element.
+ * pdf().toBlob() runs in a real async task — no DOM, no html2canvas,
+ * no main-thread blocking, no app freeze.
+ *
+ * Usage:
+ *   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
+ *     () => results ? <MyPdfDoc r={results} /> : null,
+ *     "filename.pdf",
+ *   )
  */
+
+import { useState } from 'react'
+import { pdf } from '@react-pdf/renderer'
+import type { ReactElement } from 'react'
+import { toast } from 'sonner'
+
 export function usePdfExport(
-  reportRef: RefObject<HTMLElement | null>,
+  getPdfDoc: () => ReactElement | null,
   filename: string,
 ) {
   const [isExporting, setIsExporting] = useState(false)
 
-  /**
-   * Prepares the hidden report div for capture.
-   * Returns the element (or null if not available).
-   */
-  const prepare = async (): Promise<HTMLElement | null> => {
-    if (!reportRef.current) return null
-    reportRef.current.style.display = 'block'
-    // Two animation frames so the DOM is fully painted before html2canvas captures
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    )
-    return reportRef.current
-  }
-
-  const cleanup = () => {
-    if (reportRef.current) reportRef.current.style.display = 'none'
-  }
-
-  /** Download PDF directly. */
-  const exportPDF = async () => {
-    if (isExporting) return
-    setIsExporting(true)
-    const el = await prepare()
-    if (!el) { setIsExporting(false); return }
+  /** Render the react-pdf Document tree to a Blob. */
+  const exportBlob = async (): Promise<Blob | null> => {
+    const doc = getPdfDoc()
+    if (!doc) return null
     try {
-      await html2pdf().set({ ...PDF_OPTIONS, filename }).from(el).save()
-    } catch {
-      toast.error('Erro ao exportar PDF. Tente novamente.')
-    } finally {
-      cleanup()
-      setIsExporting(false)
+      return await pdf(doc).toBlob()
+    } catch (err) {
+      console.error('[usePdfExport] pdf().toBlob() failed:', err)
+      return null
     }
   }
 
-  /** Generate PDF as Blob (without triggering download). */
-  const exportBlob = async (): Promise<Blob | null> => {
-    const el = await prepare()
-    if (!el) return null
+  /** Download PDF to disk. */
+  const exportPDF = async () => {
+    if (isExporting) return
+    setIsExporting(true)
+    const toastId = toast.loading('Gerando PDF…')
     try {
-      const blob = await html2pdf()
-        .set({ ...PDF_OPTIONS, filename })
-        .from(el)
-        .outputPdf('blob') as Blob
-      return blob
+      const blob = await exportBlob()
+      if (!blob) {
+        toast.error('Erro ao gerar PDF. Tente novamente.', { id: toastId })
+        return
+      }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success('PDF exportado com sucesso!', { id: toastId })
     } catch {
-      return null
+      toast.error('Erro ao exportar PDF.', { id: toastId })
     } finally {
-      cleanup()
+      setIsExporting(false)
     }
   }
 
   /**
    * Share PDF via WhatsApp.
-   * @param phone  Phone number — any format, digits-only or formatted. Brazilian numbers
-   *               without country code will have +55 prepended automatically.
+   * Mobile: native Web Share API with PDF attachment.
+   * Desktop: download PDF + open WhatsApp Web.
    */
   const shareWhatsApp = async (phone: string) => {
     if (isExporting) return
-    if (!phone.trim()) { toast.error('Informe o número do WhatsApp.'); return }
+    if (!phone.trim()) {
+      toast.error('Informe o número do WhatsApp.')
+      return
+    }
     setIsExporting(true)
+    const toastId = toast.loading('Gerando PDF…')
 
     try {
-      // Normalize phone
       const digits = phone.replace(/\D/g, '')
       const intlPhone = digits.startsWith('55') ? digits : `55${digits}`
-
       const text =
-        `Olá! Preparei um relatório de simulação de consórcio especialmente para você. ` +
-        `Segue o PDF com todos os números e a estratégia recomendada. ` +
-        `Qualquer dúvida estou à disposição! 😊`
+        'Olá! Preparei um relatório de simulação de consórcio especialmente para você. ' +
+        'Segue o PDF com todos os números e a estratégia recomendada. ' +
+        'Qualquer dúvida estou à disposição! 😊'
       const waUrl = `https://wa.me/${intlPhone}?text=${encodeURIComponent(text)}`
 
       const blob = await exportBlob()
-      if (!blob) { toast.error('Erro ao gerar PDF.'); return }
+      if (!blob) {
+        toast.error('Erro ao gerar PDF.', { id: toastId })
+        return
+      }
 
       const file = new File([blob], filename, { type: 'application/pdf' })
 
-      // Mobile: try native Web Share API with file
+      // Try native share sheet (works on iOS/Android with PDF support)
       if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title: 'Relatório de Simulação', text })
+          toast.dismiss(toastId)
           return
         } catch (err) {
-          // AbortError = user cancelled. Any other error falls through.
-          if ((err as DOMException).name === 'AbortError') return
+          if ((err as DOMException).name === 'AbortError') {
+            toast.dismiss(toastId)
+            return
+          }
         }
       }
 
-      // Desktop fallback: download the PDF then open WhatsApp Web
+      // Desktop fallback: download + open WhatsApp Web
       const objUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objUrl
@@ -121,11 +117,10 @@ export function usePdfExport(
       a.remove()
       URL.revokeObjectURL(objUrl)
 
-      // Open WhatsApp Web after a short delay so the download starts
       setTimeout(() => window.open(waUrl, '_blank'), 800)
-      toast.success('PDF baixado! Abrindo WhatsApp para envio...')
+      toast.success('PDF baixado! Abrindo WhatsApp para envio…', { id: toastId })
     } catch {
-      toast.error('Erro ao compartilhar. Tente exportar o PDF manualmente.')
+      toast.error('Erro ao compartilhar. Tente exportar o PDF manualmente.', { id: toastId })
     } finally {
       setIsExporting(false)
     }

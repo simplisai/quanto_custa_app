@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import {
@@ -20,7 +20,7 @@ import {
 import { Line } from "react-chartjs-2";
 import { ArrowLeft, Home, TrendingUp, Scale, Clock, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -113,8 +113,10 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function AluguelVsConsorcioPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "Aluguel_vs_Consorcio.pdf");
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
+    () => results ? <PDFAluguelDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    "Aluguel_vs_Consorcio.pdf",
+  );
 
   const [aluguel, setAluguel] = useState(maskMoney(String(defaultAluguelInputs.aluguelAtual * 100)));
   const [reajuste, setReajuste] = useState(maskPercent(String(defaultAluguelInputs.reajusteAluguelAnual * 100)));
@@ -353,9 +355,6 @@ function AluguelVsConsorcioPage() {
 
       {results && <ResultsAluguel r={results} inputs={inputs} />}
 
-      <div ref={reportRef} style={{ display: "none" }}>
-        <PDFAluguel r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
-      </div>
     </div>
   );
 }
@@ -487,22 +486,21 @@ function ResultsAluguel({ r, inputs }: { r: AluguelResults; inputs: AluguelInput
   );
 }
 
-function PDFAluguel({ r, inputs, clientName }: {
-  r: AluguelResults | null; inputs: AluguelInputs; clientName?: string;
+function PDFAluguelDoc({ r, inputs, clientName }: {
+  r: AluguelResults; inputs: AluguelInputs; clientName?: string;
 }) {
-  if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const anosHorizonte = inputs.horizonte;
 
   return (
-    <PdfPage>
-      <PdfHeader
+    <RpDoc>
+      <RpHeader
         title="Aluguel vs. Consórcio"
-        subtitle="Análise Patrimonial — O Custo Real de Continuar Alugando"
+        subtitle="Analise Patrimonial — O Custo Real de Continuar Alugando"
         clientName={clientName}
         date={hoje}
       />
-      <PdfPremises items={[
+      <RpPremises items={[
         ["Aluguel atual", fmtBRL(inputs.aluguelAtual)],
         ["Reajuste anual", `${inputs.reajusteAluguelAnual}%`],
         ["Horizonte de análise", `${anosHorizonte} anos`],
@@ -513,58 +511,43 @@ function PDFAluguel({ r, inputs, clientName }: {
         ["Contempl. prevista", `Mês ${inputs.mesContemplacao}`],
       ]} />
 
-      <PdfSection title="O Veredicto em Números" description="Em exatamente o mesmo período de tempo — pagando aluguel ou construindo patrimônio:">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
-          <PdfMetric
-            label={`Total gasto no aluguel (${anosHorizonte} anos)`}
-            value={fmtBRL(r.totalAluguel)}
-            description="Valor desembolsado sem gerar nenhum ativo. Patrimônio final: R$ 0,00."
-            color={C.red}
-          />
-          <PdfMetric
-            label="Total pago no consórcio"
-            value={fmtBRL(r.totalConsorcio)}
-            description={`Incluindo parcelas e lance. Patrimônio final: ${fmtBRL(r.valorImovelFinal)}`}
-            color={C.navy}
-          />
-          <PdfMetric
-            label="Diferença patrimonial"
-            value={fmtBRL(r.vantagemPatrimonial)}
-            description={`Vantagem real de escolher o consórcio em vez de continuar alugando`}
-            color={C.green}
-          />
-        </div>
-      </PdfSection>
+      <RpSection title="O Veredicto em Números" description="Em exatamente o mesmo período de tempo — pagando aluguel ou construindo patrimônio:">
+        <RpMetricRow>
+          <RpMetric label={`Total gasto no aluguel (${anosHorizonte} anos)`} value={fmtBRL(r.totalAluguel)} description="Valor desembolsado sem gerar nenhum ativo. Patrimônio final: R$ 0,00." color={C.red} />
+          <RpMetric label="Total pago no consórcio" value={fmtBRL(r.totalConsorcio)} description={`Incluindo parcelas e lance. Patrimônio final: ${fmtBRL(r.valorImovelFinal)}`} color={C.navy} />
+          <RpMetric label="Diferença patrimonial" value={fmtBRL(r.vantagemPatrimonial)} description="Vantagem real de escolher o consórcio em vez de continuar alugando" color={C.green} />
+        </RpMetricRow>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="🏠"
         title={`Em ${anosHorizonte} anos de aluguel: ${fmtBRL(r.totalAluguel)} pagos. Patrimônio: R$ 0,00.`}
-        body={`Cada mês de aluguel pago é dinheiro que vai embora — sem construir ativo, sem valorização, sem herança. No mesmo período, com o consórcio, você paga ${fmtBRL(r.totalConsorcio)} e tem um imóvel avaliado em ${fmtBRL(r.valorImovelFinal)}. A diferença patrimonial é de ${fmtBRL(r.vantagemPatrimonial)}. Não é uma questão de opinião — é matemática.`}
+        body={`Cada mes de aluguel pago e dinheiro que vai embora — sem construir ativo, sem valorizacao, sem heranca. No mesmo periodo, com o consorcio, voce paga ${fmtBRL(r.totalConsorcio)} e tem um imovel avaliado em ${fmtBRL(r.valorImovelFinal)}. A diferenca patrimonial e de ${fmtBRL(r.vantagemPatrimonial)}. Nao e uma questao de opiniao — e matematica.`}
         variant="primary"
       />
 
-      <PdfSection title="Análise Mês a Mês" description="Como a decisão impacta seu patrimônio ao longo do tempo:">
-        <PdfKVList rows={[
+      <RpSection title="Análise Mês a Mês" description="Como a decisão impacta seu patrimônio ao longo do tempo:">
+        <RpKVList rows={[
           { label: "Aluguel atual (mês 1)", value: fmtBRL(inputs.aluguelAtual) },
           { label: `Aluguel projetado (mês ${anosHorizonte * 12})`, value: fmtBRL(inputs.aluguelAtual * Math.pow(1 + inputs.reajusteAluguelAnual / 100, anosHorizonte)), color: C.red },
           { label: "Parcela do consórcio (pré-contempl.)", value: fmtBRL(r.parcelaPadrao) },
-          { label: `Contemplação prevista`, value: `Mês ${inputs.mesContemplacao}`, color: C.navy },
+          { label: "Contemplação prevista", value: `Mês ${inputs.mesContemplacao}`, color: C.navy },
           { label: "Parcela após contemplação (pós-lance)", value: fmtBRL(r.parcelaPosLance) },
           { label: "Valor do imóvel hoje", value: fmtBRL(inputs.cartaCredito), color: C.navy },
           { label: `Valor do imóvel em ${anosHorizonte} anos (valoriz. ${inputs.valorizacaoAnual}% a.a.)`, value: fmtBRL(r.valorImovelFinal), color: C.green },
           { label: "Riqueza acumulada com aluguel", value: "R$ 0,00", color: C.red },
           { label: "Patrimônio acumulado com consórcio", value: fmtBRL(r.vantagemPatrimonial), color: C.green },
         ]} />
-      </PdfSection>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="📊"
         title="O aluguel certo vs. o imóvel certo"
-        body={`Você paga aluguel porque parece "mais seguro" — mas a certeza do aluguel é a certeza de não ter patrimônio. O consórcio tem uma incerteza de timing, mas a certeza do resultado: ao final de ${anosHorizonte} anos, você tem um imóvel. Com aluguel, você tem o recibo do último mês.`}
+        body={`Voce paga aluguel porque parece mais seguro — mas a certeza do aluguel e a certeza de nao ter patrimônio. O consorcio tem uma incerteza de timing, mas a certeza do resultado: ao final de ${anosHorizonte} anos, voce tem um imovel. Com aluguel, voce tem o recibo do ultimo mes.`}
         variant="warning"
       />
 
-      <PdfFooter note="Valores do aluguel projetados com reajuste composto anual. Valor do imóvel projetado com valorização anual. Resultados reais podem variar conforme condições de mercado." />
-    </PdfPage>
+      <RpFooter note="Valores do aluguel projetados com reajuste composto anual. Valor do imóvel projetado com valorização anual. Resultados reais podem variar conforme condições de mercado." />
+    </RpDoc>
   );
 }

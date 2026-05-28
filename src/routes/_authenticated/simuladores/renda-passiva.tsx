@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import {
@@ -21,7 +21,7 @@ import {
 import { Bar, Line } from "react-chartjs-2";
 import { ArrowLeft, Banknote, TrendingUp, BarChart2, Zap, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -114,8 +114,10 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function RendaPassivaPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "Renda_Passiva_Consorcio.pdf");
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
+    () => results ? <PDFRendaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    "Renda_Passiva_Consorcio.pdf",
+  );
 
   const [carta, setCarta] = useState(maskMoney(String(defaultRendaPassivaInputs.cartaCredito * 100)));
   const [taxaAdm, setTaxaAdm] = useState(maskPercent(String(defaultRendaPassivaInputs.taxaAdmTotal * 100)));
@@ -374,9 +376,6 @@ function RendaPassivaPage() {
 
       {results && <ResultsRenda r={results} inputs={inputs} />}
 
-      <div ref={reportRef} style={{ display: "none" }}>
-        <PDFRenda r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
-      </div>
     </div>
   );
 }
@@ -385,99 +384,45 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
   const step = Math.max(1, Math.floor(r.prazoMeses / 20));
   const sampled = r.timeline.filter((_, i) => i % step === 0 || i === r.timeline.length - 1);
 
-  // Gráfico de barras: parcela vs renda por mês amostrado
+  const isCDI = inputs.usoCreditoContemplado === "credito_rende_cdi";
+  const fmtK = (v: unknown) => {
+    const n = Number(v);
+    return n >= 1_000_000 ? `R$ ${(n / 1_000_000).toFixed(1)}M` : `R$ ${(n / 1000).toFixed(0)}k`;
+  };
+  const tooltipFmt = (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
+    `${ctx.dataset.label}: ${fmtBRL(ctx.parsed.y)}`;
+  const baseChartOpts = {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+    interaction: { mode: "index" as const, intersect: false },
+    plugins: { tooltip: { callbacks: { label: tooltipFmt } } },
+    scales: { x: { grid: { display: false } }, y: { ticks: { callback: fmtK } } },
+  };
+
+  // Gráfico A: Parcela vs Renda (estratégia compra_imovel — barras INCC-corrigidas)
   const barData = {
     labels: sampled.map((d) => `M${d.mes}`),
     datasets: [
-      {
-        label: "Parcela Consórcio",
-        data: sampled.map((d) => d.parcelaCons),
-        backgroundColor: "rgba(239,68,68,0.8)",
-        borderRadius: 3,
-        borderSkipped: false,
-      },
-      {
-        label: "Renda de Aluguel",
-        data: sampled.map((d) => d.rendaAluguel),
-        backgroundColor: "rgba(34,197,94,0.8)",
-        borderRadius: 3,
-        borderSkipped: false,
-      },
+      { label: "Parcela Consórcio (INCC)", data: sampled.map((d) => d.parcelaCons), backgroundColor: "rgba(239,68,68,0.85)", borderRadius: 3, borderSkipped: false as const },
+      { label: "Renda de Aluguel", data: sampled.map((d) => d.rendaAluguel), backgroundColor: "rgba(34,197,94,0.85)", borderRadius: 3, borderSkipped: false as const },
     ],
   };
 
-  const barOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: { duration: 400 },
-    interaction: { mode: "index" as const, intersect: false },
-    plugins: {
-      tooltip: {
-        callbacks: {
-          label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
-            `${ctx.dataset.label}: ${fmtBRL(ctx.parsed.y)}`,
-        },
-      },
-    },
-    scales: {
-      x: { grid: { display: false } },
-      y: {
-        ticks: { callback: (v: unknown) => `R$ ${(Number(v) / 1000).toFixed(0)}k` },
-      },
-    },
+  // Gráfico B: Crédito CDI vs Parcelas INCC (estratégia credito_rende_cdi)
+  const cdiData = {
+    labels: sampled.map((d) => `M${d.mes}`),
+    datasets: [
+      { label: "Parcela Consórcio (INCC)", data: sampled.map((d) => d.parcelaCons), backgroundColor: "rgba(239,68,68,0.85)", borderRadius: 3, borderSkipped: false as const },
+      { label: "Crédito Rendendo CDI", data: sampled.map((d) => d.creditoCDI / Math.max(r.prazoMeses, 1)), borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.1)", fill: true, pointRadius: 0, borderWidth: 2.5, tension: 0.3, type: "line" as const },
+    ],
   };
 
-  // Gráfico de linha: evolução do patrimônio
+  // Gráfico C: Evolução do Patrimônio
   const lineData = {
     labels: sampled.map((d) => `M${d.mes}`),
     datasets: [
-      {
-        label: "Total Investido",
-        data: sampled.map((d) => d.totalInvestido),
-        borderColor: "#ef4444",
-        backgroundColor: "rgba(239,68,68,0.05)",
-        fill: true,
-        pointRadius: 0,
-        borderWidth: 2,
-        tension: 0.3,
-      },
-      {
-        label: "Patrimônio Total",
-        data: sampled.map((d) => d.patrimonioTotal),
-        borderColor: "#22c55e",
-        backgroundColor: "rgba(34,197,94,0.08)",
-        fill: true,
-        pointRadius: 0,
-        borderWidth: 2.5,
-        tension: 0.3,
-      },
+      { label: "Total Investido", data: sampled.map((d) => d.totalInvestido), borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.05)", fill: true, pointRadius: 0, borderWidth: 2, tension: 0.3 },
+      { label: "Patrimônio Total", data: sampled.map((d) => d.patrimonioTotal), borderColor: "#22c55e", backgroundColor: "rgba(34,197,94,0.08)", fill: true, pointRadius: 0, borderWidth: 2.5, tension: 0.3 },
     ],
-  };
-
-  const lineOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: { duration: 400 },
-    interaction: { mode: "index" as const, intersect: false },
-    plugins: {
-      tooltip: {
-        callbacks: {
-          label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
-            `${ctx.dataset.label}: ${fmtBRL(ctx.parsed.y)}`,
-        },
-      },
-    },
-    scales: {
-      x: { grid: { display: false } },
-      y: {
-        ticks: {
-          callback: (v: unknown) => {
-            const n = Number(v);
-            return n >= 1_000_000 ? `R$ ${(n / 1_000_000).toFixed(1)}M` : `R$ ${(n / 1000).toFixed(0)}k`;
-          },
-        },
-      },
-    },
   };
 
   return (
@@ -505,22 +450,36 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
         <KPI icon={Zap} label="ROI anual" value={`${r.roiAnual.toFixed(2)}% a.a.`} sub={`vs. CDB: ${inputs.taxaCDIAnual}% a.a.`} variant={r.roiAnual > inputs.taxaCDIAnual ? "success" : "warning"} />
       </div>
 
-      {/* ── Gráfico: parcela vs renda ─────────────────────────────── */}
-      <Section title="Parcela do Consórcio vs. Renda de Aluguel por Mês">
-        <div className="h-52 sm:h-64 w-full">
-          <Bar data={barData} options={barOptions} />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          As barras verdes (renda) crescem com o reajuste anual. A partir do mês {r.mesFluxoNeutro ?? "—"}, superam a parcela (barra vermelha).
-        </p>
-      </Section>
+      {/* ── Gráfico único conforme estratégia pós-contemplação ────── */}
+      {!isCDI ? (
+        <Section title="Parcela do Consórcio vs. Renda de Aluguel por Mês">
+          <div className="h-52 sm:h-64 w-full">
+            <Bar data={barData} options={baseChartOpts} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Parcelas corrigidas anualmente pelo INCC. Barras verdes (renda) crescem com o reajuste.
+            {r.mesFluxoNeutro ? ` A partir do mês ${r.mesFluxoNeutro}, o fluxo é neutro ou positivo.` : ""}
+          </p>
+        </Section>
+      ) : (
+        <Section title="Crédito Rendendo CDI vs. Parcelas com Reajuste INCC">
+          <div className="h-52 sm:h-64 w-full">
+            <Bar data={cdiData} options={baseChartOpts} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Barras vermelhas = parcela mensal corrigida pelo INCC. Linha roxa = saldo diário médio do crédito acumulado no CDI.
+          </p>
+        </Section>
+      )}
 
-      {/* ── Gráfico: patrimônio ───────────────────────────────────── */}
-      <Section title="Evolução do Patrimônio vs. Total Investido">
-        <div className="h-52 sm:h-64 w-full">
-          <Line data={lineData} options={lineOptions} />
-        </div>
-      </Section>
+      {/* ── Gráfico: evolução do patrimônio (só compra_imovel) ────── */}
+      {!isCDI && (
+        <Section title="Evolução do Patrimônio vs. Total Investido">
+          <div className="h-52 sm:h-64 w-full">
+            <Line data={lineData} options={baseChartOpts} />
+          </div>
+        </Section>
+      )}
 
       {/* ── Tabela comparativa: Consórcio vs CDB ──────────────────── */}
       <Section title="Comparativo: Consórcio + Aluguel vs. CDB" accent>
@@ -585,22 +544,34 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
   );
 }
 
-function PDFRenda({ r, inputs, clientName }: {
-  r: RendaPassivaResults | null; inputs: RendaPassivaInputs; clientName?: string;
+function PDFRendaDoc({ r, inputs, clientName }: {
+  r: RendaPassivaResults; inputs: RendaPassivaInputs; clientName?: string;
 }) {
-  if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const anos = inputs.prazoMeses / 12;
+  const isCDI = inputs.usoCreditoContemplado === "credito_rende_cdi";
+
+  const fluxoRows: { label: string; value: string; color?: string }[] = [
+    { label: "Total investido (parcelas + lance)", value: fmtBRL(r.totalInvestido) },
+    { label: "Patrimônio final (imóvel + fluxo)", value: fmtBRL(r.patrimonioFinal), color: C.green },
+    { label: `Projeção CDB/Selic (${inputs.taxaCDIAnual}% a.a.)`, value: fmtBRL(r.cdbFuturo), color: C.red },
+    { label: "Vantagem do consórcio vs. CDB", value: fmtBRL(r.vantagemVsCDB), color: r.vantagemVsCDB >= 0 ? C.green : C.red },
+    { label: "ROI total no período", value: `${r.roiPercentual.toFixed(1)}%`, color: C.green },
+    { label: "ROI anual equivalente", value: `${r.roiAnual.toFixed(1)}% a.a.`, color: C.green },
+  ];
+  if (r.mesFluxoNeutro) {
+    fluxoRows.push({ label: "Mês em que aluguel paga a parcela", value: `Mês ${r.mesFluxoNeutro}`, color: C.navy });
+  }
 
   return (
-    <PdfPage>
-      <PdfHeader
+    <RpDoc>
+      <RpHeader
         title="Renda Passiva com Consórcio"
         subtitle="Consórcio como Investimento — Relatório de Viabilidade"
         clientName={clientName}
         date={hoje}
       />
-      <PdfPremises items={[
+      <RpPremises items={[
         ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
         ["Prazo do grupo", `${inputs.prazoMeses} meses`],
         ["Taxa de adm.", `${inputs.taxaAdmTotal}%`],
@@ -611,52 +582,44 @@ function PDFRenda({ r, inputs, clientName }: {
         ["CDI comparativo", `${inputs.taxaCDIAnual}% a.a.`],
       ]} />
 
-      <PdfSection title="Resultados da Estratégia de Renda Passiva" description="Quanto rende o consórcio como veículo de investimento imobiliário:">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
-          <PdfMetric label="Total investido" value={fmtBRL(r.totalInvestido)} description="Parcelas + lance próprio desembolsado" color={C.navy} />
-          <PdfMetric label="Renda gerada no período" value={fmtBRL(r.totalRendaGerada)} description={`Aluguéis recebidos em ${anos.toFixed(0)} anos`} color={C.green} />
-          <PdfMetric label="Valor do imóvel no final" value={fmtBRL(r.valorImovelFinal)} description={`Valorização de ${inputs.valorizacaoAnual}% a.a. sobre ${fmtBRL(inputs.cartaCredito)}`} color={C.navy} />
-          <PdfMetric label="ROI anual" value={`${r.roiAnual.toFixed(1)}% a.a.`} description={`vs. CDI de ${inputs.taxaCDIAnual}% a.a.`} color={r.roiAnual >= inputs.taxaCDIAnual ? C.green : C.amber} />
-        </div>
-      </PdfSection>
+      <RpSection title="Resultados da Estratégia de Renda Passiva" description="Quanto rende o consórcio como veículo de investimento imobiliário:">
+        <RpMetricRow>
+          <RpMetric label="Total investido" value={fmtBRL(r.totalInvestido)} description="Parcelas + lance próprio desembolsado" color={C.navy} />
+          <RpMetric label="Renda gerada no período" value={fmtBRL(r.totalRendaGerada)} description={`Alugueis recebidos em ${anos.toFixed(0)} anos`} color={C.green} />
+          <RpMetric label="Valor do imóvel no final" value={fmtBRL(r.valorImovelFinal)} description={`Valorização de ${inputs.valorizacaoAnual}% a.a.`} color={C.navy} />
+          <RpMetric label="ROI anual" value={`${r.roiAnual.toFixed(1)}% a.a.`} description={`vs. CDI de ${inputs.taxaCDIAnual}% a.a.`} color={r.roiAnual >= inputs.taxaCDIAnual ? C.green : C.amber} />
+        </RpMetricRow>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="🏦"
         title="O consórcio pode se pagar sozinho"
-        body={`Após a contemplação no mês ${inputs.mesContemplacao}, o imóvel gera ${fmtBRL(inputs.rendaAluguelMensal)}/mês de aluguel${r.mesFluxoNeutro ? ` — e a partir do mês ${r.mesFluxoNeutro}, o aluguel já supera a parcela do consórcio. Isso significa que o próprio inquilino paga sua cota` : ""}. Ao final de ${anos.toFixed(0)} anos, você tem um imóvel avaliado em ${fmtBRL(r.valorImovelFinal)} + ${fmtBRL(r.totalRendaGerada)} em renda acumulada — com um ROI anual de ${r.roiAnual.toFixed(1)}%.`}
+        body={`Apos a contemplacao no mes ${inputs.mesContemplacao}, o imovel gera ${fmtBRL(inputs.rendaAluguelMensal)}/mes de aluguel${r.mesFluxoNeutro ? ` — e a partir do mes ${r.mesFluxoNeutro}, o aluguel ja supera a parcela do consorcio` : ""}. Ao final de ${anos.toFixed(0)} anos, voce tem um imovel avaliado em ${fmtBRL(r.valorImovelFinal)} + ${fmtBRL(r.totalRendaGerada)} em renda acumulada — ROI anual de ${r.roiAnual.toFixed(1)}%.`}
         variant="primary"
       />
 
-      <PdfSection title="Comparativo: Consórcio vs. CDB/Selic" description="Se você investisse o mesmo valor em renda fixa em vez de usar no consórcio:">
-        <PdfKVList rows={[
-          { label: "Total investido (parcelas + lance)", value: fmtBRL(r.totalInvestido) },
-          { label: "Patrimônio final (imóvel + fluxo)", value: fmtBRL(r.patrimonioFinal), color: C.green },
-          { label: `Projeção CDB/Selic (${inputs.taxaCDIAnual}% a.a.)`, value: fmtBRL(r.cdbFuturo), color: C.red },
-          { label: "Vantagem do consórcio vs. CDB", value: fmtBRL(r.vantagemVsCDB), color: r.vantagemVsCDB >= 0 ? C.green : C.red },
-          { label: "ROI total no período", value: `${r.roiPercentual.toFixed(1)}%`, color: C.green },
-          { label: "ROI anual equivalente", value: `${r.roiAnual.toFixed(1)}% a.a.`, color: C.green },
-          ...(r.mesFluxoNeutro ? [{ label: "Mês em que aluguel paga a parcela", value: `Mês ${r.mesFluxoNeutro}`, color: C.navy }] : []),
-        ]} />
-      </PdfSection>
+      <RpSection title="Comparativo: Consórcio vs. CDB/Selic" description="Se você investisse o mesmo valor em renda fixa:">
+        <RpKVList rows={fluxoRows} />
+      </RpSection>
 
-      {inputs.usoCreditoContemplado === "credito_rende_cdi" && r.creditoFinalComCDI > 0 && (
-        <PdfSection title="Estratégia Alternativa: Crédito Rende CDI" description="E se, em vez de comprar um imóvel, você deixar o crédito render CDI enquanto paga as parcelas com INCC?">
-          <PdfKVList rows={[
+      {isCDI && r.creditoFinalComCDI > 0 ? (
+        <RpSection title="Estratégia Alternativa: Crédito Rende CDI" description="Credito rendendo CDI enquanto paga parcelas com reajuste INCC:">
+          <RpKVList rows={[
             { label: "Crédito acumulado com CDI", value: fmtBRL(r.creditoFinalComCDI), color: C.green },
             { label: "Total pago em parcelas (INCC)", value: fmtBRL(r.totalParcelasComINCC), color: C.red },
             { label: "Lucro líquido da estratégia CDI", value: fmtBRL(r.lucroEstrategiaCDI), color: r.lucroEstrategiaCDI >= 0 ? C.green : C.red },
           ]} />
-        </PdfSection>
-      )}
+        </RpSection>
+      ) : null}
 
-      <PdfInsight
+      <RpInsight
         emoji="📈"
         title="Por que consórcio bate a renda fixa neste cenário?"
-        body={`O consórcio combina alavancagem (você controla um imóvel de ${fmtBRL(inputs.cartaCredito)} com desembolso fracionado), renda (aluguel mensal crescente), e valorização (imóvel sobe ${inputs.valorizacaoAnual}% a.a. sobre o valor total, não sobre o que você pagou). Renda fixa só rende sobre o que você investiu — sem alavancagem, sem valorização de ativo real.`}
+        body={`O consorcio combina alavancagem (voce controla um imovel de ${fmtBRL(inputs.cartaCredito)} com desembolso fracionado), renda (aluguel mensal crescente), e valorização (imovel sobe ${inputs.valorizacaoAnual}% a.a. sobre o valor total). Renda fixa so rende sobre o que voce investiu — sem alavancagem, sem valorização de ativo real.`}
         variant="success"
       />
 
-      <PdfFooter />
-    </PdfPage>
+      <RpFooter />
+    </RpDoc>
   );
 }

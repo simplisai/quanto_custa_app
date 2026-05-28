@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import {
@@ -23,7 +23,8 @@ import {
   ArrowLeft, ArrowRight, BookOpen, Trophy, Coins, TrendingUp, Building2, Percent,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
+import { View as RpView, Text as RpText } from "@react-pdf/renderer";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -95,11 +96,11 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
   return (
     <div className={`rounded-2xl p-4 sm:p-5 ${colors[variant]}`}>
       <div className="flex items-center gap-2 mb-2">
-        <Icon className={`h-4 w-4 ${iconColors[variant]}`} />
-        <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">{label}</span>
+        <Icon className={`h-4 w-4 shrink-0 ${iconColors[variant]}`} />
+        <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-70 leading-tight">{label}</span>
       </div>
-      <div className="text-xl sm:text-2xl font-extrabold">{value}</div>
-      {sub && <div className="mt-1 text-xs opacity-60">{sub}</div>}
+      <div className="text-base sm:text-lg font-extrabold break-words min-w-0 leading-snug">{value}</div>
+      {sub && <div className="mt-1 text-xs opacity-60 break-words">{sub}</div>}
     </div>
   );
 }
@@ -107,8 +108,10 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function MetaPatrimonialPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "meta-patrimonial.pdf");
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
+    () => results ? <PDFMetaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    "meta-patrimonial.pdf",
+  );
 
   const [modo, setModo] = useState<ModoMeta>("patrimonio");
   const [patrimonioAlvo, setPatrimonioAlvo] = useState(maskMoney(String(defaultMetaInputs.patrimonioAlvoR * 100)));
@@ -466,19 +469,15 @@ function MetaPatrimonialPage() {
             </Link>
           )}
 
-          {/* Relatório PDF */}
-          <div ref={reportRef} style={{ display: "none" }}>
-            <PDFMeta r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
-          </div>
         </>
       )}
     </div>
   );
 }
 
-// ─── PDF Component ────────────────────────────────────────────────────────────
-function PDFMeta({ r, inputs, clientName }: {
-  r: MetaPatrimonialResults | null;
+// ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
+function PDFMetaDoc({ r, inputs, clientName }: {
+  r: MetaPatrimonialResults;
   inputs: {
     modo: ModoMeta;
     patrimonioAlvoR: number;
@@ -495,20 +494,20 @@ function PDFMeta({ r, inputs, clientName }: {
   };
   clientName?: string;
 }) {
-  if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  const metaLabel = inputs.modo === "patrimonio" ? fmtBRL(inputs.patrimonioAlvoR) : `${fmtBRL(inputs.rendaMensalAlvoR)}/mes`;
 
   return (
-    <PdfPage>
-      <PdfHeader
+    <RpDoc>
+      <RpHeader
         title="Meta Patrimonial"
         subtitle="Plano de Aquisição de Patrimônio via Consórcio — Cálculo Reverso"
         clientName={clientName}
         date={hoje}
       />
-      <PdfPremises items={[
+      <RpPremises items={[
         ["Modo", inputs.modo === "patrimonio" ? "Patrimônio" : "Renda Passiva"],
-        ["Meta", inputs.modo === "patrimonio" ? fmtBRL(inputs.patrimonioAlvoR) : `${fmtBRL(inputs.rendaMensalAlvoR)}/mês`],
+        ["Meta", metaLabel],
         ["Horizonte", `${inputs.horizonteAnos} anos`],
         ["Nº de cotas", String(r.numCotas)],
         ["Taxa de adm.", `${inputs.taxaAdmConsorcio}%`],
@@ -517,53 +516,53 @@ function PDFMeta({ r, inputs, clientName }: {
         ["Valorização", `${inputs.valorizacaoAnual}% a.a.`],
       ]} />
 
-      <PdfSection title="Resultado do Plano Patrimonial" description="O que o consórcio entrega ao final do horizonte planejado:">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
-          <PdfMetric label="Nº de cotas necessárias" value={`${r.numCotas} cotas`} description="Quantidade de consórcios para atingir a meta" color={C.navy} />
-          <PdfMetric label="Patrimônio total final" value={fmtBRL(r.patrimonioTotalFinal)} description="Soma do valor de mercado de todos os imóveis" color={C.green} />
-          <PdfMetric label="Renda passiva mensal" value={fmtBRL(r.rendaMensalFinalR)} description="Aluguel potencial com yield aplicado sobre o patrimônio" color={C.green} />
-          <PdfMetric label="Investimento mensal (pico)" value={fmtBRL(r.investimentoMensalTotal)} description="Maior desembolso simultâneo de parcelas" color={C.amber} />
-        </div>
-      </PdfSection>
+      <RpSection title="Resultado do Plano Patrimonial" description="O que o consórcio entrega ao final do horizonte planejado:">
+        <RpMetricRow>
+          <RpMetric label="Nº de cotas necessárias" value={`${r.numCotas} cotas`} description="Quantidade de consórcios para atingir a meta" color={C.navy} />
+          <RpMetric label="Patrimônio total final" value={fmtBRL(r.patrimonioTotalFinal)} description="Soma do valor de mercado de todos os imóveis" color={C.green} />
+          <RpMetric label="Renda passiva mensal" value={fmtBRL(r.rendaMensalFinalR)} description="Aluguel potencial com yield aplicado sobre o patrimônio" color={C.green} />
+          <RpMetric label="Investimento mensal (pico)" value={fmtBRL(r.investimentoMensalTotal)} description="Maior desembolso simultâneo de parcelas" color={C.amber} />
+        </RpMetricRow>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="🏆"
         title="Por que consórcio para construir patrimônio?"
-        body={`Com ${r.numCotas} cotas de consórcio ao longo de ${inputs.horizonteAnos} anos, você constrói um patrimônio de ${fmtBRL(r.patrimonioTotalFinal)} — contra ${fmtBRL(r.cdbFinal)} que o mesmo capital renderia no CDB. Vantagem patrimonial: ${fmtBRL(r.vantageVsCDB)}. O consórcio combina alavancagem imobiliária (você controla imóveis de valor total maior que o desembolso) com valorização real do ativo.`}
+        body={`Com ${r.numCotas} cotas de consorcio ao longo de ${inputs.horizonteAnos} anos, voce constroi um patrimônio de ${fmtBRL(r.patrimonioTotalFinal)} — contra ${fmtBRL(r.cdbFinal)} que o mesmo capital renderia no CDB. Vantagem patrimonial: ${fmtBRL(r.vantageVsCDB)}. O consorcio combina alavancagem imobiliária com valorização real do ativo.`}
         variant="primary"
       />
 
-      <PdfSection title="Comparativo: Consórcio vs. CDB" description="O que acontece com o mesmo dinheiro aplicado em renda fixa:">
-        <PdfKVList rows={[
+      <RpSection title="Comparativo: Consórcio vs. CDB" description="O que acontece com o mesmo dinheiro aplicado em renda fixa:">
+        <RpKVList rows={[
           { label: "Total investido no plano", value: fmtBRL(r.totalInvestido) },
           { label: "Patrimônio final — consórcio", value: fmtBRL(r.patrimonioTotalFinal), color: C.green },
           { label: `Retorno CDB (${inputs.cdiAnual}% a.a.)`, value: fmtBRL(r.cdbFinal), color: C.red },
           { label: "Vantagem patrimonial vs. CDB", value: fmtBRL(r.vantageVsCDB), color: r.vantageVsCDB > 0 ? C.green : C.red },
           { label: "Renda passiva mensal potencial", value: fmtBRL(r.rendaMensalFinalR), color: C.green },
         ]} />
-      </PdfSection>
+      </RpSection>
 
-      {inputs.regimeTributario !== "nenhum" && r.economiaFiscalTotal > 0 && (
-        <PdfSection title="Benefício Fiscal PJ" description={`Regime ${inputs.regimeTributario} — parcelas dedutíveis como despesa operacional`}>
-          <PdfKVList rows={[
+      {inputs.regimeTributario !== "nenhum" && r.economiaFiscalTotal > 0 ? (
+        <RpSection title="Benefício Fiscal PJ" description={`Regime ${inputs.regimeTributario} — parcelas dedutiveis como despesa operacional`}>
+          <RpKVList rows={[
             { label: "Economia fiscal total", value: fmtBRL(r.economiaFiscalTotal), color: C.green },
             { label: "Custo real da operação (pós fiscal)", value: fmtBRL(r.custoRealTotal), color: C.navy },
             { label: "Retorno líquido de impostos", value: fmtBRL(r.patrimonioTotalFinal - r.custoRealTotal), color: C.green },
           ]} />
-        </PdfSection>
-      )}
+        </RpSection>
+      ) : null}
 
-      <PdfSection title="Plano de Cotas" description="Cada cota e seu resultado esperado:">
+      <RpSection title="Plano de Cotas" description="Cada cota e seu resultado esperado:">
         {r.cotas.map((c) => (
-          <div key={c.numero} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11 }}>
-            <span style={{ color: C.textSub, flex: 1 }}>Cota {c.numero} — Mês {c.mesContemplacaoAbsoluto}</span>
-            <span style={{ color: C.navy, width: 120, textAlign: "right" as const }}>{fmtBRL(c.valorCarta)}</span>
-            <span style={{ color: C.green, width: 120, textAlign: "right" as const }}>{fmtBRL(c.valorImovelFinal)}</span>
-          </div>
+          <RpView key={c.numero} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: C.border }}>
+            <RpText style={{ color: C.textSub, flex: 1, fontSize: 9 }}>Cota {c.numero} — Mês {c.mesContemplacaoAbsoluto}</RpText>
+            <RpText style={{ color: C.navy, width: 100, textAlign: "right", fontSize: 9 }}>{fmtBRL(c.valorCarta)}</RpText>
+            <RpText style={{ color: C.green, width: 100, textAlign: "right", fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmtBRL(c.valorImovelFinal)}</RpText>
+          </RpView>
         ))}
-      </PdfSection>
+      </RpSection>
 
-      <PdfFooter />
-    </PdfPage>
+      <RpFooter />
+    </RpDoc>
   );
 }

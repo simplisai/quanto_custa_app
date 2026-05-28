@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import { calcLance, defaultLanceInputs, type LanceInputs, type LanceResults } from "@/lib/calc-lance";
@@ -15,7 +15,8 @@ import {
 import { Bar } from "react-chartjs-2";
 import { ArrowLeft, Target, TrendingDown, Coins, CalendarCheck, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfFooter, C } from "@/components/PdfShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpFooter, RpMetricRow, RpKVList, C } from "@/components/RpShell";
+import { View as RpView, Text as RpText } from "@react-pdf/renderer";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -108,8 +109,10 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function SimuladorLancePage() {
   const { user } = useAuth();
   const search = Route.useSearch();
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "Simulador_Lance_Consorcio.pdf");
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
+    () => results ? <PDFLanceDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    "Simulador_Lance_Consorcio.pdf",
+  );
 
   // ── Raws (string state para inputs mascarados) ──────────────────────────
   const [cartaCredito, setCartaCredito] = useState(maskMoney(String(defaultLanceInputs.cartaCredito * 100)));
@@ -382,10 +385,6 @@ function SimuladorLancePage() {
       {/* ── Resultados ─────────────────────────────────────────────────── */}
       {results && <ResultsLance r={results} inputs={inputs} />}
 
-      {/* ── PDF (oculto) ─────────────────────────────────────────────── */}
-      <div ref={reportRef} style={{ display: "none" }}>
-        <PDFLance r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
-      </div>
     </div>
   );
 }
@@ -559,88 +558,98 @@ function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
   );
 }
 
-// ─── PDF Report ───────────────────────────────────────────────────────────────
-function PDFLance({ r, inputs, clientName }: {
-  r: LanceResults | null; inputs: LanceInputs; clientName?: string;
+// ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
+function PDFLanceDoc({ r, inputs, clientName }: {
+  r: LanceResults; inputs: LanceInputs; clientName?: string;
 }) {
-  if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const reducaoParcela = r.parcelaPadrao - r.parcelaPosLance;
   const mesesRestantes = Math.max(inputs.prazoMeses - inputs.mesContemplacaoLance, 1);
   const espera = Math.max(inputs.mesSemLance - inputs.mesContemplacaoLance, 0);
+  const tipoLanceLabel = inputs.tipoLance === "embutido" ? "Embutido" : inputs.tipoLance === "proprio" ? "Próprio" : "Combinado";
+
+  const compRows: [string, string, string][] = [
+    ["Parcela antes da contemplação", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPadrao)],
+    ["Parcela após a contemplação", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPosLance)],
+    ["Mês de contemplação", `Mês ${inputs.mesSemLance}`, `Mês ${inputs.mesContemplacaoLance}`],
+    ["Crédito disponível", fmtBRL(inputs.cartaCredito), fmtBRL(r.creditoLiquido)],
+    ["Saldo devedor pós-lance", fmtBRL(inputs.cartaCredito), fmtBRL(r.saldoDevedorPosLance)],
+    ["Total pago no contrato", fmtBRL(r.totalSemLance), fmtBRL(r.totalComLance)],
+  ];
 
   return (
-    <PdfPage>
-      <PdfHeader
+    <RpDoc>
+      <RpHeader
         title="Simulador de Lance"
         subtitle="Estratégia de Contemplação — Relatório Personalizado"
         clientName={clientName}
         date={hoje}
       />
-      <PdfPremises items={[
+      <RpPremises items={[
         ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
         ["Prazo do grupo", `${inputs.prazoMeses} meses`],
         ["Taxa de adm.", `${inputs.taxaAdmTotal}%`],
-        ["Tipo de lance", inputs.tipoLance === "embutido" ? "Embutido" : inputs.tipoLance === "proprio" ? "Próprio" : "Combinado"],
+        ["Tipo de lance", tipoLanceLabel],
         ["Lance total", fmtBRL(r.lanceTotalR)],
         ["Contempl. com lance", `Mês ${inputs.mesContemplacaoLance}`],
-        ["Contempl. sem lance (média)", `Mês ${inputs.mesSemLance}`],
+        ["Contempl. sem lance", `Mês ${inputs.mesSemLance}`],
         ["Meses antecipados", `${espera} meses`],
       ]} />
 
-      <PdfSection title="Resultados do Lance Estratégico" description="O que muda na sua vida financeira ao dar o lance — números reais, sem interpretação:">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
-          <PdfMetric label="Contemplação garantida" value={`Mês ${inputs.mesContemplacaoLance}`} description={espera > 0 ? `${espera} meses antes da média sem lance` : "Contemplação antecipada"} color={C.navy} />
-          <PdfMetric label="Nova parcela mensal" value={fmtBRL(r.parcelaPosLance)} description={`Queda de ${fmtBRL(r.parcelaPadrao)} — ${((reducaoParcela / (r.parcelaPadrao || 1)) * 100).toFixed(0)}% a menos por mês`} color={C.green} />
-          <PdfMetric label="Lance desembolsado" value={fmtBRL(r.lanceTotalR)} description={`${r.percLanceTotalSobreCarta.toFixed(1)}% da carta — abate o saldo devedor`} color={C.amber} />
-          <PdfMetric label="Economia total no contrato" value={fmtBRL(r.economia)} description="Valor que você deixa de pagar vs. não dar lance" color={C.green} />
-        </div>
-      </PdfSection>
+      <RpSection title="Resultados do Lance Estratégico" description="O que muda na sua vida financeira ao dar o lance:">
+        <RpMetricRow>
+          <RpMetric label="Contemplação garantida" value={`Mês ${inputs.mesContemplacaoLance}`} description={espera > 0 ? `${espera} meses antes da media sem lance` : "Contemplação antecipada"} color={C.navy} />
+          <RpMetric label="Nova parcela mensal" value={fmtBRL(r.parcelaPosLance)} description={`Queda de ${fmtBRL(r.parcelaPadrao)} — ${((reducaoParcela / (r.parcelaPadrao || 1)) * 100).toFixed(0)}% a menos por mes`} color={C.green} />
+          <RpMetric label="Lance desembolsado" value={fmtBRL(r.lanceTotalR)} description={`${r.percLanceTotalSobreCarta.toFixed(1)}% da carta — abate o saldo devedor`} color={C.amber} />
+          <RpMetric label="Economia total no contrato" value={fmtBRL(r.economia)} description="Valor que voce deixa de pagar vs. nao dar lance" color={C.green} />
+        </RpMetricRow>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="💡"
         title="Por que o lance é um investimento, não um gasto?"
-        body={`Com o lance de ${fmtBRL(r.lanceTotalR)}, a parcela cai ${fmtBRL(reducaoParcela)}/mês durante os ${mesesRestantes} meses restantes — isso são ${fmtBRL(reducaoParcela * mesesRestantes)} em economia de parcelas. Em outras palavras: cada real dado no lance retorna ${r.lanceTotalR > 0 ? (r.economia / r.lanceTotalR).toFixed(1) : "0"}x ao longo do contrato. Além disso, você elimina a incerteza da contemplação aleatória: ao invés de esperar até o mês ${inputs.mesSemLance}, você garante o crédito já no mês ${inputs.mesContemplacaoLance}.`}
+        body={`Com o lance de ${fmtBRL(r.lanceTotalR)}, a parcela cai ${fmtBRL(reducaoParcela)}/mes durante os ${mesesRestantes} meses restantes — isso sao ${fmtBRL(reducaoParcela * mesesRestantes)} em economia de parcelas. Cada real dado no lance retorna ${r.lanceTotalR > 0 ? (r.economia / r.lanceTotalR).toFixed(1) : "0"}x ao longo do contrato. Alem disso, voce elimina a incerteza da contemplacao aleatoria: ao inves de esperar ate o mes ${inputs.mesSemLance}, voce garante o credito ja no mes ${inputs.mesContemplacaoLance}.`}
         variant="primary"
       />
 
-      <PdfSection title="Comparativo Direto: Sem Lance vs. Com Lance" description="Cada linha é um fato concreto — sem suposições, sem margem para dúvida:">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
-          <div style={{ fontSize: 9, fontWeight: 800, color: C.textSub, textTransform: "uppercase" as const }}>Item</div>
-          <div style={{ fontSize: 9, fontWeight: 800, color: C.red, textAlign: "center" as const, textTransform: "uppercase" as const }}>Sem Lance</div>
-          <div style={{ fontSize: 9, fontWeight: 800, color: C.green, textAlign: "center" as const, textTransform: "uppercase" as const }}>Com Lance ✓</div>
-        </div>
-        {[
-          ["Parcela antes da contemplação", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPadrao)],
-          ["Parcela após a contemplação", fmtBRL(r.parcelaPadrao), fmtBRL(r.parcelaPosLance)],
-          ["Mês de contemplação", `Mês ${inputs.mesSemLance}`, `Mês ${inputs.mesContemplacaoLance}`],
-          ["Crédito disponível", fmtBRL(inputs.cartaCredito), fmtBRL(r.creditoLiquido)],
-          ["Saldo devedor pós-lance", fmtBRL(inputs.cartaCredito), fmtBRL(r.saldoDevedorPosLance)],
-          ["Total pago no contrato", fmtBRL(r.totalSemLance), fmtBRL(r.totalComLance)],
-        ].map(([label, sem, com], i) => (
-          <div key={i} style={{ display: "flex", padding: "5px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11 }}>
-            <span style={{ flex: 1, color: C.textSub }}>{label as string}</span>
-            <span style={{ width: 120, textAlign: "center" as const, color: C.red, fontWeight: 600 }}>{sem as string}</span>
-            <span style={{ width: 120, textAlign: "center" as const, color: C.green, fontWeight: 700 }}>{com as string}</span>
-          </div>
+      <RpSection title="Comparativo: Sem Lance vs. Com Lance" description="Cada linha é um fato concreto — sem suposições:">
+        {/* Header row */}
+        <RpView style={{ flexDirection: "row", marginBottom: 4 }}>
+          <RpText style={{ flex: 1, fontSize: 8, color: C.textSub, fontFamily: "Helvetica-Bold", textTransform: "uppercase" }}>Item</RpText>
+          <RpText style={{ width: 90, fontSize: 8, color: C.red, fontFamily: "Helvetica-Bold", textTransform: "uppercase", textAlign: "center" }}>Sem Lance</RpText>
+          <RpText style={{ width: 90, fontSize: 8, color: C.green, fontFamily: "Helvetica-Bold", textTransform: "uppercase", textAlign: "center" }}>Com Lance</RpText>
+        </RpView>
+        {compRows.map(([label, sem, com], i) => (
+          <RpView key={i} style={{ flexDirection: "row", paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: C.border }}>
+            <RpText style={{ flex: 1, fontSize: 9, color: C.textSub }}>{label}</RpText>
+            <RpText style={{ width: 90, fontSize: 9, color: C.red, textAlign: "center", fontFamily: "Helvetica-Bold" }}>{sem}</RpText>
+            <RpText style={{ width: 90, fontSize: 9, color: C.green, textAlign: "center", fontFamily: "Helvetica-Bold" }}>{com}</RpText>
+          </RpView>
         ))}
-        <div style={{ display: "flex", padding: "8px 8px", background: "#f0fdf4", borderRadius: 6, marginTop: 4, fontSize: 12, fontWeight: 800 }}>
-          <span style={{ flex: 1, color: C.green }}>✅ ECONOMIA TOTAL COM O LANCE</span>
-          <span style={{ width: 120, textAlign: "center" as const }}></span>
-          <span style={{ width: 120, textAlign: "center" as const, color: C.green }}>{fmtBRL(r.economia)}</span>
-        </div>
-      </PdfSection>
+        {/* Total row */}
+        <RpView style={{ flexDirection: "row", paddingVertical: 6, paddingHorizontal: 5, backgroundColor: "#f0fdf4", borderRadius: 5, marginTop: 4 }}>
+          <RpText style={{ flex: 1, fontSize: 10, color: C.green, fontFamily: "Helvetica-Bold" }}>Economia total com o lance</RpText>
+          <RpText style={{ width: 90, fontSize: 10, textAlign: "center" }}></RpText>
+          <RpText style={{ width: 90, fontSize: 10, color: C.green, textAlign: "center", fontFamily: "Helvetica-Bold" }}>{fmtBRL(r.economia)}</RpText>
+        </RpView>
+      </RpSection>
 
-      {r.breakEvenMes && (
-        <PdfInsight
+      <RpKVList rows={[
+        { label: "Lance próprio desembolsado", value: fmtBRL(r.lanceProprioR), color: C.amber },
+        { label: "Lance embutido (do crédito)", value: fmtBRL(r.lanceEmbutidoR), color: C.navy },
+        { label: "Crédito líquido disponível", value: fmtBRL(r.creditoLiquido), color: C.green },
+      ]} />
+
+      {r.breakEvenMes ? (
+        <RpInsight
           emoji="📅"
           title={`Ponto de retorno: Mês ${r.breakEvenMes}`}
-          body={`A partir do mês ${r.breakEvenMes}, o lance próprio já foi completamente recuperado pela redução de parcelas. Cada mês seguinte, você economiza ${fmtBRL(reducaoParcela)} — puro ganho financeiro.`}
+          body={`A partir do mes ${r.breakEvenMes}, o lance proprio ja foi completamente recuperado pela reducao de parcelas. Cada mes seguinte, voce economiza ${fmtBRL(reducaoParcela)} — puro ganho financeiro.`}
           variant="success"
         />
-      )}
+      ) : null}
 
-      <PdfFooter />
-    </PdfPage>
+      <RpFooter />
+    </RpDoc>
   );
 }

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import { calcular, defaultInputs, type CalcInputs, type CalcResults } from "@/lib/calculator";
@@ -14,6 +14,7 @@ import {
   Title, Tooltip, Legend, Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -110,8 +111,10 @@ function CalculatorPage() {
   const [results, setResults] = useState<CalcResults | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { exportPDF, isExporting } = usePdfExport(reportRef, "Relatorio_Inteligencia_Imobiliaria.pdf");
+  const { exportPDF, isExporting } = usePdfExport(
+    () => results ? <PDFReportDoc r={results} usoCredito={usoCredito} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    "Relatorio_Inteligencia_Imobiliaria.pdf",
+  );
 
   // Context state
   const [clients, setClients] = useState<ClientOpt[]>([]);
@@ -406,14 +409,6 @@ function CalculatorPage() {
           entrada={inputs.entrada} credito={inputs.creditoCons} />
       )}
 
-      <div ref={reportRef} style={{ display: "none" }}>
-        <PDFReport
-          r={results}
-          usoCredito={usoCredito}
-          inputs={inputs}
-          clientName={clients.find((c) => c.id === selectedClientId)?.name}
-        />
-      </div>
     </div>
   );
 }
@@ -451,14 +446,8 @@ function ResultsView({ r, usoCredito, valorImovel, entrada, credito }: {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card title="Financiamento SAC" value={fmtBRL(r.tSAC)} className="from-danger to-destructive" />
         <Card title="Financiamento PRICE" value={fmtBRL(r.tPrice)} className="from-warning to-[oklch(0.55_0.18_45)]" />
-        <Card title="Custo Bruto Consórcio" value={fmtBRL(r.tCons)} className="from-primary to-primary-glow" />
+        <ConsorcioCard tCons={r.tCons} valorEmbVisual={r.valorEmbVisual} />
       </div>
-      {r.valorEmbVisual > 0 && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-center justify-between gap-4 text-sm">
-          <span className="text-foreground/70">Lance embutido ({fmtBRL(r.valorEmbVisual)}) sai do crédito — não do bolso. Custo real desembolsado:</span>
-          <span className="font-extrabold text-primary whitespace-nowrap">{fmtBRL(r.tCons - r.valorEmbVisual)}</span>
-        </div>
-      )}
       <ChartParcelas r={r} />
       <ChartAlavancagem r={r} />
       <Section title="Quadro Analítico de Patrimônio">
@@ -494,6 +483,25 @@ function Card({ title, value, className }: { title: string; value: string; class
     <div className={`rounded-2xl bg-gradient-to-br p-5 text-white shadow-elegant ${className}`}>
       <div className="text-[10px] font-extrabold uppercase tracking-widest opacity-90">{title}</div>
       <div className="mt-2 text-2xl font-extrabold">{value}</div>
+    </div>
+  );
+}
+
+function ConsorcioCard({ tCons, valorEmbVisual }: { tCons: number; valorEmbVisual: number }) {
+  const custoReal = tCons - valorEmbVisual;
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-glow p-5 text-white shadow-elegant flex flex-col justify-between">
+      <div>
+        <div className="text-[10px] font-extrabold uppercase tracking-widest opacity-90">Custo Total Consórcio</div>
+        <div className="mt-2 text-2xl font-extrabold">{fmtBRL(tCons)}</div>
+      </div>
+      {valorEmbVisual > 0 && (
+        <div className="mt-3 rounded-xl bg-white/15 px-3 py-2">
+          <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">Lance embutido abatido</div>
+          <div className="text-[10px] opacity-80">− {fmtBRL(valorEmbVisual)} (sai do crédito, não do bolso)</div>
+          <div className="mt-1 text-sm font-extrabold">Custo real: {fmtBRL(custoReal)}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -587,147 +595,73 @@ function ChartAlavancagem({ r }: { r: CalcResults }) {
   );
 }
 
-function PDFReport({ r, usoCredito, inputs, clientName }: {
-  r: CalcResults | null;
+// ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
+function PDFReportDoc({ r, usoCredito, inputs, clientName }: {
+  r: CalcResults;
   usoCredito: "comprar" | "patrimonio";
   inputs: CalcInputs;
   clientName?: string;
 }) {
-  if (!r) return null;
-  const valor = inputs.valorImovel;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
-  const sectionTitle: React.CSSProperties = {
-    fontSize: 10, color: "#1a2a6c", fontWeight: 800, textTransform: "uppercase",
-    letterSpacing: "0.08em", borderBottom: "2px solid #1a2a6c", paddingBottom: 5, marginBottom: 10,
-  };
-  const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid #f0f1f5", fontSize: 11 };
-  const rowLabel: React.CSSProperties = { color: "#5d6d7e", flex: 1 };
-  const rowVal: React.CSSProperties = { fontWeight: 700, textAlign: "right" as const };
-
   return (
-    <div style={{ padding: "16mm 18mm", width: "210mm", fontFamily: "'Inter', 'Helvetica Neue', sans-serif", color: "#2f3640", background: "#fff", boxSizing: "border-box" }}>
+    <RpDoc>
+      <RpHeader
+        title="Quanto custa? Imobiliário"
+        subtitle="Relatório de Inteligência Patrimonial"
+        clientName={clientName}
+        date={hoje}
+      />
 
-      {/* ── CABEÇALHO ─────────────────────────────────────────────── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "3px solid #1a2a6c", paddingBottom: 12, marginBottom: 16 }}>
-        <div>
-          <div style={{ fontSize: 20, color: "#1a2a6c", fontWeight: 900, letterSpacing: "-0.03em" }}>Quanto custa? Imobiliário</div>
-          <div style={{ fontSize: 10, color: "#7f8c8d", fontWeight: 700, marginTop: 2, letterSpacing: "0.1em", textTransform: "uppercase" }}>Relatório de Inteligência Patrimonial</div>
-        </div>
-        <div style={{ textAlign: "right", fontSize: 10, color: "#7f8c8d" }}>
-          <div style={{ fontWeight: 800, color: "#c0392b", fontSize: 11, letterSpacing: "0.05em" }}>CONFIDENCIAL</div>
-          <div style={{ marginTop: 3 }}>{hoje}</div>
-          {clientName && (
-            <div style={{ marginTop: 4, background: "#1a2a6c", color: "#fff", padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
-              Cliente: {clientName}
-            </div>
-          )}
-        </div>
-      </div>
+      <RpPremises items={[
+        ["Valor do Imóvel", fmtBRL(inputs.valorImovel)],
+        ["Entrada Disponível", fmtBRL(inputs.entrada)],
+        ["Prazo Financ.", `${inputs.prazoF} meses`],
+        ["Juros Anual", `${inputs.jFinAnual}% a.a.`],
+        ["Crédito Consórcio", fmtBRL(inputs.creditoCons)],
+        ["Prazo Consórcio", `${inputs.prazoC} meses`],
+        ["Taxa de Adm.", `${inputs.tAdm}%`],
+        ["CDI Mensal", `${inputs.taxaOportunidadeMensal}% a.m.`],
+      ]} />
 
-      {/* ── PREMISSAS ─────────────────────────────────────────────── */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={sectionTitle}>Premissas da Simulação</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 7 }}>
-          {[
-            ["Valor do Imóvel", fmtBRL(inputs.valorImovel)],
-            ["Entrada Disponível", fmtBRL(inputs.entrada)],
-            ["Prazo Financ.", `${inputs.prazoF} meses`],
-            ["Juros Anual", `${inputs.jFinAnual}% a.a.`],
-            ["Crédito Consórcio", fmtBRL(inputs.creditoCons)],
-            ["Prazo Consórcio", `${inputs.prazoC} meses`],
-            ["Taxa de Adm.", `${inputs.tAdm}%`],
-            ["CDI Mensal", `${inputs.taxaOportunidadeMensal}% a.m.`],
-          ].map(([label, value]) => (
-            <div key={label} style={{ background: "#f7f8fc", padding: "6px 8px", borderRadius: 5, borderLeft: "3px solid #1a2a6c" }}>
-              <div style={{ fontSize: 8.5, color: "#7f8c8d", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-              <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2, color: "#2f3640" }}>{value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <RpSection title="Custo Global Comparado" description="Total desembolsado em cada cenário ao longo de todo o contrato:">
+        <RpMetricRow>
+          <RpMetric label="Financiamento SAC" value={fmtBRL(r.tSAC)} color="#b21f1f" />
+          <RpMetric label="Financiamento PRICE" value={fmtBRL(r.tPrice)} color="#d35400" />
+          <RpMetric label="Estratégia Consórcio" value={fmtBRL(r.tCons)} color={C.navy} />
+        </RpMetricRow>
+      </RpSection>
 
-      {/* ── CUSTO TOTAL (3 cards) ──────────────────────────────────── */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={sectionTitle}>Custo Global Comparado</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-          {[
-            ["Financiamento SAC", r.tSAC, "#b21f1f", "#fff"],
-            ["Financiamento PRICE", r.tPrice, "#d35400", "#fff"],
-            ["Estratégia Consórcio", r.tCons, "#1a2a6c", "#fff"],
-          ].map(([title, value, bg, fg]) => (
-            <div key={title as string} style={{ padding: "12px 14px", borderRadius: 8, background: bg as string, color: fg as string }}>
-              <div style={{ fontSize: 8.5, opacity: 0.85, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.07em" }}>{title as string}</div>
-              <div style={{ fontSize: 17, fontWeight: 900, marginTop: 5, letterSpacing: "-0.02em" }}>{fmtBRL(value as number)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <RpSection title="Parcela Mensal Inicial Estimada">
+        <RpMetricRow>
+          <RpMetric label="SAC — 1ª parcela" value={fmtBRL(r.parcelasSAC[0] ?? 0)} description="por mês" color="#b21f1f" />
+          <RpMetric label="PRICE — parcela fixa" value={fmtBRL(r.parcelasPrice[0] ?? 0)} description="por mês" color="#d35400" />
+          <RpMetric label="Consórcio — pré-contempl." value={fmtBRL(r.parcelasCons[0] ?? 0)} description="por mês" color={C.navy} />
+        </RpMetricRow>
+      </RpSection>
 
-      {/* ── PARCELA MENSAL INICIAL ────────────────────────────────── */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={sectionTitle}>Parcela Mensal Inicial Estimada</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-          {[
-            ["SAC — 1ª parcela", r.parcelasSAC[0] ?? 0, "#b21f1f"],
-            ["PRICE — parcela fixa", r.parcelasPrice[0] ?? 0, "#d35400"],
-            ["Consórcio — pré-contempl.", r.parcelasCons[0] ?? 0, "#1a2a6c"],
-          ].map(([label, value, color]) => (
-            <div key={label as string} style={{ border: `2px solid ${color as string}`, borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 9, color: color as string, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label as string}</div>
-              <div style={{ fontSize: 16, fontWeight: 900, marginTop: 5, color: color as string }}>{fmtBRL(value as number)}</div>
-              <div style={{ fontSize: 9, color: "#95a5a6", marginTop: 3 }}>por mês</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <RpSection title="Cenário Financiamento" accent="navy">
+        <RpKVList rows={[
+          { label: "Valor do Imóvel", value: fmtBRL(inputs.valorImovel) },
+          { label: "Entrada Aportada", value: fmtBRL(inputs.entrada) },
+          { label: "Financiado (Banco)", value: fmtBRL(inputs.valorImovel - inputs.entrada), color: C.red },
+          { label: "ITBI / Cartório", value: fmtBRL(r.custoItbiFinanciamento) },
+          { label: "Imóvel no Futuro", value: fmtBRL(r.imovelNoFuturo), color: C.green },
+        ]} />
+      </RpSection>
 
-      {/* ── ANÁLISE DETALHADA (2 colunas) ────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        {/* Financiamento */}
-        <div>
-          <div style={{ ...sectionTitle, borderColor: "#b21f1f", color: "#b21f1f" }}>Cenário Financiamento</div>
-          {[
-            { label: "Valor do Imóvel", value: fmtBRL(valor), color: "" },
-            { label: "Entrada Aportada", value: fmtBRL(inputs.entrada), color: "" },
-            { label: "Financiado (Banco)", value: fmtBRL(valor - inputs.entrada), color: "#c0392b" },
-            { label: "ITBI / Cartório", value: fmtBRL(r.custoItbiFinanciamento), color: "" },
-            { label: "Imóvel no Futuro", value: fmtBRL(r.imovelNoFuturo), color: "#27ae60" },
-          ].map(({ label, value, color }) => (
-            <div key={label} style={row}>
-              <span style={rowLabel}>{label}</span>
-              <span style={{ ...rowVal, color: color || "#2f3640" }}>{value}</span>
-            </div>
-          ))}
-        </div>
+      <RpSection title="Cenário Consórcio" accent="navy">
+        <RpKVList rows={[
+          { label: "Crédito da Carta", value: fmtBRL(inputs.creditoCons) },
+          { label: "Lance Embutido", value: fmtBRL(r.valorEmbVisual), color: C.red },
+          { label: "Poder de Compra Líquido", value: fmtBRL(inputs.creditoCons - r.valorEmbVisual) },
+          { label: "Saldo Devedor Pós-Lance", value: fmtBRL(r.saldoDevedorNaContemplacao), color: C.navy },
+          { label: "Custo c/ Aluguel (Espera)", value: fmtBRL(r.custoAluguelTotal), color: C.red },
+          { label: usoCredito === "patrimonio" ? "Patrimônio Total (CDI + Carta)" : "Patrimônio CDI Final", value: fmtBRL(r.patrimonioConsTotal), color: C.green },
+        ]} />
+      </RpSection>
 
-        {/* Consórcio */}
-        <div>
-          <div style={{ ...sectionTitle, borderColor: "#1a2a6c", color: "#1a2a6c" }}>Cenário Consórcio</div>
-          {[
-            { label: "Crédito da Carta", value: fmtBRL(inputs.creditoCons), color: "" },
-            { label: "Lance Embutido", value: fmtBRL(r.valorEmbVisual), color: "#c0392b" },
-            { label: "Poder de Compra Líquido", value: fmtBRL(inputs.creditoCons - r.valorEmbVisual), color: "" },
-            { label: "Saldo Devedor Pós-Lance", value: fmtBRL(r.saldoDevedorNaContemplacao), color: "#2980b9" },
-            { label: "Custo c/ Aluguel (Espera)", value: fmtBRL(r.custoAluguelTotal), color: "#c0392b" },
-            {
-              label: usoCredito === "patrimonio" ? "Patrimônio Total (CDI + Carta)" : "Patrimônio CDI Final",
-              value: fmtBRL(r.patrimonioConsTotal),
-              color: "#27ae60",
-            },
-          ].map(({ label, value, color }) => (
-            <div key={label} style={row}>
-              <span style={rowLabel}>{label}</span>
-              <span style={{ ...rowVal, color: color || "#2f3640" }}>{value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── RODAPÉ ───────────────────────────────────────────────── */}
-      <div style={{ marginTop: 14, fontSize: 9.5, color: "#7f8c8d", background: "#f7f8fc", padding: "10px 12px", borderRadius: 6, borderLeft: "3px solid #1a2a6c" }}>
-        <strong style={{ color: "#1a2a6c" }}>Nota Técnica:</strong> O custo global inclui entrada + parcelas + ITBI/cartório + custo de aluguel durante a espera (consórcio). O patrimônio do consórcio representa a entrada aplicada em CDI até a contemplação. Simulação elaborada com base nas premissas declaradas — resultados reais podem variar conforme condições de mercado.
-      </div>
-    </div>
+      <RpFooter note="O custo global inclui entrada + parcelas + ITBI/cartório + custo de aluguel durante a espera (consórcio). O patrimônio do consórcio representa a entrada aplicada em CDI até a contemplação. Simulação elaborada com base nas premissas declaradas — resultados reais podem variar conforme condições de mercado." />
+    </RpDoc>
   );
 }

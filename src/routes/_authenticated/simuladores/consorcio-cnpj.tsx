@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import {
@@ -22,7 +22,7 @@ import {
   ArrowLeft, ArrowRight, BookOpen, Building2, Coins, TrendingDown, TrendingUp,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -105,8 +105,10 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function ConsorcioCNPJPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "consorcio-cnpj.pdf");
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
+    () => results ? <PDFCnpjDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    "consorcio-cnpj.pdf",
+  );
 
   // Consórcio PJ
   const [cartaCredito, setCartaCredito] = useState(maskMoney(String(defaultCNPJInputs.cartaCredito * 100)));
@@ -423,19 +425,15 @@ function ConsorcioCNPJPage() {
             </Link>
           )}
 
-          {/* Relatório PDF */}
-          <div ref={reportRef} style={{ display: "none" }}>
-            <PDFCnpj r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
-          </div>
         </>
       )}
     </div>
   );
 }
 
-// ─── PDF Component ────────────────────────────────────────────────────────────
-function PDFCnpj({ r, inputs, clientName }: {
-  r: ConsorcioCNPJResults | null;
+// ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
+function PDFCnpjDoc({ r, inputs, clientName }: {
+  r: ConsorcioCNPJResults;
   inputs: {
     cartaCredito: number;
     taxaAdmConsorcio: number;
@@ -452,46 +450,46 @@ function PDFCnpj({ r, inputs, clientName }: {
   };
   clientName?: string;
 }) {
-  if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const aliquotaTotal = inputs.aliquotaIRPJ + inputs.aliquotaCSLL;
+  const regimeLabel = inputs.regimeTributario === "presumido" ? "Lucro Presumido" : "Lucro Real";
 
   return (
-    <PdfPage>
-      <PdfHeader
+    <RpDoc>
+      <RpHeader
         title="Consórcio para CNPJ"
-        subtitle="Benefício Fiscal PJ — Parcelas Dedutíveis como Despesa Operacional"
+        subtitle="Beneficio Fiscal PJ — Parcelas Dedutiveis como Despesa Operacional"
         clientName={clientName}
         date={hoje}
       />
-      <PdfPremises items={[
+      <RpPremises items={[
         ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
         ["Taxa de adm.", `${inputs.taxaAdmConsorcio}%`],
         ["Prazo do grupo", `${inputs.prazoConsorcio} meses`],
         ["Lance ofertado", `${inputs.percLance}%`],
         ["Contemplação", `Mês ${inputs.mesContemplacaoConsorcio}`],
-        ["Regime tributário", inputs.regimeTributario === "presumido" ? "Lucro Presumido" : "Lucro Real"],
+        ["Regime tributário", regimeLabel],
         ["Alíquota efetiva total", `${aliquotaTotal}%`],
         ["Valorização do bem", `${inputs.valorizacaoAnual}% a.a.`],
       ]} />
 
-      <PdfSection title="Benefício Fiscal Mensal" description="O que o consórcio custa de verdade para a empresa, depois do abatimento fiscal:">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
-          <PdfMetric label="Parcela bruta" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Valor nominal da parcela antes do benefício fiscal" color={C.navy} />
-          <PdfMetric label="Economia fiscal mensal" value={fmtBRL(r.economiaFiscalMensal)} description={`${aliquotaTotal}% sobre a parcela — imposto que não é pago`} color={C.green} />
-          <PdfMetric label="Parcela líquida (custo real)" value={fmtBRL(r.parcelaLiquidaConsorcio)} description="O que a empresa realmente desembolsa por mês" color={C.amber} />
-        </div>
-      </PdfSection>
+      <RpSection title="Benefício Fiscal Mensal" description="O que o consórcio custa de verdade para a empresa, depois do abatimento fiscal:">
+        <RpMetricRow>
+          <RpMetric label="Parcela bruta" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Valor nominal da parcela antes do benefício fiscal" color={C.navy} />
+          <RpMetric label="Economia fiscal mensal" value={fmtBRL(r.economiaFiscalMensal)} description={`${aliquotaTotal}% sobre a parcela — imposto que nao e pago`} color={C.green} />
+          <RpMetric label="Parcela líquida (custo real)" value={fmtBRL(r.parcelaLiquidaConsorcio)} description="O que a empresa realmente desembolsa por mes" color={C.amber} />
+        </RpMetricRow>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="🏢"
         title="O Estado financia parte do seu consórcio"
-        body={`No ${inputs.regimeTributario === "presumido" ? "Lucro Presumido" : "Lucro Real"}, as parcelas de consórcio são dedutíveis como despesa operacional. Isso significa que ${aliquotaTotal}% de cada parcela é subsidiado pelo imposto que você deixa de pagar. Resultado: parcela bruta de ${fmtBRL(r.parcelaBrutaConsorcio)} vira custo real de ${fmtBRL(r.parcelaLiquidaConsorcio)} — economia fiscal de ${fmtBRL(r.economiaFiscalMensal)}/mês.`}
+        body={`No ${regimeLabel}, as parcelas de consorcio sao dedutiveis como despesa operacional. Isso significa que ${aliquotaTotal}% de cada parcela e subsidiado pelo imposto que voce deixa de pagar. Resultado: parcela bruta de ${fmtBRL(r.parcelaBrutaConsorcio)} vira custo real de ${fmtBRL(r.parcelaLiquidaConsorcio)} — economia fiscal de ${fmtBRL(r.economiaFiscalMensal)}/mes.`}
         variant="primary"
       />
 
-      <PdfSection title="Consórcio PJ vs. Financiamento PJ" description="Comparativo de custo total entre as duas alternativas:">
-        <PdfKVList rows={[
+      <RpSection title="Consórcio PJ vs. Financiamento PJ" description="Comparativo de custo total entre as duas alternativas:">
+        <RpKVList rows={[
           { label: "Parcela bruta consórcio", value: fmtBRL(r.parcelaBrutaConsorcio) },
           { label: "Parcela líquida consórcio (pós fiscal)", value: fmtBRL(r.parcelaLiquidaConsorcio), color: C.green },
           { label: "Parcela financiamento PJ", value: fmtBRL(r.parcelaFinanciamento), color: C.red },
@@ -503,16 +501,16 @@ function PDFCnpj({ r, inputs, clientName }: {
           { label: "Economia total vs. financiamento", value: fmtBRL(r.economiaTotalVsFinanciamento), color: C.green },
           { label: "Percentual de economia", value: `${r.percentualEconomia.toFixed(1)}%`, color: C.green },
         ]} />
-      </PdfSection>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="📊"
         title={`Consórcio é ${r.percentualEconomia.toFixed(1)}% mais barato que o financiamento PJ`}
-        body={`O financiamento PJ cobra juros sobre o saldo devedor — quanto mais você deve, mais você paga. O consórcio não tem juros: você paga apenas a taxa de administração diluída nas parcelas, e ainda deduz tudo do imposto. A combinação de ausência de juros + benefício fiscal resulta em ${fmtBRL(r.economiaTotalVsFinanciamento)} a mais no caixa da empresa.`}
+        body={`O financiamento PJ cobra juros sobre o saldo devedor — quanto mais voce deve, mais voce paga. O consorcio nao tem juros: voce paga apenas a taxa de administracao diluida nas parcelas, e ainda deduz tudo do imposto. A combinacao de ausencia de juros + beneficio fiscal resulta em ${fmtBRL(r.economiaTotalVsFinanciamento)} a mais no caixa da empresa.`}
         variant="success"
       />
 
-      <PdfFooter note="Benefício fiscal calculado com base na dedutibilidade das parcelas como despesa operacional nos regimes de Lucro Presumido e Lucro Real. Consulte o contador da empresa para validar o enquadramento específico." />
-    </PdfPage>
+      <RpFooter note="Beneficio fiscal calculado com base na dedutibildiade das parcelas como despesa operacional nos regimes de Lucro Presumido e Lucro Real. Consulte o contador da empresa para validar o enquadramento especifico." />
+    </RpDoc>
   );
 }

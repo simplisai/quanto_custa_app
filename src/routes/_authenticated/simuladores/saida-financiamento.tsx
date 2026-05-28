@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import {
@@ -23,7 +23,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -114,8 +114,10 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function SaidaFinanciamentoPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "saida-financiamento.pdf");
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
+    () => results ? <PDFSaidaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    "saida-financiamento.pdf",
+  );
 
   // Financiamento atual
   const [valorImovel, setValorImovel] = useState(maskMoney(String(defaultSaidaInputs.valorImovelAtual * 100)));
@@ -136,6 +138,7 @@ function SaidaFinanciamentoPage() {
   // Premissas
   const [valorizacao, setValorizacao] = useState(maskPercent(String(defaultSaidaInputs.valorizacaoAnual * 100)));
   const [custosVenda, setCustosVenda] = useState(maskPercent(String(defaultSaidaInputs.custosVenda * 100)));
+  const [taxaAtualiz, setTaxaAtualiz] = useState(String(defaultSaidaInputs.taxaAtualizacaoAnual));
 
   const [clients, setClients] = useState<{ id: string; name: string; phone?: string | null }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -217,6 +220,7 @@ function SaidaFinanciamentoPage() {
     tipoAbatimento,
     valorizacaoAnual: unmask(valorizacao),
     custosVenda: unmask(custosVenda),
+    taxaAtualizacaoAnual: parseFloat(taxaAtualiz || "4") || 4,
   }), [valorImovel, saldoDevedor, parcelaAtual, prazoRestante, taxaJuros, cartaConsorcio, taxaAdm, prazoConsorcio, percLance, percLanceEmb, mesContemplacao, tipoAbatimento, valorizacao, custosVenda]);
 
   const calcular = () => {
@@ -353,6 +357,7 @@ function SaidaFinanciamentoPage() {
           <NumInput label="Lance embutido — % da carta" value={percLanceEmb} onChange={setPercLanceEmb} type="int" hint="Sai do crédito recebido — não do bolso" />
           <NumInput label="Mês de contemplação" value={mesContemplacao} onChange={setMesContemplacao} type="int" />
           <NumInput label="Valorização anual (%)" value={valorizacao} onChange={setValorizacao} type="percent" />
+          <NumInput label="Correção da carta — INCC (% a.a.)" value={taxaAtualiz} onChange={setTaxaAtualiz} type="int" hint="Taxa anual de atualização das parcelas do consórcio pelo INCC" />
         </Grid2>
         <div>
           <p className="mb-2 text-xs font-semibold text-foreground/70">Lance abate:</p>
@@ -470,19 +475,15 @@ function SaidaFinanciamentoPage() {
             </Link>
           )}
 
-          {/* Relatório oculto para PDF */}
-          <div ref={reportRef} style={{ display: "none" }}>
-            <PDFSaida r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
-          </div>
         </>
       )}
     </div>
   );
 }
 
-// ─── PDF Component ────────────────────────────────────────────────────────────
-function PDFSaida({ r, inputs, clientName }: {
-  r: SaidaFinanciamentoResults | null;
+// ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
+function PDFSaidaDoc({ r, inputs, clientName }: {
+  r: SaidaFinanciamentoResults;
   inputs: {
     valorImovelAtual: number;
     saldoDevedor: number;
@@ -498,18 +499,17 @@ function PDFSaida({ r, inputs, clientName }: {
   };
   clientName?: string;
 }) {
-  if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
-    <PdfPage>
-      <PdfHeader
+    <RpDoc>
+      <RpHeader
         title="Saída do Financiamento"
         subtitle="Migração do Financiamento Bancário para Consórcio — Análise de Viabilidade"
         clientName={clientName}
         date={hoje}
       />
-      <PdfPremises items={[
+      <RpPremises items={[
         ["Valor do imóvel", fmtBRL(inputs.valorImovelAtual)],
         ["Saldo devedor", fmtBRL(inputs.saldoDevedor)],
         ["Parcela atual", fmtBRL(inputs.parcelaAtual)],
@@ -520,24 +520,24 @@ function PDFSaida({ r, inputs, clientName }: {
         ["Contemplação", `Mês ${inputs.mesContemplacaoConsorcio}`],
       ]} />
 
-      <PdfSection title="Resultado da Migração" description="O que acontece quando você vende o imóvel financiado e migra para o consórcio:">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
-          <PdfMetric label="Capital líquido da venda" value={fmtBRL(r.capitalLiquidoVenda)} description="Após pagar o banco e custos de venda" color={C.navy} />
-          <PdfMetric label="Parcela pós-lance (consórcio)" value={fmtBRL(r.parcelaPosLance)} description={`vs. financiamento: ${fmtBRL(inputs.parcelaAtual)}`} color={C.green} />
-          <PdfMetric label="Economia mensal" value={fmtBRL(r.economiaParcelaMensal)} description="Diferença de parcela por mês após contemplação" color={r.economiaParcelaMensal > 0 ? C.green : C.red} />
-          <PdfMetric label="Vantagem total" value={fmtBRL(r.economiaTotalCusto)} description="Economia total vs. manter o financiamento" color={C.green} />
-        </div>
-      </PdfSection>
+      <RpSection title="Resultado da Migração" description="O que acontece quando você vende o imóvel financiado e migra para o consórcio:">
+        <RpMetricRow>
+          <RpMetric label="Capital líquido da venda" value={fmtBRL(r.capitalLiquidoVenda)} description="Apos pagar o banco e custos de venda" color={C.navy} />
+          <RpMetric label="Parcela pós-lance (consórcio)" value={fmtBRL(r.parcelaPosLance)} description={`vs. financiamento: ${fmtBRL(inputs.parcelaAtual)}`} color={C.green} />
+          <RpMetric label="Economia mensal" value={fmtBRL(r.economiaParcelaMensal)} description="Diferença de parcela por mes após contemplação" color={r.economiaParcelaMensal > 0 ? C.green : C.red} />
+          <RpMetric label="Vantagem total" value={fmtBRL(r.economiaTotalCusto)} description="Economia total vs. manter o financiamento" color={C.green} />
+        </RpMetricRow>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="🔄"
         title="Por que sair do financiamento?"
-        body={`Você vende o imóvel financiado, quita o banco (${fmtBRL(inputs.saldoDevedor)}), e usa o capital líquido de ${fmtBRL(r.capitalLiquidoVenda)} como lance no consórcio. A partir da contemplação no mês ${inputs.mesContemplacaoConsorcio}, sua parcela cai de ${fmtBRL(inputs.parcelaAtual)} para ${fmtBRL(r.parcelaPosLance)} — economizando ${fmtBRL(r.economiaParcelaMensal)}/mês. No total, a operação economiza ${fmtBRL(r.economiaTotalCusto)} comparado a manter o financiamento.`}
+        body={`Voce vende o imovel financiado, quita o banco (${fmtBRL(inputs.saldoDevedor)}), e usa o capital liquido de ${fmtBRL(r.capitalLiquidoVenda)} como lance no consorcio. A partir da contemplacao no mes ${inputs.mesContemplacaoConsorcio}, sua parcela cai de ${fmtBRL(inputs.parcelaAtual)} para ${fmtBRL(r.parcelaPosLance)} — economizando ${fmtBRL(r.economiaParcelaMensal)}/mes. No total, a operacao economiza ${fmtBRL(r.economiaTotalCusto)} comparado a manter o financiamento.`}
         variant="primary"
       />
 
-      <PdfSection title="Comparativo: Financiamento vs. Consórcio" description="Dois caminhos, resultados completamente diferentes:">
-        <PdfKVList rows={[
+      <RpSection title="Comparativo: Financiamento vs. Consórcio" description="Dois caminhos, resultados completamente diferentes:">
+        <RpKVList rows={[
           { label: "Parcela atual — financiamento", value: fmtBRL(inputs.parcelaAtual), color: C.red },
           { label: "Parcela pós-lance — consórcio", value: fmtBRL(r.parcelaPosLance), color: C.green },
           { label: "Economia mensal de parcela", value: fmtBRL(r.economiaParcelaMensal), color: C.green },
@@ -549,9 +549,9 @@ function PDFSaida({ r, inputs, clientName }: {
           { label: "Capital que sobra após o lance", value: fmtBRL(r.sobra), color: C.navy },
           { label: "Crédito disponível após contemplação", value: fmtBRL(r.creditoLiquido), color: C.green },
         ]} />
-      </PdfSection>
+      </RpSection>
 
-      <PdfFooter />
-    </PdfPage>
+      <RpFooter />
+    </RpDoc>
   );
 }

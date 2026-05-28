@@ -24,6 +24,7 @@ export interface SaidaFinanciamentoInputs {
   // Premissas de mercado
   valorizacaoAnual: number;      // Valorização anual do imóvel (%)
   custosVenda: number;           // Custos de venda do imóvel (% do valor — corretagem, ITBI etc.)
+  taxaAtualizacaoAnual: number;  // Taxa de atualização anual da carta (INCC, % a.a. — ex: 4)
 }
 
 export interface SaidaMesData {
@@ -83,6 +84,7 @@ export const defaultSaidaInputs: SaidaFinanciamentoInputs = {
   tipoAbatimento: "parcela",
   valorizacaoAnual: 6,
   custosVenda: 6,                // 6% do valor (corretagem 5% + despesas)
+  taxaAtualizacaoAnual: 4,
 };
 
 export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanciamentoResults {
@@ -90,7 +92,7 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
     valorImovelAtual, saldoDevedor, parcelaAtual, prazoRestanteMeses,
     taxaJurosMensal, cartaConsorcio, taxaAdmConsorcio, prazoConsorcio,
     percLance, percLanceEmb, mesContemplacaoConsorcio, tipoAbatimento,
-    valorizacaoAnual, custosVenda,
+    valorizacaoAnual, custosVenda, taxaAtualizacaoAnual,
   } = i;
 
   const taxaJurosFrac = taxaJurosMensal / 100;
@@ -174,7 +176,18 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
   let desembolsoAcumCons = 0;
   const prazoTL = Math.min(prazoAnalise, 360);
 
+  // Parcelas do consórcio corrigidas pelo INCC anualmente
+  const inccAnualFrac = (taxaAtualizacaoAnual || 4) / 100;
+  let parcelaConsAtual = parcelaConsorcio;
+  let parcelaPosLanceAtual = parcelaPosLance;
+
   for (let m = 1; m <= prazoTL; m++) {
+    // Correção anual das parcelas do consórcio pelo INCC
+    if (m > 1 && (m - 1) % 12 === 0 && m <= prazoConsorcio) {
+      parcelaConsAtual *= (1 + inccAnualFrac);
+      parcelaPosLanceAtual *= (1 + inccAnualFrac);
+    }
+
     // Financiamento
     const jurosMes = saldoFinTimeline * taxaJurosFrac;
     const amort = saldoFinTimeline > 0 ? Math.min(amortizacaoMensal, saldoFinTimeline) : 0;
@@ -183,8 +196,8 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
     const valorImovelMes = valorImovelAtual * Math.pow(1 + valorizMensal, m);
     const patrimonioLiquidoFin = valorImovelMes - saldoFinTimeline;
 
-    // Consórcio
-    const parcelaMesCons = m <= mesContemplacaoConsorcio ? parcelaConsorcio : parcelaPosLance;
+    // Consórcio (com INCC)
+    const parcelaMesCons = m <= mesContemplacaoConsorcio ? parcelaConsAtual : (m <= prazoConsorcio ? parcelaPosLanceAtual : 0);
     if (m === mesContemplacaoConsorcio + 1) {
       desembolsoAcumCons += lanceEmReaisConsorcio;
     }

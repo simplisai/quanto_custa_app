@@ -130,18 +130,26 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
   // Valorização mensal do imóvel
   const valorizMensal = Math.pow(1 + valorizacaoAnual / 100, 1 / 12) - 1;
 
+  // Parcelas correntes — corrigidas pelo INCC no aniversário do grupo (a cada 12 meses)
+  let parcelaPadraoAtual = parcelaPadrao;
+  let parcelaPosLanceAtual = parcelaPosLance;
+
   for (let m = 1; m <= horizonteMeses; m++) {
-    // Reajuste anual do aluguel (nos meses múltiplos de 12, exceto no 1º)
+    // Reajuste anual do aluguel e das parcelas do consórcio pelo INCC
     if (m > 1 && (m - 1) % 12 === 0) {
       aluguelMesAtual = aluguelMesAtual * (1 + reajusteAluguelAnual / 100);
+      if (m <= prazo) {
+        parcelaPadraoAtual *= (1 + (taxaAtualizacaoAnual || 0) / 100);
+        parcelaPosLanceAtual *= (1 + (taxaAtualizacaoAnual || 0) / 100);
+      }
     }
 
-    // Parcela do consórcio neste mês
+    // Parcela do consórcio neste mês (corrigida pelo INCC)
     let parcelaCons = 0;
     if (m <= mesContemp && m <= prazo) {
-      parcelaCons = parcelaPadrao;
+      parcelaCons = parcelaPadraoAtual;
     } else if (m > mesContemp && m <= prazo) {
-      parcelaCons = parcelaPosLance;
+      parcelaCons = parcelaPosLanceAtual;
     }
     // Após o prazo: parcela = 0 (consórcio encerrado)
 

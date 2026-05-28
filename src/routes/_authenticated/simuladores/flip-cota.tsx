@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import {
@@ -20,7 +20,7 @@ import {
 import { Bar } from "react-chartjs-2";
 import { ArrowLeft, Zap, TrendingUp, Coins, BarChart2, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { PdfPage, PdfHeader, PdfSection, PdfMetric, PdfInsight, PdfPremises, PdfKVList, PdfFooter, C } from "@/components/PdfShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -116,8 +116,10 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function FlipCotaPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
-  const reportRef = useRef<HTMLDivElement>(null);
-  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(reportRef, "Flip_Cota_Consorcio.pdf");
+  const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
+    () => results ? <PDFFlipDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    "Flip_Cota_Consorcio.pdf",
+  );
 
   const [cartaCredito, setCartaCredito] = useState(maskMoney(String(defaultFlipCotaInputs.cartaCredito * 100)));
   const [prazo, setPrazo] = useState(String(defaultFlipCotaInputs.prazo));
@@ -378,9 +380,6 @@ function FlipCotaPage() {
 
       {results && <ResultsFlip r={results} inputs={inputs} />}
 
-      <div ref={reportRef} style={{ display: "none" }}>
-        <PDFFlip r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} />
-      </div>
     </div>
   );
 }
@@ -437,7 +436,7 @@ function ResultsFlip({ r, inputs }: { r: FlipCotaResults; inputs: FlipCotaInputs
       {/* ── KPIs ─────────────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KPI icon={Coins} label="Desembolso total" value={fmtBRL(r.desembolsoTotal)} sub={`Parcelas + ${r.desembolsoLance > 0 ? "lance próprio" : "lance embutido"}`} variant="primary" />
-        <KPI icon={TrendingUp} label="Ágio recebido na venda" value={fmtBRL(r.valorVenda)} sub={`${inputs.agioVenda}% sobre crédito líquido`} variant="success" />
+        <KPI icon={TrendingUp} label="Ágio recebido na venda" value={fmtBRL(r.valorVenda)} sub={`${inputs.agioVenda}% sobre crédito corrigido (INCC)`} variant="success" />
         <KPI icon={BarChart2} label="Lucro líquido" value={fmtBRL(r.lucroLiquido)} sub={`ROI total: ${r.roiTotal.toFixed(1)}%`} variant={isProfit ? "success" : "danger"} />
         <KPI icon={Zap} label="TIR mensal" value={`${r.tirMensal.toFixed(2)}% a.m.`} sub={`${r.tirAnual.toFixed(1)}% a.a. — em ${inputs.mesContemplacao} meses`} variant={isProfit ? "success" : "danger"} />
       </div>
@@ -505,22 +504,21 @@ function ResultsFlip({ r, inputs }: { r: FlipCotaResults; inputs: FlipCotaInputs
   );
 }
 
-// ─── PDF ──────────────────────────────────────────────────────────────────────
-function PDFFlip({ r, inputs, clientName }: {
-  r: FlipCotaResults | null; inputs: FlipCotaInputs; clientName?: string;
+// ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
+function PDFFlipDoc({ r, inputs, clientName }: {
+  r: FlipCotaResults; inputs: FlipCotaInputs; clientName?: string;
 }) {
-  if (!r) return null;
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
-    <PdfPage>
-      <PdfHeader
+    <RpDoc>
+      <RpHeader
         title="Flip de Cota"
         subtitle="Estratégia de Compra e Venda de Cota — Relatório de Retorno"
         clientName={clientName}
         date={hoje}
       />
-      <PdfPremises items={[
+      <RpPremises items={[
         ["Carta de crédito", fmtBRL(inputs.cartaCredito)],
         ["Prazo do grupo", `${inputs.prazo} meses`],
         ["Lance ofertado", `${inputs.lancePerc}%`],
@@ -531,24 +529,24 @@ function PDFFlip({ r, inputs, clientName }: {
         ["Meia parcela", inputs.meiaParcela ? "Sim" : "Não"],
       ]} />
 
-      <PdfSection title="Resultado do Flip" description="Retorno real da estratégia de compra e revenda de cota contemplada:">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
-          <PdfMetric label="Valor de venda da cota" value={fmtBRL(r.precoVendaTotal)} description={`Carta atualizada + ${inputs.agioVenda}% de ágio`} color={C.green} />
-          <PdfMetric label="Custo de aquisição" value={fmtBRL(r.desembolsoTotal)} description="Parcelas pagas + lance próprio" color={C.navy} />
-          <PdfMetric label="Lucro líquido" value={fmtBRL(r.lucroLiquido)} description="Valor de venda menos custo total" color={r.lucroLiquido >= 0 ? C.green : C.red} />
-          <PdfMetric label="ROI no período" value={`${r.roiTotal.toFixed(1)}%`} description={`Em apenas ${inputs.mesContemplacao} meses`} color={r.roiTotal >= 0 ? C.green : C.red} />
-        </div>
-      </PdfSection>
+      <RpSection title="Resultado do Flip" description="Retorno real da estratégia de compra e revenda de cota contemplada:">
+        <RpMetricRow>
+          <RpMetric label="Valor de venda da cota" value={fmtBRL(r.precoVendaTotal)} description={`Carta atualizada + ${inputs.agioVenda}% de ágio`} color={C.green} />
+          <RpMetric label="Custo de aquisição" value={fmtBRL(r.desembolsoTotal)} description="Parcelas pagas + lance próprio" color={C.navy} />
+          <RpMetric label="Lucro líquido" value={fmtBRL(r.lucroLiquido)} description="Valor de venda menos custo total" color={r.lucroLiquido >= 0 ? C.green : C.red} />
+          <RpMetric label="ROI no período" value={`${r.roiTotal.toFixed(1)}%`} description={`Em apenas ${inputs.mesContemplacao} meses`} color={r.roiTotal >= 0 ? C.green : C.red} />
+        </RpMetricRow>
+      </RpSection>
 
-      <PdfInsight
+      <RpInsight
         emoji="🔄"
         title="A lógica do Flip de Cota"
-        body={`Você entra na cota, paga ${inputs.mesContemplacao} meses de parcela (${fmtBRL(r.valorPagoParcelas)} no total) e dá um lance de ${fmtBRL(r.desembolsoLance)}. Após a contemplação, a carta de ${fmtBRL(inputs.cartaCredito)} — corrigida pelo INCC para ${fmtBRL(r.creditoAtualizado)} — é vendida com ${inputs.agioVenda}% de ágio. Resultado: ${fmtBRL(r.lucroLiquido)} de lucro em ${inputs.mesContemplacao} meses, ROI de ${r.roiTotal.toFixed(1)}%.`}
+        body={`Você entra na cota, paga ${inputs.mesContemplacao} meses de parcela (${fmtBRL(r.valorPagoParcelas)} no total) e dá um lance de ${fmtBRL(r.desembolsoLance)}. Apos a contemplacao, a carta de ${fmtBRL(inputs.cartaCredito)} — corrigida pelo INCC para ${fmtBRL(r.creditoAtualizado)} — e vendida com ${inputs.agioVenda}% de agio. Resultado: ${fmtBRL(r.lucroLiquido)} de lucro em ${inputs.mesContemplacao} meses, ROI de ${r.roiTotal.toFixed(1)}%.`}
         variant="primary"
       />
 
-      <PdfSection title="Detalhamento Financeiro" description="Cada centavo da operação:">
-        <PdfKVList rows={[
+      <RpSection title="Detalhamento Financeiro" description="Cada centavo da operação:">
+        <RpKVList rows={[
           { label: "Carta de crédito contratada", value: fmtBRL(inputs.cartaCredito) },
           { label: "Carta corrigida pelo INCC na contemplação", value: fmtBRL(r.creditoAtualizado), color: C.navy },
           { label: "Lance desembolsado (próprio)", value: fmtBRL(r.desembolsoLance) },
@@ -560,9 +558,9 @@ function PDFFlip({ r, inputs, clientName }: {
           { label: "ROI da operação", value: `${r.roiTotal.toFixed(1)}%`, color: C.green },
           { label: "TIR anual", value: `${r.tirAnual.toFixed(1)}% a.a.`, color: C.green },
         ]} />
-      </PdfSection>
+      </RpSection>
 
-      <PdfFooter note="O flip de cota é uma operação de curto prazo. O lucro depende do ágio praticado no mercado secundário de cotas e das condições da administradora. Consulte as regras do grupo antes de operar." />
-    </PdfPage>
+      <RpFooter note="O flip de cota e uma operacao de curto prazo. O lucro depende do agio praticado no mercado secundario de cotas e das condicoes da administradora. Consulte as regras do grupo antes de operar." />
+    </RpDoc>
   );
 }
