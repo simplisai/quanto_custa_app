@@ -134,6 +134,7 @@ function SaidaFinanciamentoPage() {
   const [percLance, setPercLance] = useState(String(defaultSaidaInputs.percLance));
   const [percLanceEmb, setPercLanceEmb] = useState(String(defaultSaidaInputs.percLanceEmb));
   const [tipoAbatimento, setTipoAbatimento] = useState<TipoAbatimento>(defaultSaidaInputs.tipoAbatimento);
+  const [tipoAbatimentoEmbutido, setTipoAbatimentoEmbutido] = useState<"credito" | "saldoDevedor">(defaultSaidaInputs.tipoAbatimentoEmbutido || "credito");
   const [mesContemplacao, setMesContemplacao] = useState(String(defaultSaidaInputs.mesContemplacaoConsorcio));
 
   // Premissas
@@ -164,6 +165,7 @@ function SaidaFinanciamentoPage() {
       if (s.percLance) setPercLance(s.percLance);
       if (s.percLanceEmb) setPercLanceEmb(s.percLanceEmb);
       if (s.tipoAbatimento) setTipoAbatimento(s.tipoAbatimento);
+      if (s.tipoAbatimentoEmbutido) setTipoAbatimentoEmbutido(s.tipoAbatimentoEmbutido);
       if (s.mesContemplacao) setMesContemplacao(s.mesContemplacao);
       if (s.valorizacao) setValorizacao(s.valorizacao);
       if (s.custosVenda) setCustosVenda(s.custosVenda);
@@ -219,10 +221,11 @@ function SaidaFinanciamentoPage() {
     percLanceEmb: parseInt(percLanceEmb || "0", 10) || 0,
     mesContemplacaoConsorcio: parseInt(mesContemplacao || "0", 10) || 0,
     tipoAbatimento,
+    tipoAbatimentoEmbutido,
     valorizacaoAnual: unmask(valorizacao),
     custosVenda: unmask(custosVenda),
     taxaAtualizacaoAnual: parseFloat(taxaAtualiz || "4") || 4,
-  }), [valorImovel, saldoDevedor, parcelaAtual, prazoRestante, taxaJuros, cartaConsorcio, taxaAdm, prazoConsorcio, percLance, percLanceEmb, mesContemplacao, tipoAbatimento, valorizacao, custosVenda]);
+  }), [valorImovel, saldoDevedor, parcelaAtual, prazoRestante, taxaJuros, cartaConsorcio, taxaAdm, prazoConsorcio, percLance, percLanceEmb, mesContemplacao, tipoAbatimento, tipoAbatimentoEmbutido, valorizacao, custosVenda]);
 
   const calcular = () => {
     setResults(calcSaidaFinanciamento(inputs));
@@ -230,7 +233,7 @@ function SaidaFinanciamentoPage() {
     sessionStorage.setItem("sf-inputs", JSON.stringify({
       valorImovel, saldoDevedor, parcelaAtual, prazoRestante, taxaJuros,
       cartaConsorcio, taxaAdm, prazoConsorcio, percLance, percLanceEmb,
-      tipoAbatimento, mesContemplacao, valorizacao, custosVenda,
+      tipoAbatimento, tipoAbatimentoEmbutido, mesContemplacao, valorizacao, custosVenda,
     }));
   };
 
@@ -361,12 +364,23 @@ function SaidaFinanciamentoPage() {
           <NumInput label="Correção da carta — INCC (% a.a.)" value={taxaAtualiz} onChange={setTaxaAtualiz} type="int" hint="Taxa anual de atualização das parcelas do consórcio pelo INCC" />
         </Grid2>
         <div>
-          <p className="mb-2 text-xs font-semibold text-foreground/70">Lance abate:</p>
+          <p className="mb-2 text-xs font-semibold text-foreground/70">Lance próprio abate:</p>
           <div className="grid grid-cols-2 gap-2">
             {(["parcela", "prazo"] as TipoAbatimento[]).map((t) => (
               <button key={t} onClick={() => setTipoAbatimento(t)}
                 className={`rounded-xl py-2.5 text-sm font-bold transition-colors ${tipoAbatimento === t ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground hover:bg-accent"}`}>
                 {t === "parcela" ? "💸 Parcela (mantém prazo)" : "⏱ Prazo (mantém parcela)"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-semibold text-foreground/70">Lance embutido abate:</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["credito", "saldoDevedor"] as ("credito" | "saldoDevedor")[]).map((t) => (
+              <button key={t} onClick={() => setTipoAbatimentoEmbutido(t)}
+                className={`rounded-xl py-2.5 text-sm font-bold transition-colors ${tipoAbatimentoEmbutido === t ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground hover:bg-accent"}`}>
+                {t === "credito" ? "Poder de compra" : "Saldo devedor"}
               </button>
             ))}
           </div>
@@ -399,7 +413,7 @@ function SaidaFinanciamentoPage() {
               <KPI icon={Home} label="Crédito disponível" value={fmtBRL(results.creditoLiquido)}
                 sub={results.lanceEmbR > 0 ? `Carta − lance embutido ${fmtBRL(results.lanceEmbR)}` : "Carta cheia disponível"}
                 variant="success" />
-              <KPI icon={Wallet} label="Saldo devedor residual" value={fmtBRL(results.lanceEmReaisConsorcio > 0 || results.lanceEmbR > 0 ? Math.max(inputs.cartaConsorcio - results.lanceEmReaisConsorcio - results.lanceEmbR, 0) : inputs.cartaConsorcio)}
+              <KPI icon={Wallet} label="Saldo devedor residual" value={fmtBRL(results.saldoDevedorPosLance)}
                 sub="Parcelas restantes a pagar" variant="default" />
               <KPI icon={ArrowRight} label="Prazo restante" value={`${results.prazoPosFinal} meses`}
                 sub={inputs.tipoAbatimento === "prazo" ? "Prazo reduzido pelo lance" : "Prazo original mantido"} variant="default" />
@@ -523,16 +537,16 @@ function PDFSaidaDoc({ r, inputs, clientName, chartImg }: {
         ["Contemplação", `Mês ${inputs.mesContemplacaoConsorcio}`],
       ]} />
 
-      <RpSection title="Resultado da Migração" description="O que acontece quando você vende o imóvel financiado e migra para o consórcio:">
+      <RpSection title="Resultado da Migracao" description="O que acontece quando voce vende o imovel financiado e migra para o consorcio:">
         <RpMetricRow>
-          <RpMetric label="Capital líquido da venda" value={fmtBRL(r.capitalLiquidoVenda)} description="Apos pagar o banco e custos de venda" color={C.navy} />
-          <RpMetric label="Parcela pós-lance (consórcio)" value={fmtBRL(r.parcelaPosLance)} description={`vs. financiamento: ${fmtBRL(inputs.parcelaAtual)}`} color={C.green} />
-          <RpMetric label="Economia mensal" value={fmtBRL(r.economiaParcelaMensal)} description="Diferença de parcela por mes após contemplação" color={r.economiaParcelaMensal > 0 ? C.green : C.red} />
+          <RpMetric label="Capital liquido da venda" value={fmtBRL(r.capitalLiquidoVenda)} description="Apos pagar o banco e custos de venda" color={C.navy} />
+          <RpMetric label="Parcela pos-lance (consorcio)" value={fmtBRL(r.parcelaPosLance)} description={`vs. financiamento: ${fmtBRL(inputs.parcelaAtual)}`} color={C.green} />
+          <RpMetric label="Economia mensal" value={fmtBRL(r.economiaParcelaMensal)} description="Diferenca de parcela por mes apos contemplacao" color={r.economiaParcelaMensal > 0 ? C.green : C.red} />
           <RpMetric label="Vantagem total" value={fmtBRL(r.economiaTotalCusto)} description="Economia total vs. manter o financiamento" color={C.green} />
         </RpMetricRow>
       </RpSection>
 
-      <RpSection title="Resumo Pós-Contemplação" description="Como o lance é aplicado e o que resta do plano após a contemplação:">
+      <RpSection title="Resumo Pos-Contemplacao" description="Como o lance é aplicado e o que resta do plano apos a contemplacao:">
         <RpKVList rows={[
           { label: "Lance próprio (capital da venda)", value: fmtBRL(r.lanceProprioR), color: C.navy },
           { label: "Lance embutido aplicado (sai do crédito)", value: fmtBRL(r.lanceEmbR), color: C.amber },
@@ -543,7 +557,7 @@ function PDFSaidaDoc({ r, inputs, clientName, chartImg }: {
         ]} />
       </RpSection>
 
-      <RpChartImage src={chartImg} title="Evolução Patrimonial" height={130} />
+      <RpChartImage src={chartImg} title="Evolucao Patrimonial" height={130} />
 
       <RpInsight
         emoji="🔄"
@@ -552,7 +566,7 @@ function PDFSaidaDoc({ r, inputs, clientName, chartImg }: {
         variant="primary"
       />
 
-      <RpSection title="Comparativo: Financiamento vs. Consórcio" description="Dois caminhos, resultados completamente diferentes:">
+      <RpSection title="Comparativo: Financiamento vs. Consorcio" description="Dois caminhos, resultados completamente diferentes:">
         <RpKVList rows={[
           { label: "Parcela atual — financiamento", value: fmtBRL(inputs.parcelaAtual), color: C.red },
           { label: "Parcela pós-lance — consórcio", value: fmtBRL(r.parcelaPosLance), color: C.green },

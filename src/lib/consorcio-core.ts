@@ -190,8 +190,7 @@ export function simularConsorcio(p: ConsorcioParams): ConsorcioResumo {
   const saldoDevedorContemplacao = valorPlanoMc * ((prazo - mc) / prazo);
 
   // Lance próprio sempre amortiza o saldo; embutido amortiza só no modo "saldoDevedor"
-  const lanceTotalAmortiza =
-    lanceProprioR + (abatimentoEmbutido === "saldoDevedor" ? lanceEmbutidoR : 0);
+  const lanceTotalAmortiza = lanceProprioR + lanceEmbutidoR;
   const saldoDevedorPosLance = Math.max(saldoDevedorContemplacao - lanceTotalAmortiza, 0);
 
   let prazoPosLance: number;

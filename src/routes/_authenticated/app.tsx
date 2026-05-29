@@ -446,7 +446,7 @@ function ResultsView({ r, usoCredito, valorImovel, entrada, credito }: {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card title="Financiamento SAC" value={fmtBRL(r.tSAC)} className="from-danger to-destructive" />
         <Card title="Financiamento PRICE" value={fmtBRL(r.tPrice)} className="from-warning to-[oklch(0.55_0.18_45)]" />
-        <ConsorcioCard tCons={r.tCons} valorEmbVisual={r.valorEmbVisual} />
+        <ConsorcioCard tCons={r.tCons} />
       </div>
       <ChartParcelas r={r} />
       <ChartAlavancagem r={r} />
@@ -488,14 +488,12 @@ function Card({ title, value, className }: { title: string; value: string; class
   );
 }
 
-function ConsorcioCard({ tCons, valorEmbVisual }: { tCons: number; valorEmbVisual: number }) {
-  // Mostra apenas o custo real (líquido do lance embutido, que sai do crédito e não do bolso).
-  const custoReal = tCons - valorEmbVisual;
+function ConsorcioCard({ tCons }: { tCons: number }) {
   return (
     <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-glow p-5 text-white shadow-elegant flex flex-col justify-between">
       <div>
-        <div className="text-[10px] font-extrabold uppercase tracking-widest opacity-90">Custo Total Consórcio</div>
-        <div className="mt-2 text-2xl font-extrabold">{fmtBRL(custoReal)}</div>
+        <div className="text-[10px] font-extrabold uppercase tracking-widest opacity-90">Custo Real Líquido</div>
+        <div className="mt-2 text-2xl font-extrabold">{fmtBRL(tCons)}</div>
       </div>
     </div>
   );
@@ -623,19 +621,19 @@ function PDFReportDoc({ r, usoCredito, inputs, clientName }: {
         <RpMetricRow>
           <RpMetric label="Financiamento SAC" value={fmtBRL(r.tSAC)} color="#b21f1f" />
           <RpMetric label="Financiamento PRICE" value={fmtBRL(r.tPrice)} color="#d35400" />
-          <RpMetric label="Estratégia Consórcio" value={fmtBRL(r.tCons)} color={C.navy} />
+          <RpMetric label="Estrategia Consorcio" value={fmtBRL(r.tCons)} color={C.navy} />
         </RpMetricRow>
       </RpSection>
 
       <RpSection title="Parcela Mensal Inicial Estimada">
         <RpMetricRow>
-          <RpMetric label="SAC — 1ª parcela" value={fmtBRL(r.parcelasSAC[0] ?? 0)} description="por mês" color="#b21f1f" />
-          <RpMetric label="PRICE — parcela fixa" value={fmtBRL(r.parcelasPrice[0] ?? 0)} description="por mês" color="#d35400" />
-          <RpMetric label="Consórcio — pré-contempl." value={fmtBRL(r.parcelasCons[0] ?? 0)} description="por mês" color={C.navy} />
+          <RpMetric label="SAC — 1ª parcela" value={fmtBRL(r.parcelasSAC[0] ?? 0)} description="por mes" color="#b21f1f" />
+          <RpMetric label="PRICE — parcela fixa" value={fmtBRL(r.parcelasPrice[0] ?? 0)} description="por mes" color="#d35400" />
+          <RpMetric label="Consorcio — pre-contempl." value={fmtBRL(r.parcelasCons[0] ?? 0)} description="por mes" color={C.navy} />
         </RpMetricRow>
       </RpSection>
 
-      <RpSection title="Cenário Financiamento" accent="navy">
+      <RpSection title="Cenario Financiamento" accent="navy">
         <RpKVList rows={[
           { label: "Valor do Imóvel", value: fmtBRL(inputs.valorImovel) },
           { label: "Entrada Aportada", value: fmtBRL(inputs.entrada) },
@@ -645,7 +643,7 @@ function PDFReportDoc({ r, usoCredito, inputs, clientName }: {
         ]} />
       </RpSection>
 
-      <RpSection title="Cenário Consórcio" accent="navy">
+      <RpSection title="Cenario Consorcio" accent="navy">
         <RpKVList rows={[
           { label: "Crédito da Carta", value: fmtBRL(inputs.creditoCons) },
           { label: "Crédito Atualizado (INCC)", value: fmtBRL(r.creditoAtualizadoContemplacao), color: C.navy },
@@ -657,7 +655,7 @@ function PDFReportDoc({ r, usoCredito, inputs, clientName }: {
         ]} />
       </RpSection>
 
-      <RpFooter note="O custo global inclui entrada + parcelas + ITBI/cartório + custo de aluguel durante a espera (consórcio). O patrimônio do consórcio representa a entrada aplicada em CDI até a contemplação. Simulação elaborada com base nas premissas declaradas — resultados reais podem variar conforme condições de mercado." />
+      <RpFooter note="O custo global inclui entrada + parcelas + ITBI/cartório + custo de aluguel durante a espera (consorcio). O patrimonio do consorcio representa a entrada aplicada em CDI ate a contemplacao. Simulacao elaborada com base nas premissas declaradas — resultados reais podem variar conforme condições de mercado." />
     </RpDoc>
   );
 }

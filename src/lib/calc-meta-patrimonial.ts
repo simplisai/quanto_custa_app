@@ -2,6 +2,8 @@
 // Cálculo reverso: dado patrimônio-alvo ou renda passiva-alvo,
 // mostra quantas cotas, de qual valor e prazo o cliente precisa contratar.
 
+import { simularConsorcio } from "./consorcio-core";
+
 export type ModoMeta = "patrimonio" | "renda";
 export type RegimeTributario = "nenhum" | "simples" | "presumido" | "real";
 
@@ -16,9 +18,9 @@ export interface MetaPatrimonialInputs {
   // Horizonte e premissas
   horizonteAnos: number;         // Prazo total do plano (anos)
   valorizacaoAnual: number;      // Valorização anual dos imóveis (%)
-  cdiAnual: number;              // CDI anual para comparação (%)
 
   // Parâmetros do consórcio
+  taxaAtualizacaoAnual: number;  // Taxa de atualização anual da carta (INCC, % a.a.)
   taxaAdmConsorcio: number;      // Taxa de administração total (%)
   prazoConsorcio: number;        // Prazo do grupo (meses)
   percLance: number;             // Lance médio ofertado (% da carta)
@@ -54,10 +56,6 @@ export interface MetaPatrimonialResults {
   totalInvestido: number;
   cotas: CotaPlano[];
 
-  // Comparativo CDB
-  cdbFinal: number;
-  vantageVsCDB: number;
-
   // Benefício fiscal (PJ)
   economiaFiscalTotal: number;  // aliquota × totalInvestido (parcelas dedutíveis)
   custoRealTotal: number;       // totalInvestido - economiaFiscalTotal
@@ -74,7 +72,7 @@ export const defaultMetaInputs: MetaPatrimonialInputs = {
   yeildAluguelPerc: 0.5,
   horizonteAnos: 15,
   valorizacaoAnual: 6,
-  cdiAnual: 10.5,
+  taxaAtualizacaoAnual: 4,
   taxaAdmConsorcio: 18,
   prazoConsorcio: 120,
   percLance: 20,
@@ -88,7 +86,7 @@ export const defaultMetaInputs: MetaPatrimonialInputs = {
 export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialResults {
   const {
     modo, patrimonioAlvoR, rendaMensalAlvoR, yeildAluguelPerc,
-    horizonteAnos, valorizacaoAnual, cdiAnual,
+    horizonteAnos, valorizacaoAnual, taxaAtualizacaoAnual,
     taxaAdmConsorcio, prazoConsorcio, percLance, percLanceEmb,
     mesContemplacaoPrimeira, intervaloCotasMeses,
     regimeTributario, aliquotaEfetiva,
@@ -96,8 +94,6 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
 
   const horizonteMeses = horizonteAnos * 12;
   const valorizMensal = Math.pow(1 + valorizacaoAnual / 100, 1 / 12) - 1;
-  const cdiMensal = Math.pow(1 + cdiAnual / 100, 1 / 12) - 1;
-  const taxaAdmFrac = taxaAdmConsorcio / 100;
 
   // Patrimônio-alvo efetivo
   const patrimonioAlvo =
@@ -109,12 +105,6 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
   // Estratégia: cartas iguais, contemplações escalonadas, valor de cada carta
   // cresce com a valorização até o final do horizonte.
   // Processo iterativo: aumenta num. cotas até atingir meta.
-
-  // Valor de uma carta que, valorizada até o final, entrega 1 unidade de patrimônio
-  // valorFinal = cartaBase × (1 + valorizMensal)^(horizonteMeses - mesContemplacaoAbsoluto)
-  // Para a primeira cota:
-  const cartaBaseUnitaria = (mes: number) =>
-    1 / Math.pow(1 + valorizMensal, Math.max(horizonteMeses - mes, 0));
 
   const maxCotas = 20;
   let numCotas = 1;
@@ -140,36 +130,40 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
       if (mesContemplacao >= horizonteMeses) break;
 
       const mesesDesdeContemplacao = horizonteMeses - mesContemplacao;
-      // Carta necessária para entregar partePatrimonio no final
-      const cartaNec = partePatrimonio / Math.pow(1 + valorizMensal, mesesDesdeContemplacao);
+      
+      // Fator INCC até a contemplação
+      const fatorINCC = Math.pow(1 + taxaAtualizacaoAnual / 100, Math.floor(Math.max(mesContemplacao - 1, 0) / 12));
+      
+      // Carta inicial necessária (C0) para que, após INCC e valorização, entregue partePatrimonio
+      const cartaNec = partePatrimonio / (fatorINCC * Math.pow(1 + valorizMensal, mesesDesdeContemplacao));
 
-      const lanceEmbR = cartaNec * ((percLanceEmb || 0) / 100);
-      const lanceR = cartaNec * (percLance / 100); // próprio (desembolso real)
-      const lanceTotalNaCota = lanceR + lanceEmbR;
-      const valorPlano = cartaNec * (1 + taxaAdmFrac);
-      const parcelaMensal = valorPlano / prazoConsorcio;
-      const parcelasPos = Math.max(prazoConsorcio - mesContemplacao, 0);
-      // Saldo do plano na contemplação (não re-aplica taxaAdm — já está embutida no plano)
-      const saldoPlanoContemp = Math.max(valorPlano - parcelaMensal * mesContemplacao, 0);
-      const saldoPosLance = Math.max(saldoPlanoContemp - lanceTotalNaCota, 0);
-      const parcelaPosLance = parcelasPos > 0 ? saldoPosLance / parcelasPos : 0;
+      const sim = simularConsorcio({
+        credito: cartaNec,
+        taxaAdm: taxaAdmConsorcio,
+        prazo: prazoConsorcio,
+        inccAnual: taxaAtualizacaoAnual,
+        mesContemplacao,
+        lanceEmbutidoPerc: percLanceEmb || 0,
+        lanceProprioR: cartaNec * fatorINCC * (percLance / 100), // Lance ofertado no valor atualizado
+        abatimentoEmbutido: "saldoDevedor",
+        amortizacao: "parcela",
+        horizonteMeses: prazoConsorcio
+      });
 
-      const totalNaCota =
-        parcelaMensal * Math.min(mesContemplacao, prazoConsorcio) +
-        lanceR +
-        parcelaPosLance * Math.max(parcelasPos, 0);
-
+      const totalNaCota = sim.desembolsoTotal;
       totalInvestidoCalc += totalNaCota;
-      const valorImovelFinal = cartaNec * Math.pow(1 + valorizMensal, mesesDesdeContemplacao);
+      
+      // O valor final do imóvel será o crédito atualizado na contemplação vezes a valorização
+      const valorImovelFinal = sim.creditoAtualizadoContemplacao * Math.pow(1 + valorizMensal, mesesDesdeContemplacao);
       patrimonioResultante += valorImovelFinal;
 
       cotas.push({
         numero: c + 1,
         valorCarta: cartaNec,
         mesContemplacaoAbsoluto: mesContemplacao,
-        parcelaMensal,
-        parcelaPosLance,
-        lanceR,
+        parcelaMensal: sim.parcelaInicial,
+        parcelaPosLance: sim.parcelaPosLance,
+        lanceR: sim.lanceProprioR,
         totalPagoNaCota: totalNaCota,
         valorImovelFinal,
       });
@@ -188,10 +182,6 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
 
   const valorCadaCarta =
     cotasPlano.length > 0 ? cotasPlano[0].valorCarta : 0;
-
-  // CDB: mesmo dinheiro investido mensalmente
-  const cdbFinal = totalInvestido * Math.pow(1 + cdiMensal, horizonteMeses);
-  const vantageVsCDB = patrimonioResultante - cdbFinal;
 
   const rendaMensalFinalR = patrimonioResultante * (yeildAluguelPerc / 100);
   const metaAtingida = patrimonioResultante >= patrimonioAlvo;
@@ -215,8 +205,6 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
     investimentoMensalTotal,
     totalInvestido,
     cotas: cotasPlano,
-    cdbFinal,
-    vantageVsCDB,
     economiaFiscalTotal,
     custoRealTotal,
     metaAtingida,

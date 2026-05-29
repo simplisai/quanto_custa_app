@@ -7,6 +7,7 @@ import {
   Gift, Copy, Share2, CheckCircle2, Clock, Users, Star,
   ChevronDown, ChevronUp, ArrowRight,
 } from "lucide-react";
+import { copyToClipboard } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/indicar")({
   component: IndicarPage,
@@ -16,31 +17,57 @@ function IndicarPage() {
   const { user } = useAuth();
   const { stats, loading, referralLink, refresh } = useReferralStats(user?.id);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [isCopying, setIsCopying] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   const handleCopy = async () => {
-    if (!referralLink) return;
+    if (!referralLink) {
+      toast.error("Link ainda não carregado. Tente novamente.");
+      return;
+    }
+    setIsCopying(true);
     try {
-      await navigator.clipboard.writeText(referralLink);
-      toast.success("Link copiado!");
-    } catch {
-      toast.error("Não foi possível copiar. Copie manualmente.");
+      const success = await copyToClipboard(referralLink);
+      if (success) {
+        toast.success("Link copiado!");
+      } else {
+        toast.error("Não foi possível copiar. Selecione e copie manualmente.");
+      }
+    } catch (err) {
+      console.error("[Copy Error]", err);
+      toast.error("Não foi possível copiar. Selecione e copie manualmente.");
+    } finally {
+      setIsCopying(false);
     }
   };
 
   const handleShare = async () => {
-    if (!referralLink) return;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Quanto Custa — Calculadora para Consórcio",
-          text: "Use meu link e teste grátis por 14 dias. Ferramentas essenciais para vendedores de consórcio.",
-          url: referralLink,
-        });
-      } catch {
-        // User cancelled share
+    if (!referralLink) {
+      toast.error("Link ainda não carregado. Tente novamente.");
+      return;
+    }
+    setIsSharing(true);
+    try {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: "Quanto Custa — Calculadora para Consórcio",
+            text: "Use meu link e teste grátis por 14 dias. Ferramentas essenciais para vendedores de consórcio.",
+            url: referralLink,
+          });
+        } catch (err) {
+          // User cancelled share
+          console.log("[Share] User cancelled or failed");
+        }
+      } else {
+        // Fallback to copy
+        await handleCopy();
       }
-    } else {
-      handleCopy();
+    } catch (err) {
+      console.error("[Share Error]", err);
+      toast.error("Não foi possível compartilhar.");
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -112,19 +139,29 @@ function IndicarPage() {
             </div>
             <button
               onClick={handleCopy}
+              disabled={loading || isCopying || !referralLink}
               title="Copiar link"
-              className="shrink-0 flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-extrabold text-primary-foreground hover:opacity-90 active:scale-95 transition-all"
+              className="shrink-0 flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-extrabold text-primary-foreground hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Copy className="h-4 w-4" />
-              <span className="hidden sm:inline">Copiar</span>
+              {isCopying ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{isCopying ? "Copiando…" : "Copiar"}</span>
             </button>
             <button
               onClick={handleShare}
+              disabled={loading || isSharing || !referralLink}
               title="Compartilhar"
-              className="shrink-0 flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-xs font-bold text-foreground hover:bg-accent active:scale-95 transition-all"
+              className="shrink-0 flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-xs font-bold text-foreground hover:bg-accent active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Share2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Compartilhar</span>
+              {isSharing ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              ) : (
+                <Share2 className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">{isSharing ? "Compartilhando…" : "Compartilhar"}</span>
             </button>
           </div>
         )}
@@ -257,9 +294,19 @@ function IndicarPage() {
         </div>
         <button
           onClick={handleShare}
-          className="shrink-0 flex items-center gap-2 rounded-xl bg-primary-foreground text-primary px-4 py-2.5 text-sm font-extrabold hover:opacity-90 active:scale-95 transition-all"
+          disabled={loading || isSharing || !referralLink}
+          className="shrink-0 flex items-center gap-2 rounded-xl bg-primary-foreground text-primary px-4 py-2.5 text-sm font-extrabold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Compartilhar <ArrowRight className="h-4 w-4" />
+          {isSharing ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Compartilhando…
+            </>
+          ) : (
+            <>
+              Compartilhar <ArrowRight className="h-4 w-4" />
+            </>
+          )}
         </button>
       </div>
 

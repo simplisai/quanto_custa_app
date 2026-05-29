@@ -91,8 +91,8 @@ export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
     horizonteMeses: mesContemp, // o operador paga só até contemplar e vende
   });
 
-  const parcelaCheia = sim.parcelaCheiaInicial;
-  const parcelaEfetiva = sim.parcelaInicial;
+  const parcelaCheia = sim.timeline[mesContemp - 1]?.parcelaCheia ?? 0;
+  const parcelaEfetiva = sim.timeline[mesContemp - 1]?.parcela ?? 0;
 
   // Parcelas EFETIVAMENTE pagas até a contemplação (já reajustadas pelo INCC) —
   // corrige o bug de desembolso subestimado.

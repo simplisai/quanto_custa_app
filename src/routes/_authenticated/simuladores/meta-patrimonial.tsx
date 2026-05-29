@@ -508,11 +508,11 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
         ["Valorização", `${inputs.valorizacaoAnual}% a.a.`],
       ]} />
 
-      <RpSection title="Resultado do Plano Patrimonial" description="O que o consórcio entrega ao final do horizonte planejado:">
+      <RpSection title="Resultado do Plano Patrimonial" description="O que o consorcio entrega ao final do horizonte planejado:">
         <RpMetricRow>
-          <RpMetric label="Nº de cotas necessárias" value={`${r.numCotas} cotas`} description="Quantidade de consórcios para atingir a meta" color={C.navy} />
-          <RpMetric label="Patrimônio total final" value={fmtBRL(r.patrimonioTotalFinal)} description="Soma do valor de mercado de todos os imóveis" color={C.green} />
-          <RpMetric label="Renda passiva mensal" value={fmtBRL(r.rendaMensalFinalR)} description="Aluguel potencial com yield aplicado sobre o patrimônio" color={C.green} />
+          <RpMetric label="Nº de cotas necessárias" value={`${r.numCotas} cotas`} description="Quantidade de consorcios para atingir a meta" color={C.navy} />
+          <RpMetric label="Patrimonio total final" value={fmtBRL(r.patrimonioTotalFinal)} description="Soma do valor de mercado de todos os imóveis" color={C.green} />
+          <RpMetric label="Renda passiva mensal" value={fmtBRL(r.rendaMensalFinalR)} description="Aluguel potencial com yield aplicado sobre o patrimonio" color={C.green} />
           <RpMetric label="Investimento mensal (pico)" value={fmtBRL(r.investimentoMensalTotal)} description="Maior desembolso simultâneo de parcelas" color={C.amber} />
         </RpMetricRow>
       </RpSection>
@@ -524,7 +524,7 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
         variant="primary"
       />
 
-      <RpSection title="Resultado do Plano Patrimonial" description="O patrimônio construído e a renda passiva potencial ao final do horizonte:">
+      <RpSection title="Resultado do Plano Patrimonial" description="O patrimonio construído e a renda passiva potencial ao final do horizonte:">
         <RpKVList rows={[
           { label: "Total investido no plano", value: fmtBRL(r.totalInvestido) },
           { label: "Patrimônio final (valor de mercado)", value: fmtBRL(r.patrimonioTotalFinal), color: C.green },
@@ -533,7 +533,7 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
       </RpSection>
 
       {inputs.regimeTributario === "real" && r.economiaFiscalTotal > 0 ? (
-        <RpSection title="Benefício Fiscal PJ (Lucro Real)" description="No Lucro Real a taxa de administração é despesa operacional dedutível: o Estado patrocina parte do custo via redução de IRPJ + CSLL.">
+        <RpSection title="Beneficio Fiscal PJ (Lucro Real)" description="No Lucro Real a taxa de administracao é despesa operacional dedutível: o Estado patrocina parte do custo via reducao de IRPJ + CSLL.">
           <RpKVList rows={[
             { label: `Quanto o Estado paga da sua cota (${inputs.aliquotaEfetiva}% sobre a taxa adm.)`, value: fmtBRL(r.economiaFiscalTotal), color: C.green },
             { label: "Economia fiscal total no plano", value: fmtBRL(r.economiaFiscalTotal), color: C.green },
@@ -542,7 +542,7 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
           ]} />
         </RpSection>
       ) : inputs.regimeTributario === "presumido" ? (
-        <RpSection title="Benefício PJ (Lucro Presumido)" description="No Lucro Presumido o imposto incide sobre o faturamento — não há dedução direta. A vantagem é patrimonial e de caixa.">
+        <RpSection title="Beneficio PJ (Lucro Presumido)" description="No Lucro Presumido o imposto incide sobre o faturamento — não há dedução direta. A vantagem é patrimonial e de caixa.">
           <RpKVList rows={[
             { label: "Preservação de caixa", value: "Compra patrimônio sem retirar capital de giro da atividade-fim", color: C.navy },
             { label: "Balanço limpo (SCR intocado)", value: "Até a contemplação entra como Investimento (Ativo), não como dívida no Banco Central", color: C.navy },
@@ -555,7 +555,7 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
       <RpSection title="Plano de Cotas" description="Cada cota e seu resultado esperado:">
         {r.cotas.map((c) => (
           <RpView key={c.numero} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: C.border }}>
-            <RpText style={{ color: C.textSub, flex: 1, fontSize: 9 }}>Cota {c.numero} — Mês {c.mesContemplacaoAbsoluto}</RpText>
+            <RpText style={{ color: C.textSub, flex: 1, fontSize: 9 }}>Cota {c.numero} — Mes {c.mesContemplacaoAbsoluto}</RpText>
             <RpText style={{ color: C.navy, width: 100, textAlign: "right", fontSize: 9 }}>{fmtBRL(c.valorCarta)}</RpText>
             <RpText style={{ color: C.green, width: 100, textAlign: "right", fontSize: 9, fontFamily: "Helvetica-Bold" }}>{fmtBRL(c.valorImovelFinal)}</RpText>
           </RpView>

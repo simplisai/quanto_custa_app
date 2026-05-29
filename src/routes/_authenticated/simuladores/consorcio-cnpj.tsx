@@ -478,11 +478,11 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
 
       {r.beneficioFiscalAtivo ? (
         <>
-          <RpSection title="Benefício Fiscal Mensal (Lucro Real)" description="O que o consórcio custa de verdade para a empresa, depois do abatimento fiscal:">
+          <RpSection title="Beneficio Fiscal Mensal (Lucro Real)" description="O que o consorcio custa de verdade para a empresa, depois do abatimento fiscal:">
             <RpMetricRow>
-              <RpMetric label="Parcela bruta" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Valor nominal da parcela antes do benefício fiscal" color={C.navy} />
+              <RpMetric label="Parcela bruta" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Valor nominal da parcela antes do beneficio fiscal" color={C.navy} />
               <RpMetric label="Economia fiscal mensal" value={fmtBRL(r.economiaFiscalMensal)} description={`${aliquotaTotal}% sobre a taxa de adm. — imposto que não é pago`} color={C.green} />
-              <RpMetric label="Parcela líquida (custo real)" value={fmtBRL(r.parcelaLiquidaConsorcio)} description="O que a empresa realmente desembolsa por mês" color={C.amber} />
+              <RpMetric label="Parcela liquida (custo real)" value={fmtBRL(r.parcelaLiquidaConsorcio)} description="O que a empresa realmente desembolsa por mes" color={C.amber} />
             </RpMetricRow>
           </RpSection>
 
@@ -494,11 +494,11 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
         </>
       ) : (
         <>
-          <RpSection title="Vantagem PJ (Lucro Presumido)" description="No Lucro Presumido o imposto incide sobre o faturamento — NÃO há dedução direta. O benefício é de caixa e de balanço:">
+          <RpSection title="Vantagem PJ (Lucro Presumido)" description="No Lucro Presumido o imposto incide sobre o faturamento — NÃO há dedução direta. O beneficio é de caixa e de balanço:">
             <RpMetricRow>
-              <RpMetric label="Parcela do consórcio" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Sem dedução fiscal direta neste regime" color={C.navy} />
-              <RpMetric label="Preservação de caixa" value="Capital de giro intacto" description="Compra patrimônio sem retirar milhões do caixa de uma vez" color={C.green} />
-              <RpMetric label="Balanço (SCR)" value="Rating intocado" description="Entra como Investimento (Ativo), não como dívida no Banco Central" color={C.green} />
+              <RpMetric label="Parcela do consorcio" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Sem dedução fiscal direta neste regime" color={C.navy} />
+              <RpMetric label="Preservacao de caixa" value="Capital de giro intacto" description="Compra patrimonio sem retirar milhões do caixa de uma vez" color={C.green} />
+              <RpMetric label="Balanço (SCR)" value="Rating intocado" description="Entra como Investimento (Ativo), não como divida no Banco Central" color={C.green} />
             </RpMetricRow>
           </RpSection>
 
@@ -510,7 +510,7 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
         </>
       )}
 
-      <RpSection title="Consórcio PJ vs. Financiamento PJ" description="Comparativo de custo total entre as duas alternativas:">
+      <RpSection title="Consorcio PJ vs. Financiamento PJ" description="Comparativo de custo total entre as duas alternativas:">
         <RpKVList rows={[
           { label: "Parcela bruta consórcio", value: fmtBRL(r.parcelaBrutaConsorcio) },
           { label: "Parcela líquida consórcio (pós fiscal)", value: fmtBRL(r.parcelaLiquidaConsorcio), color: C.green },
@@ -525,7 +525,7 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
         ]} />
       </RpSection>
 
-      <RpChartImage src={chartImg} title="Parcelas: Bruta × Líquida × Financiamento" height={140} />
+      <RpChartImage src={chartImg} title="Parcelas: Bruta × Liquida × Financiamento" height={140} />
 
       <RpInsight
         title={`Consórcio é ${r.percentualEconomia.toFixed(1)}% mais barato que o financiamento PJ`}
@@ -533,7 +533,7 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
         variant="success"
       />
 
-      <RpFooter note="Benefício fiscal calculado conforme o regime: no Lucro Real a taxa de administração é despesa operacional dedutível (abate IRPJ + CSLL); no Lucro Presumido o imposto incide sobre o faturamento e não há dedução direta — o ganho é de caixa e de balanço. Consulte o contador da empresa para validar o enquadramento específico." />
+      <RpFooter note="Beneficio fiscal calculado conforme o regime: no Lucro Real a taxa de administracao é despesa operacional dedutível (abate IRPJ + CSLL); no Lucro Presumido o imposto incide sobre o faturamento e não há dedução direta — o ganho é de caixa e de balanço. Consulte o contador da empresa para validar o enquadramento especifico." />
     </RpDoc>
   );
 }

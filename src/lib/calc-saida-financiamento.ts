@@ -22,6 +22,7 @@ export interface SaidaFinanciamentoInputs {
   percLanceEmb: number;          // Lance embutido (% da carta) — sai do crédito recebido
   mesContemplacaoConsorcio: number; // Mês estimado de contemplação com lance
   tipoAbatimento: TipoAbatimento;  // Como o lance abate: reduz prazo ou parcela
+  tipoAbatimentoEmbutido?: "credito" | "saldoDevedor"; // Como o lance embutido abate
 
   // Premissas de mercado
   valorizacaoAnual: number;      // Valorização anual do imóvel (%)
@@ -66,6 +67,7 @@ export interface SaidaFinanciamentoResults {
   economiaTotalCusto: number;    // Diferença total de custo
   diferencaPatrimonial: number;  // Patrimônio final consórcio - financiamento
   prazoParaImovelCons: number;   // Mês em que o imóvel é adquirido (contemplação)
+  saldoDevedorPosLance: number;  // Saldo residual
 
   // Timeline
   timeline: SaidaMesData[];
@@ -121,7 +123,7 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
     mesContemplacao: mesContemplacaoConsorcio,
     lanceEmbutidoPerc: percLanceEmb || 0,
     lanceProprioR: lanceEmReaisConsorcio,
-    abatimentoEmbutido: "credito",
+    abatimentoEmbutido: i.tipoAbatimentoEmbutido ?? "credito",
     amortizacao: tipoAbatimento,
     horizonteMeses: prazoAnaliseSim,
   });
@@ -216,6 +218,7 @@ export function calcSaidaFinanciamento(i: SaidaFinanciamentoInputs): SaidaFinanc
     economiaTotalCusto,
     diferencaPatrimonial,
     prazoParaImovelCons: mesContemplacaoConsorcio,
+    saldoDevedorPosLance,
     timeline,
   };
 }

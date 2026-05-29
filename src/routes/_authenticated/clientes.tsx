@@ -35,6 +35,14 @@ type Simulation = {
   results: Record<string, unknown>
 }
 
+type FormSubmission = {
+  id: string
+  form_id: string
+  submitted_at: string
+  responses: Record<string, any>
+  form_templates: { title: string } | null
+}
+
 const emptyForm = { name: '', document: '', email: '', phone: '', notes: '' }
 
 function ClientesPage() {
@@ -49,6 +57,7 @@ function ClientesPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [simsByClient, setSimsByClient] = useState<Record<string, Simulation[]>>({})
+  const [subsByClient, setSubsByClient] = useState<Record<string, FormSubmission[]>>({})
   const [loadingSims, setLoadingSims] = useState<string | null>(null)
 
   const load = async () => {
@@ -63,14 +72,24 @@ function ClientesPage() {
   const toggleExpand = async (clientId: string) => {
     if (expandedId === clientId) { setExpandedId(null); return }
     setExpandedId(clientId)
-    if (simsByClient[clientId]) return
+    if (simsByClient[clientId] && subsByClient[clientId]) return
     setLoadingSims(clientId)
-    const { data } = await supabase
-      .from('simulations')
-      .select('id, title, created_at, results')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
-    setSimsByClient((prev) => ({ ...prev, [clientId]: (data ?? []) as Simulation[] }))
+    
+    const [simsRes, subsRes] = await Promise.all([
+      supabase
+        .from('simulations')
+        .select('id, title, created_at, results')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('form_submissions')
+        .select('id, form_id, submitted_at, responses, form_templates(title)')
+        .eq('client_id', clientId)
+        .order('submitted_at', { ascending: false })
+    ])
+    
+    setSimsByClient((prev) => ({ ...prev, [clientId]: (simsRes.data ?? []) as Simulation[] }))
+    setSubsByClient((prev) => ({ ...prev, [clientId]: (subsRes.data ?? []) as FormSubmission[] }))
     setLoadingSims(null)
   }
 
@@ -192,54 +211,98 @@ function ClientesPage() {
 
                     {/* Simulações do cliente (expandido) */}
                     {expandedId === c.id && (
-                      <div className="border-t bg-muted/20 px-6 py-4">
+                      <div className="border-t bg-muted/20 px-6 py-6 space-y-6">
                         {c.notes && (
-                          <p className="mb-3 text-xs text-muted-foreground italic">{c.notes}</p>
-                        )}
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                            Simulações vinculadas
-                          </h4>
-                          <Button asChild size="sm" variant="outline">
-                            <Link to="/app" search={{ client: c.id }}>
-                              <Calculator className="mr-1.5 h-3 w-3" />Nova simulação
-                            </Link>
-                          </Button>
-                        </div>
-                        {loadingSims === c.id ? (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />Carregando…
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Observações / Resumo</h4>
+                            <p className="text-sm text-foreground whitespace-pre-wrap">{c.notes}</p>
                           </div>
-                        ) : (simsByClient[c.id] ?? []).length === 0 ? (
-                          <p className="text-sm text-muted-foreground">Nenhuma simulação vinculada a este cliente.</p>
-                        ) : (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Título</TableHead>
-                                <TableHead>Resumo</TableHead>
-                                <TableHead>Data</TableHead>
-                                <TableHead className="w-10" />
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {(simsByClient[c.id] ?? []).map((sim) => (
-                                <TableRow key={sim.id}>
-                                  <TableCell className="text-sm font-medium">{sim.title ?? 'Sem título'}</TableCell>
-                                  <TableCell className="text-sm text-muted-foreground">{simSummary(sim.results)}</TableCell>
-                                  <TableCell className="text-sm text-muted-foreground">{fmtDateTime(sim.created_at)}</TableCell>
-                                  <TableCell>
-                                    <Button asChild size="icon" variant="ghost" title="Reabrir na calculadora">
-                                      <Link to="/app" search={{ load: sim.id, client: c.id }}>
-                                        <RotateCcw className="h-4 w-4" />
-                                      </Link>
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
                         )}
+
+                        {/* Formulários Respondidos */}
+                        <div>
+                          <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                            Formulários Respondidos
+                          </h4>
+                          {loadingSims === c.id ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />Carregando…
+                            </div>
+                          ) : (subsByClient[c.id] ?? []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Nenhum formulário respondido.</p>
+                          ) : (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {(subsByClient[c.id] ?? []).map((sub) => (
+                                <Card key={sub.id} className="bg-card shadow-sm">
+                                  <CardHeader className="py-3 px-4">
+                                    <CardTitle className="text-sm font-semibold">{sub.form_templates?.title ?? 'Formulário'}</CardTitle>
+                                    <CardDescription className="text-xs">{fmtDateTime(sub.submitted_at)}</CardDescription>
+                                  </CardHeader>
+                                  <CardContent className="py-3 px-4 border-t text-sm bg-muted/5">
+                                    <dl className="space-y-2">
+                                      {Object.entries(sub.responses).map(([k, v]) => (
+                                        <div key={k} className="flex flex-col">
+                                          <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wider">{k}</dt>
+                                          <dd className="font-semibold">{String(v)}</dd>
+                                        </div>
+                                      ))}
+                                    </dl>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Simulações Vinculadas */}
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                              Simulações vinculadas
+                            </h4>
+                            <Button asChild size="sm" variant="outline">
+                              <Link to="/app" search={{ client: c.id }}>
+                                <Calculator className="mr-1.5 h-3 w-3" />Nova simulação
+                              </Link>
+                            </Button>
+                          </div>
+                          {loadingSims === c.id ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />Carregando…
+                            </div>
+                          ) : (simsByClient[c.id] ?? []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Nenhuma simulação vinculada a este cliente.</p>
+                          ) : (
+                            <div className="overflow-hidden rounded-lg border bg-background">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Título</TableHead>
+                                    <TableHead>Resumo</TableHead>
+                                    <TableHead>Data</TableHead>
+                                    <TableHead className="w-10" />
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {(simsByClient[c.id] ?? []).map((sim) => (
+                                    <TableRow key={sim.id}>
+                                      <TableCell className="text-sm font-medium">{sim.title ?? 'Sem título'}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{simSummary(sim.results)}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{fmtDateTime(sim.created_at)}</TableCell>
+                                      <TableCell>
+                                        <Button asChild size="icon" variant="ghost" title="Reabrir na calculadora">
+                                          <Link to="/app" search={{ load: sim.id, client: c.id }}>
+                                            <RotateCcw className="h-4 w-4 text-primary" />
+                                          </Link>
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

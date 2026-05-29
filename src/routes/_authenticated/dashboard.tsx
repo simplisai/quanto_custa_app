@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useReferralStats } from '@/hooks/useReferralStats'
 import { OPERATIONS } from '@/lib/operations'
+import { copyToClipboard } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: DashboardPage,
@@ -21,6 +22,7 @@ function DashboardPage() {
   const [simulationCount, setSimulationCount] = useState<number | null>(null)
   const [clientCount, setClientCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isCopyingDashboard, setIsCopyingDashboard] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -60,6 +62,27 @@ function DashboardPage() {
   ]
 
   const activeSimulators = OPERATIONS.filter((o) => o.isActive)
+
+  const handleCopyDashboard = async () => {
+    if (!referralLink) {
+      toast.error("Link ainda não carregado. Tente novamente.");
+      return;
+    }
+    setIsCopyingDashboard(true);
+    try {
+      const success = await copyToClipboard(referralLink);
+      if (success) {
+        toast.success("Link copiado!");
+      } else {
+        toast.error("Não foi possível copiar. Selecione e copie manualmente.");
+      }
+    } catch (err) {
+      console.error("[Copy Error]", err);
+      toast.error("Não foi possível copiar. Selecione e copie manualmente.");
+    } finally {
+      setIsCopyingDashboard(false);
+    }
+  }
 
   const shortcuts = [
     { title: 'Histórico', description: 'Simulações salvas', icon: History, href: '/historico' },
@@ -183,20 +206,21 @@ function DashboardPage() {
               </div>
             )}
             <button
-              onClick={async () => {
-                if (!referralLink) return;
-                try {
-                  await navigator.clipboard.writeText(referralLink);
-                  toast.success("Link copiado!");
-                } catch {
-                  toast.error("Não foi possível copiar.");
-                }
-              }}
-              disabled={!referralLink}
-              className="shrink-0 flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-extrabold text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-all active:scale-95"
+              onClick={handleCopyDashboard}
+              disabled={referralLoading || isCopyingDashboard || !referralLink}
+              className="shrink-0 flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-extrabold text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-all active:scale-95 disabled:cursor-not-allowed"
             >
-              <Copy className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Copiar</span>
+              {isCopyingDashboard ? (
+                <>
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  <span className="hidden sm:inline">Copiando…</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Copiar</span>
+                </>
+              )}
             </button>
           </div>
 

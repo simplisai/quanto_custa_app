@@ -9,6 +9,7 @@ import { FieldCatalog } from '@/components/form-builder/FieldCatalog'
 import { FieldList } from '@/components/form-builder/FieldList'
 import { QuizPreview } from '@/components/form-builder/QuizPreview'
 import { FORM_FIELDS_CATALOG, FIXED_FIELD_KEYS, type FormFieldDef } from '@/lib/form-fields-catalog'
+import { copyToClipboard } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authenticated/formularios/$id')({
   component: FormEditorPage,
@@ -125,8 +126,12 @@ function FormEditorPage() {
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(`${APP_URL}/f/${slug}`)
-      toast.success('Link copiado!')
+      const success = await copyToClipboard(`${APP_URL}/f/${slug}`)
+      if (success) {
+        toast.success('Link copiado!')
+      } else {
+        toast.error('Não foi possível copiar')
+      }
     } catch {
       toast.error('Não foi possível copiar')
     }

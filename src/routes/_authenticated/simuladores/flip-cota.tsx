@@ -512,7 +512,7 @@ function PDFFlipDoc({ r, inputs, clientName, chartImg }: {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
   return (
-    <RpDoc>
+    <RpDoc compact>
       <RpHeader
         title="Flip de Cota"
         subtitle="Estratégia de Compra e Venda de Cota — Relatório de Retorno"
@@ -530,12 +530,12 @@ function PDFFlipDoc({ r, inputs, clientName, chartImg }: {
         ["Meia parcela", inputs.meiaParcela ? "Sim" : "Não"],
       ]} />
 
-      <RpSection title="Resultado do Flip" description="Retorno real da estratégia de compra e revenda de cota contemplada:">
+      <RpSection title="Resultado do Flip" description="Retorno real da estrategia de compra e revenda de cota contemplada:">
         <RpMetricRow>
           <RpMetric label="Valor de venda da cota" value={fmtBRL(r.precoVendaTotal)} description={`Carta atualizada + ${inputs.agioVenda}% de ágio`} color={C.green} />
-          <RpMetric label="Custo de aquisição" value={fmtBRL(r.desembolsoTotal)} description="Parcelas pagas + lance próprio" color={C.navy} />
-          <RpMetric label="Lucro líquido" value={fmtBRL(r.lucroLiquido)} description="Valor de venda menos custo total" color={r.lucroLiquido >= 0 ? C.green : C.red} />
-          <RpMetric label="ROI no período" value={`${r.roiTotal.toFixed(1)}%`} description={`Em apenas ${inputs.mesContemplacao} meses`} color={r.roiTotal >= 0 ? C.green : C.red} />
+          <RpMetric label="Custo de aquisição" value={fmtBRL(r.desembolsoTotal)} description="Parcelas pagas + lance proprio" color={C.navy} />
+          <RpMetric label="Lucro liquido" value={fmtBRL(r.lucroLiquido)} description="Valor de venda menos custo total" color={r.lucroLiquido >= 0 ? C.green : C.red} />
+          <RpMetric label="ROI no periodo" value={`${r.roiTotal.toFixed(1)}%`} description={`Em apenas ${inputs.mesContemplacao} meses`} color={r.roiTotal >= 0 ? C.green : C.red} />
         </RpMetricRow>
       </RpSection>
 
@@ -548,7 +548,7 @@ function PDFFlipDoc({ r, inputs, clientName, chartImg }: {
         variant="primary"
       />
 
-      <RpSection title="Detalhamento Financeiro" description="Cada centavo da operação:">
+      <RpSection title="Detalhamento Financeiro" description="Cada centavo da operacao:">
         <RpKVList rows={[
           { label: "Carta de crédito contratada", value: fmtBRL(inputs.cartaCredito) },
           { label: "Carta corrigida pelo INCC na contemplação", value: fmtBRL(r.creditoAtualizado), color: C.navy },

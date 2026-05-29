@@ -511,11 +511,11 @@ function PDFAluguelDoc({ r, inputs, clientName }: {
         ["Contempl. prevista", `Mês ${inputs.mesContemplacao}`],
       ]} />
 
-      <RpSection title="O Veredicto em Números" description="Em exatamente o mesmo período de tempo — pagando aluguel ou construindo patrimônio:">
+      <RpSection title="O Veredicto em Números" description="Em exatamente o mesmo periodo de tempo — pagando aluguel ou construindo patrimonio:">
         <RpMetricRow>
-          <RpMetric label={`Total gasto no aluguel (${anosHorizonte} anos)`} value={fmtBRL(r.totalAluguel)} description="Valor desembolsado sem gerar nenhum ativo. Patrimônio final: R$ 0,00." color={C.red} />
-          <RpMetric label="Total pago no consórcio" value={fmtBRL(r.totalConsorcio)} description={`Incluindo parcelas e lance. Patrimônio final: ${fmtBRL(r.valorImovelFinal)}`} color={C.navy} />
-          <RpMetric label="Diferença patrimonial" value={fmtBRL(r.vantagemPatrimonial)} description="Vantagem real de escolher o consórcio em vez de continuar alugando" color={C.green} />
+          <RpMetric label={`Total gasto no aluguel (${anosHorizonte} anos)`} value={fmtBRL(r.totalAluguel)} description="Valor desembolsado sem gerar nenhum ativo. Patrimonio final: R$ 0,00." color={C.red} />
+          <RpMetric label="Total pago no consorcio" value={fmtBRL(r.totalConsorcio)} description={`Incluindo parcelas e lance. Patrimonio final: ${fmtBRL(r.valorImovelFinal)}`} color={C.navy} />
+          <RpMetric label="Diferenca patrimonial" value={fmtBRL(r.vantagemPatrimonial)} description="Vantagem real de escolher o consorcio em vez de continuar alugando" color={C.green} />
         </RpMetricRow>
       </RpSection>
 
@@ -526,7 +526,7 @@ function PDFAluguelDoc({ r, inputs, clientName }: {
         variant="primary"
       />
 
-      <RpSection title="Análise Mês a Mês" description="Como a decisão impacta seu patrimônio ao longo do tempo:">
+      <RpSection title="Analise Mes a Mes" description="Como a decisao impacta seu patrimonio ao longo do tempo:">
         <RpKVList rows={[
           { label: "Aluguel atual (mês 1)", value: fmtBRL(inputs.aluguelAtual) },
           { label: `Aluguel projetado (mês ${anosHorizonte * 12})`, value: fmtBRL(inputs.aluguelAtual * Math.pow(1 + inputs.reajusteAluguelAnual / 100, anosHorizonte)), color: C.red },
@@ -547,7 +547,7 @@ function PDFAluguelDoc({ r, inputs, clientName }: {
         variant="warning"
       />
 
-      <RpFooter note="Valores do aluguel projetados com reajuste composto anual. Valor do imóvel projetado com valorização anual. Resultados reais podem variar conforme condições de mercado." />
+      <RpFooter note="Valores do aluguel projetados com reajuste composto anual. Valor do imovel projetado com valorizacao anual. Resultados reais podem variar conforme condições de mercado." />
     </RpDoc>
   );
 }

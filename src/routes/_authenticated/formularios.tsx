@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { copyToClipboard } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authenticated/formularios')({
   component: FormulariosPage,
@@ -123,8 +124,12 @@ function FormulariosPage() {
 
   async function copyLink(slug: string) {
     try {
-      await navigator.clipboard.writeText(`${APP_URL}/f/${slug}`)
-      toast.success('Link copiado!')
+      const success = await copyToClipboard(`${APP_URL}/f/${slug}`)
+      if (success) {
+        toast.success('Link copiado!')
+      } else {
+        toast.error('Não foi possível copiar')
+      }
     } catch {
       toast.error('Não foi possível copiar')
     }

@@ -53,10 +53,6 @@ export interface RendaPassivaResults {
   roiPercentual: number;         // (retornoTotalR / totalInvestido) × 100
   roiAnual: number;              // Taxa equivalente anual
 
-  // ── Comparativo CDB ──────────────────────────────────────────────────────
-  cdbFuturo: number;             // Se tivesse investido o mesmo em CDB
-  vantagemVsCDB: number;
-
   // ── Taxa de atualização ──────────────────────────────────────────────────
   cartaAtualizada: number;       // Carta corrigida pelo INCC na contemplação
 
@@ -119,6 +115,7 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
     lanceProprioR,
     abatimentoEmbutido: "saldoDevedor",
     amortizacao: "parcela",
+    horizonteMeses: prazo,
   });
 
   const cartaAtualizada = sim.creditoAtualizadoContemplacao;
@@ -150,7 +147,8 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
     // Lance próprio no mês da contemplação; crédito começa a render CDI
     if (m === mesContemp) {
       totalInvestido += lanceProprio;
-      if (isCDI) creditoCDIAcum = cartaCredito; // crédito inicial ao CDI
+      // Correção: Inicializar o CDI com o crédito já atualizado pelo INCC na data de contemplação
+      if (isCDI) creditoCDIAcum = cartaAtualizada;
     }
 
     // CDI: crédito cresce mensalmente (só após contemplação, cenário CDI)
@@ -213,11 +211,6 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
       ? (Math.pow(patrimonioFinal / totalInvestido, 1 / anos) - 1) * 100
       : 0;
 
-  // CDB comparativo: como se o investidor aplicasse todo o totalInvestido de uma vez
-  // (aproximação: aplicar o valor total ao CDI pelo prazo)
-  const cdbFuturo = totalInvestido * Math.pow(1 + cdiMensal, prazo);
-  const vantagemVsCDB = patrimonioFinal - cdbFuturo;
-
   // ── Cenário CDI: resultado final a partir da timeline já calculada ──────────
   const creditoFinalComCDI = isCDI
     ? (timeline[timeline.length - 1]?.creditoCDI ?? 0)
@@ -240,8 +233,6 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
     retornoTotalR,
     roiPercentual,
     roiAnual,
-    cdbFuturo,
-    vantagemVsCDB,
     cartaAtualizada,
     mesFluxoNeutro,
     creditoFinalComCDI,

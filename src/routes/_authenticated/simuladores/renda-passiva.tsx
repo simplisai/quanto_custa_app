@@ -413,7 +413,7 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
     labels: sampled.map((d) => `M${d.mes}`),
     datasets: [
       { label: "Parcela Consórcio (INCC)", data: sampled.map((d) => d.parcelaCons), backgroundColor: "rgba(239,68,68,0.85)", borderRadius: 3, borderSkipped: false as const },
-      { label: "Crédito Rendendo CDI", data: sampled.map((d) => d.creditoCDI / Math.max(r.prazoMeses, 1)), borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.1)", fill: true, pointRadius: 0, borderWidth: 2.5, tension: 0.3, type: "line" as const },
+      { label: "Crédito Rendendo CDI", data: sampled.map((d) => d.creditoCDI), borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.1)", fill: true, pointRadius: 0, borderWidth: 2.5, tension: 0.3, type: "line" as const },
     ],
   };
 
@@ -567,12 +567,12 @@ function PDFRendaDoc({ r, inputs, clientName, chartPrincipal, chartPatrimonio }:
         ["CDI comparativo", `${inputs.taxaCDIAnual}% a.a.`],
       ]} />
 
-      <RpSection title="Resultados da Estratégia de Renda Passiva" description="Quanto rende o consórcio como veículo de investimento imobiliário:">
+      <RpSection title="Resultados da Estrategia de Renda Passiva" description="Quanto rende o consorcio como veiculo de investimento imobiliário:">
         <RpMetricRow>
-          <RpMetric label="Total investido" value={fmtBRL(r.totalInvestido)} description="Parcelas + lance próprio desembolsado" color={C.navy} />
-          <RpMetric label="Renda gerada no período" value={fmtBRL(r.totalRendaGerada)} description={`Alugueis recebidos em ${anos.toFixed(0)} anos`} color={C.green} />
-          <RpMetric label="Valor do imóvel no final" value={fmtBRL(r.valorImovelFinal)} description={`Valorização de ${inputs.valorizacaoAnual}% a.a.`} color={C.navy} />
-          <RpMetric label="ROI anual" value={`${r.roiAnual.toFixed(1)}% a.a.`} description="Retorno do patrimônio + aluguel" color={r.roiAnual >= 0 ? C.green : C.amber} />
+          <RpMetric label="Total investido" value={fmtBRL(r.totalInvestido)} description="Parcelas + lance proprio desembolsado" color={C.navy} />
+          <RpMetric label="Renda gerada no periodo" value={fmtBRL(r.totalRendaGerada)} description={`Alugueis recebidos em ${anos.toFixed(0)} anos`} color={C.green} />
+          <RpMetric label="Valor do imovel no final" value={fmtBRL(r.valorImovelFinal)} description={`Valorizacao de ${inputs.valorizacaoAnual}% a.a.`} color={C.navy} />
+          <RpMetric label="ROI anual" value={`${r.roiAnual.toFixed(1)}% a.a.`} description="Retorno do patrimonio + aluguel" color={r.roiAnual >= 0 ? C.green : C.amber} />
         </RpMetricRow>
       </RpSection>
 
@@ -583,15 +583,15 @@ function PDFRendaDoc({ r, inputs, clientName, chartPrincipal, chartPatrimonio }:
         variant="primary"
       />
 
-      <RpSection title="Rendimento do Aluguel + Valor Patrimonial" description="O retorno real da estratégia: renda de aluguel somada à valorização do imóvel.">
+      <RpSection title="Rendimento do Aluguel + Valor Patrimonial" description="O retorno real da estrategia: renda de aluguel somada à valorizacao do imovel.">
         <RpKVList rows={fluxoRows} />
       </RpSection>
 
-      <RpChartImage src={chartPrincipal} title={isCDI ? "Crédito rendendo CDI vs. Parcela INCC" : "Parcela vs. Renda de Aluguel"} height={140} />
-      <RpChartImage src={chartPatrimonio} title="Evolução do Patrimônio" height={140} />
+      <RpChartImage src={chartPrincipal} title={isCDI ? "Credito rendendo CDI vs. Parcela INCC" : "Parcela vs. Renda de Aluguel"} height={140} />
+      {!isCDI && <RpChartImage src={chartPatrimonio} title="Evolucao do Patrimonio" height={140} />}
 
       {isCDI && r.creditoFinalComCDI > 0 ? (
-        <RpSection title="Estratégia Alternativa: Crédito Rende CDI" description="Credito rendendo CDI enquanto paga parcelas com reajuste INCC:">
+        <RpSection title="Estrategia Alternativa: Credito Rende CDI" description="Credito rendendo CDI enquanto paga parcelas com reajuste INCC:">
           <RpKVList rows={[
             { label: "Crédito acumulado com CDI", value: fmtBRL(r.creditoFinalComCDI), color: C.green },
             { label: "Total pago em parcelas (INCC)", value: fmtBRL(r.totalParcelasComINCC), color: C.red },

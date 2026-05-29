@@ -23,14 +23,14 @@ export const C = {
 } as const;
 
 // ─── Document wrapper ─────────────────────────────────────────────────────────
-export function RpDoc({ children }: { children: React.ReactNode }) {
+export function RpDoc({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
   return (
     <Document>
       <Page
         size="A4"
         style={{
-          paddingHorizontal: 36,
-          paddingVertical: 36,
+          paddingHorizontal: compact ? 4 : 36,
+          paddingVertical: compact ? 4 : 36,
           backgroundColor: C.white,
           fontFamily: "Helvetica",
           color: C.text,

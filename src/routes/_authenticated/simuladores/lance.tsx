@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Chart as ChartJS,
-  CategoryScale, LinearScale, BarElement, PointElement, LineElement,
+  CategoryScale, LinearScale, PointElement, LineElement,
   Title, Tooltip, Legend, Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
@@ -19,7 +19,7 @@ import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpFooter, 
 import { View as RpView, Text as RpText } from "@react-pdf/renderer";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 export const Route = createFileRoute("/_authenticated/simuladores/lance")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -611,9 +611,9 @@ function PDFLanceDoc({ r, inputs, clientName }: {
         ["Meses antecipados", `${espera} meses`],
       ]} />
 
-      <RpSection title="Resultados do Lance Estratégico" description="O que muda na sua vida financeira ao dar o lance:">
+      <RpSection title="Resultados do Lance Estrategico" description="O que muda na sua vida financeira ao dar o lance:">
         <RpMetricRow>
-          <RpMetric label="Contemplação garantida" value={`Mês ${inputs.mesContemplacaoLance}`} description={espera > 0 ? `${espera} meses antes da media sem lance` : "Contemplação antecipada"} color={C.navy} />
+          <RpMetric label="Contemplacao garantida" value={`Mes ${inputs.mesContemplacaoLance}`} description={espera > 0 ? `${espera} meses antes da media sem lance` : "Contemplacao antecipada"} color={C.navy} />
           <RpMetric label="Nova parcela mensal" value={fmtBRL(r.parcelaPosLance)} description={`Queda de ${fmtBRL(r.parcelaPadrao)} — ${((reducaoParcela / (r.parcelaPadrao || 1)) * 100).toFixed(0)}% a menos por mes`} color={C.green} />
           <RpMetric label="Lance desembolsado" value={fmtBRL(r.lanceTotalR)} description={`${r.percLanceTotalSobreCarta.toFixed(1)}% da carta — abate o saldo devedor`} color={C.amber} />
           <RpMetric label="Economia total no contrato" value={fmtBRL(r.economia)} description="Valor que voce deixa de pagar vs. nao dar lance" color={C.green} />

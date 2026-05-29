@@ -144,7 +144,7 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
     let patrimonioConsMes = 0;
     if (m >= mesContemp) {
       const mesesPosContemp = m - mesContemp;
-      patrimonioConsMes = cartaCredito * Math.pow(1 + valorizMensal, mesesPosContemp);
+      patrimonioConsMes = sim.creditoAtualizadoContemplacao * Math.pow(1 + valorizMensal, mesesPosContemp);
     }
 
     // Break-even: primeiro mês em que patrimônio consórcio >= custo aluguel acumulado
@@ -163,7 +163,7 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
   }
 
   // Valor do imóvel no futuro (ao final do horizonte)
-  const valorImovelFinal = cartaCredito * Math.pow(1 + valorizacaoAnual / 100, horizonte);
+  const valorImovelFinal = timeline[timeline.length - 1].patrimonioConsorcio;
   const patrimonioConsorcio = valorImovelFinal;
 
   return {

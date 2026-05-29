@@ -8,6 +8,8 @@ import {
   LayoutDashboard, Gift, ClipboardList,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { supabase } from "@/integrations/supabase/client";
+import { readReferralCode, clearReferralCode } from "@/routes/$referralCode";
 
 export const Route = createFileRoute("/_authenticated")({ component: AuthLayout });
 

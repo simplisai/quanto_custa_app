@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Logo } from "@/components/Logo";
 import { ArrowRight } from "lucide-react";
+import { readReferralCode } from "@/routes/$referralCode";
 
 export const Route = createFileRoute("/signup")({ component: SignupPage });
 
@@ -54,12 +55,17 @@ function SignupPage() {
     setBusy(true);
     
     try {
+      // Código de indicação capturado no clique do link (/{code}) — enviado no
+      // metadata para que o trigger handle_new_user grave o vínculo no servidor,
+      // imune ao localStorage expirar entre o cadastro e o checkout.
+      const referralCode = readReferralCode() ?? undefined;
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo,
-          data: { full_name: fullName },
+          data: { full_name: fullName, ...(referralCode ? { referral_code: referralCode } : {}) },
         },
       });
       

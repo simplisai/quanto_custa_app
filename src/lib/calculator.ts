@@ -162,6 +162,7 @@ export function calcular(i: CalcInputs): CalcResults {
         const valorEmbReajustado =
           i.baseLance === "plano" ? montanteComTaxaReajustado * pEmb : creditoReajustado * pEmb;
         saldoCons -= lanceP + valorEmbReajustado;
+        // Correção: Linha 'tCons -= valorEmbReajustado' removida para evitar dupla contagem do benefício.
         if (saldoCons < 0) saldoCons = 0;
         saldoDevedorNaContemplacao = saldoCons;
         // Crédito atualizado pelo INCC e poder de compra líquido (após lance embutido)
