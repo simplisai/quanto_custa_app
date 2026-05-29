@@ -462,8 +462,9 @@ function ResultsView({ r, usoCredito, valorImovel, entrada, credito }: {
           ]} />
           <Analytic title="Cenário Consórcio Estratégico" rows={[
             ["Crédito da Carta Nominal", fmtBRL(credito)],
+            ["Crédito Atualizado (INCC)", fmtBRL(r.creditoAtualizadoContemplacao), "info"],
             ["Lance Embutido Utilizado", fmtBRL(r.valorEmbVisual)],
-            ["Poder de Compra Líquido", fmtBRL(credito - r.valorEmbVisual)],
+            ["Poder de Compra Líquido", fmtBRL(r.poderCompraLiquido), "success"],
             ["Saldo Devedor Pós-Lance", fmtBRL(r.saldoDevedorNaContemplacao), "info"],
             ["Custo C/ Aluguel (Espera)", fmtBRL(r.custoAluguelTotal), "danger"],
             [usoCredito === "patrimonio" ? "Imóvel Adquirido" : "Valor do Imóvel (Corrigido)",
@@ -488,20 +489,14 @@ function Card({ title, value, className }: { title: string; value: string; class
 }
 
 function ConsorcioCard({ tCons, valorEmbVisual }: { tCons: number; valorEmbVisual: number }) {
+  // Mostra apenas o custo real (líquido do lance embutido, que sai do crédito e não do bolso).
   const custoReal = tCons - valorEmbVisual;
   return (
     <div className="rounded-2xl bg-gradient-to-br from-primary to-primary-glow p-5 text-white shadow-elegant flex flex-col justify-between">
       <div>
         <div className="text-[10px] font-extrabold uppercase tracking-widest opacity-90">Custo Total Consórcio</div>
-        <div className="mt-2 text-2xl font-extrabold">{fmtBRL(tCons)}</div>
+        <div className="mt-2 text-2xl font-extrabold">{fmtBRL(custoReal)}</div>
       </div>
-      {valorEmbVisual > 0 && (
-        <div className="mt-3 rounded-xl bg-white/15 px-3 py-2">
-          <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">Lance embutido abatido</div>
-          <div className="text-[10px] opacity-80">− {fmtBRL(valorEmbVisual)} (sai do crédito, não do bolso)</div>
-          <div className="mt-1 text-sm font-extrabold">Custo real: {fmtBRL(custoReal)}</div>
-        </div>
-      )}
     </div>
   );
 }
@@ -653,8 +648,9 @@ function PDFReportDoc({ r, usoCredito, inputs, clientName }: {
       <RpSection title="Cenário Consórcio" accent="navy">
         <RpKVList rows={[
           { label: "Crédito da Carta", value: fmtBRL(inputs.creditoCons) },
+          { label: "Crédito Atualizado (INCC)", value: fmtBRL(r.creditoAtualizadoContemplacao), color: C.navy },
           { label: "Lance Embutido", value: fmtBRL(r.valorEmbVisual), color: C.red },
-          { label: "Poder de Compra Líquido", value: fmtBRL(inputs.creditoCons - r.valorEmbVisual) },
+          { label: "Poder de Compra Líquido", value: fmtBRL(r.poderCompraLiquido), color: C.green },
           { label: "Saldo Devedor Pós-Lance", value: fmtBRL(r.saldoDevedorNaContemplacao), color: C.navy },
           { label: "Custo c/ Aluguel (Espera)", value: fmtBRL(r.custoAluguelTotal), color: C.red },
           { label: usoCredito === "patrimonio" ? "Patrimônio Total (CDI + Carta)" : "Patrimônio CDI Final", value: fmtBRL(r.patrimonioConsTotal), color: C.green },

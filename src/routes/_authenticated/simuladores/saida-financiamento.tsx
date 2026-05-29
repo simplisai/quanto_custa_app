@@ -23,7 +23,8 @@ import {
   BookOpen,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, RpChartImage, C } from "@/components/RpShell";
+import { captureChart } from "@/lib/capture-charts";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -115,7 +116,7 @@ function SaidaFinanciamentoPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFSaidaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    () => results ? <PDFSaidaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("saida-evolucao")} /> : null,
     "saida-financiamento.pdf",
   );
 
@@ -443,7 +444,7 @@ function SaidaFinanciamentoPage() {
           {/* Gráfico patrimônio */}
           {chartData && (
             <Section title="Evolução Patrimonial">
-              <div className="h-56 sm:h-72">
+              <div className="h-56 sm:h-72" data-chart="saida-evolucao">
                 <Line data={chartData} options={chartOptions} />
               </div>
               <p className="text-[11px] text-muted-foreground text-center">
@@ -482,7 +483,7 @@ function SaidaFinanciamentoPage() {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFSaidaDoc({ r, inputs, clientName }: {
+function PDFSaidaDoc({ r, inputs, clientName, chartImg }: {
   r: SaidaFinanciamentoResults;
   inputs: {
     valorImovelAtual: number;
@@ -493,11 +494,13 @@ function PDFSaidaDoc({ r, inputs, clientName }: {
     taxaAdmConsorcio: number;
     prazoConsorcio: number;
     percLance: number;
+    percLanceEmb?: number;
     mesContemplacaoConsorcio: number;
     valorizacaoAnual: number;
     [key: string]: unknown;
   };
   clientName?: string;
+  chartImg?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -528,6 +531,19 @@ function PDFSaidaDoc({ r, inputs, clientName }: {
           <RpMetric label="Vantagem total" value={fmtBRL(r.economiaTotalCusto)} description="Economia total vs. manter o financiamento" color={C.green} />
         </RpMetricRow>
       </RpSection>
+
+      <RpSection title="Resumo Pós-Contemplação" description="Como o lance é aplicado e o que resta do plano após a contemplação:">
+        <RpKVList rows={[
+          { label: "Lance próprio (capital da venda)", value: fmtBRL(r.lanceProprioR), color: C.navy },
+          { label: "Lance embutido aplicado (sai do crédito)", value: fmtBRL(r.lanceEmbR), color: C.amber },
+          { label: "Crédito líquido disponível", value: fmtBRL(r.creditoLiquido), color: C.green },
+          { label: "Saldo devedor pós-lance", value: fmtBRL(r.saldoDevedorPosLance), color: C.navy },
+          { label: "Prazo restante após contemplação", value: `${r.prazoPosFinal} meses` },
+          { label: "Parcela pós-lance", value: fmtBRL(r.parcelaPosLance), color: C.green },
+        ]} />
+      </RpSection>
+
+      <RpChartImage src={chartImg} title="Evolução Patrimonial" height={130} />
 
       <RpInsight
         emoji="🔄"

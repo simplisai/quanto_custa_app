@@ -40,6 +40,8 @@ export interface CalcResults {
   valorCreditoRentabilizado: number;
   patrimonioConsTotal: number;
   saldoDevedorNaContemplacao: number;
+  creditoAtualizadoContemplacao: number; // Crédito da carta corrigido pelo INCC na contemplação
+  poderCompraLiquido: number;            // Crédito atualizado − lance embutido (poder de compra real)
   valorEmbVisual: number;
   parcelasSAC: number[];
   parcelasPrice: number[];
@@ -98,6 +100,8 @@ export function calcular(i: CalcInputs): CalcResults {
   let baseParcelC_integral = pC > 0 ? saldoCons / pC : 0;
   let parcelaConsAtual = baseParcelC_integral;
   let saldoDevedorNaContemplacao = 0;
+  let creditoAtualizadoContemplacao = credito;
+  let poderCompraLiquido = credito;
 
   for (let m = 1; m <= maxMeses; m++) {
     cdiFin *= 1 + rOportunidade;
@@ -160,6 +164,9 @@ export function calcular(i: CalcInputs): CalcResults {
         saldoCons -= lanceP + valorEmbReajustado;
         if (saldoCons < 0) saldoCons = 0;
         saldoDevedorNaContemplacao = saldoCons;
+        // Crédito atualizado pelo INCC e poder de compra líquido (após lance embutido)
+        creditoAtualizadoContemplacao = creditoReajustado;
+        poderCompraLiquido = Math.max(creditoReajustado - valorEmbReajustado, 0);
         cdiCons -= lanceP;
         if (cdiCons < 0) cdiCons = 0;
         if (usoCredito === "patrimonio")
@@ -213,6 +220,8 @@ export function calcular(i: CalcInputs): CalcResults {
     valorCreditoRentabilizado,
     patrimonioConsTotal,
     saldoDevedorNaContemplacao,
+    creditoAtualizadoContemplacao,
+    poderCompraLiquido,
     valorEmbVisual,
     parcelasSAC: pSAC,
     parcelasPrice: pPrice,

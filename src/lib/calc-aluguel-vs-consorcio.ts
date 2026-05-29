@@ -2,6 +2,8 @@
 // Responde: "Você está jogando dinheiro fora pagando aluguel?"
 // Mostra o custo total do aluguel vs. o patrimônio gerado pelo consórcio.
 
+import { simularConsorcio } from "./consorcio-core";
+
 export interface AluguelInputs {
   aluguelAtual: number;          // Aluguel atual (R$/mês)
   reajusteAluguelAnual: number;  // Reajuste anual do aluguel (% — ex: 5)
@@ -87,82 +89,56 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
     taxaAtualizacaoAnual,
   } = i;
 
-  // Carta corrigida pelo INCC no mês da contemplação
-  const cartaAtualizada = cartaCredito * Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemplacao / 12);
-
   const horizonteMeses = Math.max(horizonte, 1) * 12;
   const prazo = Math.max(prazoMeses, 1);
   const mesContemp = Math.min(Math.max(mesContemplacao, 1), prazo);
-  const reajusteMensal = Math.pow(1 + reajusteAluguelAnual / 100, 1 / 12) - 1;
 
-  // ── Lance ────────────────────────────────────────────────────────────────
-  const lanceEmbR = cartaCredito * (percLance / 100);
-  const lanceProprio = lanceProprioR;
-  const lanceTotalR = lanceEmbR + lanceProprio;
+  // ── Núcleo: consórcio com parcela e saldo derivados do crédito atualizado ──
+  // O lance (percLance) abate o saldo devedor; lance próprio é desembolso real.
+  const sim = simularConsorcio({
+    credito: cartaCredito,
+    taxaAdm: taxaAdmTotal,
+    prazo,
+    inccAnual: taxaAtualizacaoAnual,
+    mesContemplacao: mesContemp,
+    lanceEmbutidoPerc: percLance,
+    lanceProprioR,
+    abatimentoEmbutido: "saldoDevedor",
+    amortizacao: "parcela",
+    horizonteMeses,
+  });
 
-  // ── Parcelas do consórcio ────────────────────────────────────────────────
-  const taxaAdmFrac = taxaAdmTotal / 100;
-  const valorPlano = cartaCredito * (1 + taxaAdmFrac);
-  const parcelaPadrao = valorPlano / prazo;
-
-  // Saldo do plano na contemplação (não re-aplica taxaAdm — ela já está no plano)
-  const parcelasRestantes = Math.max(prazo - mesContemp, 0);
-  const saldoPlanoContemp = Math.max(valorPlano - parcelaPadrao * mesContemp, 0);
-  const saldoPlanoPosLance = Math.max(saldoPlanoContemp - lanceTotalR, 0);
-  const parcelaPosLance = parcelasRestantes > 0 ? saldoPlanoPosLance / parcelasRestantes : 0;
-
-  // Para display: crédito disponível após lance embutido
-  const saldoDevedorPosLance = saldoPlanoPosLance;
+  const cartaAtualizada = sim.creditoAtualizadoContemplacao;
+  const lanceEmbR = sim.lanceEmbutidoR;
+  const lanceProprio = sim.lanceProprioR;
+  const parcelaPadrao = sim.parcelaInicial;
+  const parcelaPosLance = sim.parcelaPosLance;
+  const saldoDevedorPosLance = sim.saldoDevedorPosLance;
+  const totalConsorcio = sim.desembolsoTotal;
 
   // ── Totais ───────────────────────────────────────────────────────────────
-  // Aluguel: soma acumulada com reajuste anual ao longo do horizonte
   let totalAluguel = 0;
   let aluguelMesAtual = aluguelAtual;
 
-  // Consórcio: parcelas (limitadas ao prazo, depois para)
-  let totalConsorcio = 0;
-
   const timeline: MesAluguel[] = [];
   let aluguelAcum = 0;
-  let consAcum = 0;
   let breakEvenMes: number | null = null;
 
   // Valorização mensal do imóvel
   const valorizMensal = Math.pow(1 + valorizacaoAnual / 100, 1 / 12) - 1;
 
-  // Parcelas correntes — corrigidas pelo INCC no aniversário do grupo (a cada 12 meses)
-  let parcelaPadraoAtual = parcelaPadrao;
-  let parcelaPosLanceAtual = parcelaPosLance;
-
   for (let m = 1; m <= horizonteMeses; m++) {
-    // Reajuste anual do aluguel e das parcelas do consórcio pelo INCC
+    // Reajuste anual do aluguel pelo INCC/índice de reajuste
     if (m > 1 && (m - 1) % 12 === 0) {
       aluguelMesAtual = aluguelMesAtual * (1 + reajusteAluguelAnual / 100);
-      if (m <= prazo) {
-        parcelaPadraoAtual *= (1 + (taxaAtualizacaoAnual || 0) / 100);
-        parcelaPosLanceAtual *= (1 + (taxaAtualizacaoAnual || 0) / 100);
-      }
     }
 
-    // Parcela do consórcio neste mês (corrigida pelo INCC)
-    let parcelaCons = 0;
-    if (m <= mesContemp && m <= prazo) {
-      parcelaCons = parcelaPadraoAtual;
-    } else if (m > mesContemp && m <= prazo) {
-      parcelaCons = parcelaPosLanceAtual;
-    }
-    // Após o prazo: parcela = 0 (consórcio encerrado)
-
-    // Lance próprio no mês da contemplação
-    if (m === mesContemp) {
-      consAcum += lanceProprio;
-      totalConsorcio += lanceProprio;
-    }
+    // Parcela do consórcio neste mês (do núcleo — já reajustada pelo INCC)
+    const parcelaCons = sim.timeline[m - 1]?.parcela ?? 0;
+    const saldoDevedorMes = sim.timeline[m - 1]?.saldoDevedor ?? 0;
 
     aluguelAcum += aluguelMesAtual;
     totalAluguel += aluguelMesAtual;
-    consAcum += parcelaCons;
-    totalConsorcio += parcelaCons;
 
     // Patrimônio do consórcio: 0 antes da contemplação; imóvel (valorizado) após
     let patrimonioConsMes = 0;
@@ -182,7 +158,7 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
       aluguelAcum,
       parcelaCons,
       patrimonioConsorcio: patrimonioConsMes,
-      saldoDevedorCons: m < mesContemp ? cartaCredito : saldoDevedorPosLance,
+      saldoDevedorCons: m < mesContemp ? cartaCredito : saldoDevedorMes,
     });
   }
 

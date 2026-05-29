@@ -23,7 +23,8 @@ import {
   ArrowLeft, ArrowRight, BookOpen, Trophy, Coins, TrendingUp, Building2, Percent,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, RpChartImage, C } from "@/components/RpShell";
+import { captureChart } from "@/lib/capture-charts";
 import { View as RpView, Text as RpText } from "@react-pdf/renderer";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
@@ -109,7 +110,7 @@ function MetaPatrimonialPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFMetaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    () => results ? <PDFMetaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("meta-cotas")} /> : null,
     "meta-patrimonial.pdf",
   );
 
@@ -388,16 +389,6 @@ function MetaPatrimonialPage() {
             )}
           </Section>
 
-          {/* Comparativo CDB */}
-          <Section title="Consórcio vs. CDB">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <KPI icon={Trophy} label="Patrimônio — consórcio" value={fmtBRL(results.patrimonioTotalFinal)} variant="success" />
-              <KPI icon={Coins} label="Retorno — CDB" value={fmtBRL(results.cdbFinal)} variant="default" />
-              <KPI icon={TrendingUp} label="Vantagem patrimonial" value={fmtBRL(results.vantageVsCDB)}
-                variant={results.vantageVsCDB > 0 ? "success" : "warning"} />
-            </div>
-          </Section>
-
           {/* Benefício Fiscal PJ */}
           {inputs.regimeTributario !== "nenhum" && results.economiaFiscalTotal > 0 && (
             <Section title="Benefício Fiscal (PJ)">
@@ -440,7 +431,7 @@ function MetaPatrimonialPage() {
           {/* Gráfico */}
           {chartData && (
             <Section title="Carta × Valor Final por Cota">
-              <div className="h-52 sm:h-64">
+              <div className="h-52 sm:h-64" data-chart="meta-cotas">
                 <Bar data={chartData} options={chartOptions} />
               </div>
             </Section>
@@ -476,7 +467,7 @@ function MetaPatrimonialPage() {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFMetaDoc({ r, inputs, clientName }: {
+function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
   r: MetaPatrimonialResults;
   inputs: {
     modo: ModoMeta;
@@ -493,6 +484,7 @@ function PDFMetaDoc({ r, inputs, clientName }: {
     [key: string]: unknown;
   };
   clientName?: string;
+  chartImg?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const metaLabel = inputs.modo === "patrimonio" ? fmtBRL(inputs.patrimonioAlvoR) : `${fmtBRL(inputs.rendaMensalAlvoR)}/mes`;
@@ -528,29 +520,37 @@ function PDFMetaDoc({ r, inputs, clientName }: {
       <RpInsight
         emoji="🏆"
         title="Por que consórcio para construir patrimônio?"
-        body={`Com ${r.numCotas} cotas de consorcio ao longo de ${inputs.horizonteAnos} anos, voce constroi um patrimônio de ${fmtBRL(r.patrimonioTotalFinal)} — contra ${fmtBRL(r.cdbFinal)} que o mesmo capital renderia no CDB. Vantagem patrimonial: ${fmtBRL(r.vantageVsCDB)}. O consorcio combina alavancagem imobiliária com valorização real do ativo.`}
+        body={`Com ${r.numCotas} cotas de consorcio ao longo de ${inputs.horizonteAnos} anos, voce constroi um patrimônio de ${fmtBRL(r.patrimonioTotalFinal)} com desembolso fracionado. O consorcio combina alavancagem imobiliária (voce controla um ativo muito maior que o desembolso mensal) com a valorização real do imóvel — sem juros e com parcelas corrigidas apenas pelo INCC.`}
         variant="primary"
       />
 
-      <RpSection title="Comparativo: Consórcio vs. CDB" description="O que acontece com o mesmo dinheiro aplicado em renda fixa:">
+      <RpSection title="Resultado do Plano Patrimonial" description="O patrimônio construído e a renda passiva potencial ao final do horizonte:">
         <RpKVList rows={[
           { label: "Total investido no plano", value: fmtBRL(r.totalInvestido) },
-          { label: "Patrimônio final — consórcio", value: fmtBRL(r.patrimonioTotalFinal), color: C.green },
-          { label: `Retorno CDB (${inputs.cdiAnual}% a.a.)`, value: fmtBRL(r.cdbFinal), color: C.red },
-          { label: "Vantagem patrimonial vs. CDB", value: fmtBRL(r.vantageVsCDB), color: r.vantageVsCDB > 0 ? C.green : C.red },
+          { label: "Patrimônio final (valor de mercado)", value: fmtBRL(r.patrimonioTotalFinal), color: C.green },
           { label: "Renda passiva mensal potencial", value: fmtBRL(r.rendaMensalFinalR), color: C.green },
         ]} />
       </RpSection>
 
-      {inputs.regimeTributario !== "nenhum" && r.economiaFiscalTotal > 0 ? (
-        <RpSection title="Benefício Fiscal PJ" description={`Regime ${inputs.regimeTributario} — parcelas dedutiveis como despesa operacional`}>
+      {inputs.regimeTributario === "real" && r.economiaFiscalTotal > 0 ? (
+        <RpSection title="Benefício Fiscal PJ (Lucro Real)" description="No Lucro Real a taxa de administração é despesa operacional dedutível: o Estado patrocina parte do custo via redução de IRPJ + CSLL.">
           <RpKVList rows={[
-            { label: "Economia fiscal total", value: fmtBRL(r.economiaFiscalTotal), color: C.green },
+            { label: `Quanto o Estado paga da sua cota (${inputs.aliquotaEfetiva}% sobre a taxa adm.)`, value: fmtBRL(r.economiaFiscalTotal), color: C.green },
+            { label: "Economia fiscal total no plano", value: fmtBRL(r.economiaFiscalTotal), color: C.green },
             { label: "Custo real da operação (pós fiscal)", value: fmtBRL(r.custoRealTotal), color: C.navy },
             { label: "Retorno líquido de impostos", value: fmtBRL(r.patrimonioTotalFinal - r.custoRealTotal), color: C.green },
           ]} />
         </RpSection>
+      ) : inputs.regimeTributario === "presumido" ? (
+        <RpSection title="Benefício PJ (Lucro Presumido)" description="No Lucro Presumido o imposto incide sobre o faturamento — não há dedução direta. A vantagem é patrimonial e de caixa.">
+          <RpKVList rows={[
+            { label: "Preservação de caixa", value: "Compra patrimônio sem retirar capital de giro da atividade-fim", color: C.navy },
+            { label: "Balanço limpo (SCR intocado)", value: "Até a contemplação entra como Investimento (Ativo), não como dívida no Banco Central", color: C.navy },
+          ]} />
+        </RpSection>
       ) : null}
+
+      <RpChartImage src={chartImg} title="Carta × Valor Final por Cota" height={140} />
 
       <RpSection title="Plano de Cotas" description="Cada cota e seu resultado esperado:">
         {r.cotas.map((c) => (

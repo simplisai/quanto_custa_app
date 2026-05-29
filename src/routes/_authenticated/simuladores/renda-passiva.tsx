@@ -21,7 +21,8 @@ import {
 import { Bar, Line } from "react-chartjs-2";
 import { ArrowLeft, Banknote, TrendingUp, BarChart2, Zap, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, RpChartImage, C } from "@/components/RpShell";
+import { captureChart } from "@/lib/capture-charts";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
@@ -115,7 +116,7 @@ function RendaPassivaPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFRendaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    () => results ? <PDFRendaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartPrincipal={captureChart("renda-principal")} chartPatrimonio={captureChart("renda-patrimonio")} /> : null,
     "Renda_Passiva_Consorcio.pdf",
   );
 
@@ -447,13 +448,13 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
         <KPI icon={Banknote} label="Total investido" value={fmtBRL(r.totalInvestido)} sub="Parcelas + lance próprio" variant="primary" />
         <KPI icon={TrendingUp} label="Renda gerada" value={fmtBRL(r.totalRendaGerada)} sub="Aluguis recebidos no período" variant="success" />
         <KPI icon={BarChart2} label="Patrimônio final" value={fmtBRL(r.patrimonioFinal)} sub={`Imóvel + caixa extra`} variant="success" />
-        <KPI icon={Zap} label="ROI anual" value={`${r.roiAnual.toFixed(2)}% a.a.`} sub={`vs. CDB: ${inputs.taxaCDIAnual}% a.a.`} variant={r.roiAnual > inputs.taxaCDIAnual ? "success" : "warning"} />
+        <KPI icon={Zap} label="ROI anual" value={`${r.roiAnual.toFixed(2)}% a.a.`} sub="Retorno do patrimônio + aluguel" variant={r.roiAnual > 0 ? "success" : "warning"} />
       </div>
 
       {/* ── Gráfico único conforme estratégia pós-contemplação ────── */}
       {!isCDI ? (
         <Section title="Parcela do Consórcio vs. Renda de Aluguel por Mês">
-          <div className="h-52 sm:h-64 w-full">
+          <div className="h-52 sm:h-64 w-full" data-chart="renda-principal">
             <Bar data={barData} options={baseChartOpts} />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -463,7 +464,7 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
         </Section>
       ) : (
         <Section title="Crédito Rendendo CDI vs. Parcelas com Reajuste INCC">
-          <div className="h-52 sm:h-64 w-full">
+          <div className="h-52 sm:h-64 w-full" data-chart="renda-principal">
             <Bar data={cdiData} options={baseChartOpts} />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -475,47 +476,30 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
       {/* ── Gráfico: evolução do patrimônio (só compra_imovel) ────── */}
       {!isCDI && (
         <Section title="Evolução do Patrimônio vs. Total Investido">
-          <div className="h-52 sm:h-64 w-full">
+          <div className="h-52 sm:h-64 w-full" data-chart="renda-patrimonio">
             <Line data={lineData} options={baseChartOpts} />
           </div>
         </Section>
       )}
 
-      {/* ── Tabela comparativa: Consórcio vs CDB ──────────────────── */}
-      <Section title="Comparativo: Consórcio + Aluguel vs. CDB" accent>
+      {/* ── Tabela resumo: rendimento do aluguel + valor patrimonial ─── */}
+      <Section title="Resultado: Renda de Aluguel + Patrimônio" accent>
         <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <table className="w-full min-w-[480px] text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="py-2 px-4 text-left text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Item</th>
-                <th className="py-2 px-4 text-right text-xs font-extrabold uppercase tracking-wider text-primary">Consórcio + Aluguel</th>
-                <th className="py-2 px-4 text-right text-xs font-extrabold uppercase tracking-wider text-muted-foreground">CDB ({inputs.taxaCDIAnual}% a.a.)</th>
-              </tr>
-            </thead>
+          <table className="w-full min-w-[420px] text-sm">
             <tbody className="divide-y divide-border">
               {[
-                ["Total investido", fmtBRL(r.totalInvestido), fmtBRL(r.totalInvestido)],
-                ["Renda gerada no período", fmtBRL(r.totalRendaGerada), "—"],
-                ["Valor do imóvel ao final", fmtBRL(r.valorImovelFinal), "—"],
-                ["Patrimônio final", fmtBRL(r.patrimonioFinal), fmtBRL(r.cdbFuturo)],
-                ["ROI total", `${r.roiPercentual.toFixed(1)}%`, `${((r.cdbFuturo / r.totalInvestido - 1) * 100).toFixed(1)}%`],
-                ["ROI anual", `${r.roiAnual.toFixed(2)}% a.a.`, `${inputs.taxaCDIAnual}% a.a.`],
-              ].map(([label, cons, cdb]) => (
+                ["Total investido", fmtBRL(r.totalInvestido)],
+                ["Renda de aluguel gerada no período", fmtBRL(r.totalRendaGerada)],
+                ["Valor do imóvel ao final", fmtBRL(r.valorImovelFinal)],
+                ["Patrimônio final (imóvel + caixa)", fmtBRL(r.patrimonioFinal)],
+                ["ROI total", `${r.roiPercentual.toFixed(1)}%`],
+                ["ROI anual", `${r.roiAnual.toFixed(2)}% a.a.`],
+              ].map(([label, val]) => (
                 <tr key={label} className="hover:bg-muted/30">
                   <td className="py-2.5 px-4 text-foreground/70">{label}</td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-primary">{cons}</td>
-                  <td className="py-2.5 px-4 text-right font-semibold text-muted-foreground">{cdb}</td>
+                  <td className="py-2.5 px-4 text-right font-semibold text-primary">{val}</td>
                 </tr>
               ))}
-              <tr className={`font-bold ${r.vantagemVsCDB >= 0 ? "bg-success/5" : "bg-danger/5"}`}>
-                <td className={`py-2.5 px-4 font-extrabold ${r.vantagemVsCDB >= 0 ? "text-success" : "text-danger"}`}>
-                  {r.vantagemVsCDB >= 0 ? "🏆 Vantagem vs. CDB" : "⚠️ Desvantagem vs. CDB"}
-                </td>
-                <td className="py-2.5 px-4" />
-                <td className={`py-2.5 px-4 text-right font-extrabold ${r.vantagemVsCDB >= 0 ? "text-success" : "text-danger"}`}>
-                  {r.vantagemVsCDB >= 0 ? "+" : ""}{fmtBRL(r.vantagemVsCDB)}
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -544,8 +528,9 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
   );
 }
 
-function PDFRendaDoc({ r, inputs, clientName }: {
+function PDFRendaDoc({ r, inputs, clientName, chartPrincipal, chartPatrimonio }: {
   r: RendaPassivaResults; inputs: RendaPassivaInputs; clientName?: string;
+  chartPrincipal?: string | null; chartPatrimonio?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const anos = inputs.prazoMeses / 12;
@@ -553,9 +538,9 @@ function PDFRendaDoc({ r, inputs, clientName }: {
 
   const fluxoRows: { label: string; value: string; color?: string }[] = [
     { label: "Total investido (parcelas + lance)", value: fmtBRL(r.totalInvestido) },
+    { label: "Renda de aluguel gerada no período", value: fmtBRL(r.totalRendaGerada), color: C.green },
+    { label: "Valor do imóvel ao final", value: fmtBRL(r.valorImovelFinal), color: C.navy },
     { label: "Patrimônio final (imóvel + fluxo)", value: fmtBRL(r.patrimonioFinal), color: C.green },
-    { label: `Projeção CDB/Selic (${inputs.taxaCDIAnual}% a.a.)`, value: fmtBRL(r.cdbFuturo), color: C.red },
-    { label: "Vantagem do consórcio vs. CDB", value: fmtBRL(r.vantagemVsCDB), color: r.vantagemVsCDB >= 0 ? C.green : C.red },
     { label: "ROI total no período", value: `${r.roiPercentual.toFixed(1)}%`, color: C.green },
     { label: "ROI anual equivalente", value: `${r.roiAnual.toFixed(1)}% a.a.`, color: C.green },
   ];
@@ -587,7 +572,7 @@ function PDFRendaDoc({ r, inputs, clientName }: {
           <RpMetric label="Total investido" value={fmtBRL(r.totalInvestido)} description="Parcelas + lance próprio desembolsado" color={C.navy} />
           <RpMetric label="Renda gerada no período" value={fmtBRL(r.totalRendaGerada)} description={`Alugueis recebidos em ${anos.toFixed(0)} anos`} color={C.green} />
           <RpMetric label="Valor do imóvel no final" value={fmtBRL(r.valorImovelFinal)} description={`Valorização de ${inputs.valorizacaoAnual}% a.a.`} color={C.navy} />
-          <RpMetric label="ROI anual" value={`${r.roiAnual.toFixed(1)}% a.a.`} description={`vs. CDI de ${inputs.taxaCDIAnual}% a.a.`} color={r.roiAnual >= inputs.taxaCDIAnual ? C.green : C.amber} />
+          <RpMetric label="ROI anual" value={`${r.roiAnual.toFixed(1)}% a.a.`} description="Retorno do patrimônio + aluguel" color={r.roiAnual >= 0 ? C.green : C.amber} />
         </RpMetricRow>
       </RpSection>
 
@@ -598,9 +583,12 @@ function PDFRendaDoc({ r, inputs, clientName }: {
         variant="primary"
       />
 
-      <RpSection title="Comparativo: Consórcio vs. CDB/Selic" description="Se você investisse o mesmo valor em renda fixa:">
+      <RpSection title="Rendimento do Aluguel + Valor Patrimonial" description="O retorno real da estratégia: renda de aluguel somada à valorização do imóvel.">
         <RpKVList rows={fluxoRows} />
       </RpSection>
+
+      <RpChartImage src={chartPrincipal} title={isCDI ? "Crédito rendendo CDI vs. Parcela INCC" : "Parcela vs. Renda de Aluguel"} height={140} />
+      <RpChartImage src={chartPatrimonio} title="Evolução do Patrimônio" height={140} />
 
       {isCDI && r.creditoFinalComCDI > 0 ? (
         <RpSection title="Estratégia Alternativa: Crédito Rende CDI" description="Credito rendendo CDI enquanto paga parcelas com reajuste INCC:">

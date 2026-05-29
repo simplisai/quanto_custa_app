@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { Document, Page, View, Text } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image } from "@react-pdf/renderer";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 export const C = {
@@ -189,12 +189,15 @@ export function RpMetricRow({ children }: { children: React.ReactNode }) {
 
 // ─── Insight box ──────────────────────────────────────────────────────────────
 export function RpInsight({
-  emoji,
+  // `emoji` é mantido por compatibilidade de API, mas NÃO é renderizado: as
+  // fontes padrão do @react-pdf (Helvetica) não possuem glifos de emoji e
+  // produziam caracteres corrompidos no PDF (ex.: "<ÆPor que consórcio...").
+  emoji: _emoji,
   title,
   body,
   variant,
 }: {
-  emoji: string;
+  emoji?: string;
   title: string;
   body: string;
   variant?: "primary" | "success" | "warning";
@@ -217,7 +220,7 @@ export function RpInsight({
       }}
     >
       <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: titleColor, marginBottom: 4 }}>
-        {emoji} {title}
+        {title}
       </Text>
       <Text style={{ fontSize: 8.5, color: C.text, lineHeight: 1.55 }}>{body}</Text>
     </View>
@@ -348,6 +351,31 @@ export function RpPremises({ items }: { items: [string, string][] }) {
           ))}
         </View>
       ))}
+    </View>
+  );
+}
+
+// ─── Gráfico (imagem capturada do chart.js) ─────────────────────────────────
+// Recebe um data URL PNG (canvas.toDataURL) e o renderiza no PDF. Não renderiza
+// nada se `src` estiver vazio (ex.: exportado fora do navegador).
+export function RpChartImage({
+  src,
+  title,
+  height = 150,
+}: {
+  src?: string | null;
+  title?: string;
+  height?: number;
+}) {
+  if (!src) return null;
+  return (
+    <View style={{ marginBottom: 12 }}>
+      {title ? (
+        <Text style={{ fontSize: 8, color: C.muted, fontFamily: "Helvetica-Bold", textTransform: "uppercase", marginBottom: 4 }}>
+          {title}
+        </Text>
+      ) : null}
+      <Image src={src} style={{ width: "100%", height, objectFit: "contain" }} />
     </View>
   );
 }

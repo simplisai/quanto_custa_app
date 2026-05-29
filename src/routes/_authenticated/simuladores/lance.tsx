@@ -12,7 +12,7 @@ import {
   CategoryScale, LinearScale, BarElement, PointElement, LineElement,
   Title, Tooltip, Legend, Filler,
 } from "chart.js";
-import { Bar } from "react-chartjs-2";
+import { Line } from "react-chartjs-2";
 import { ArrowLeft, Target, TrendingDown, Coins, CalendarCheck, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
 import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpFooter, RpMetricRow, RpKVList, C } from "@/components/RpShell";
@@ -391,17 +391,30 @@ function SimuladorLancePage() {
 
 // ─── Results Component ────────────────────────────────────────────────────────
 function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
-  // Gráfico de barras: parcela por fase (sem lance vs com lance)
-  const phases = ["Pré-Contempl. (ambos)", `Pós-Contempl. sem lance`, `Pós-Contempl. com lance`];
+  // Evolução da parcela mês a mês (amostrada) — mostra o reajuste pelo INCC
+  const sampledParc = r.timeline.filter((_, i) => i % 6 === 0 || i === r.timeline.length - 1);
   const chartData = {
-    labels: phases,
+    labels: sampledParc.map((d) => `M${d.mes}`),
     datasets: [
       {
-        label: "Parcela Mensal",
-        data: [r.parcelaPadrao, r.parcelaPadrao, r.parcelaPosLance],
-        backgroundColor: ["#6b7280", "#ef4444", "#22c55e"],
-        borderRadius: 6,
-        borderSkipped: false,
+        label: "Parcela sem lance",
+        data: sampledParc.map((d) => d.parcelaSemLance),
+        borderColor: "#ef4444",
+        backgroundColor: "rgba(239,68,68,0.08)",
+        fill: false,
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.3,
+      },
+      {
+        label: "Parcela com lance",
+        data: sampledParc.map((d) => d.parcelaComLance),
+        borderColor: "#22c55e",
+        backgroundColor: "rgba(34,197,94,0.08)",
+        fill: false,
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.3,
       },
     ],
   };
@@ -409,11 +422,13 @@ function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
     responsive: true,
     maintainAspectRatio: false,
     animation: { duration: 400 },
+    interaction: { mode: "index" as const, intersect: false },
     plugins: {
-      legend: { display: false },
+      legend: { display: true },
       tooltip: {
         callbacks: {
-          label: (ctx: { parsed: { y: number } }) => fmtBRL(ctx.parsed.y),
+          label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
+            `${ctx.dataset.label}: ${fmtBRL(ctx.parsed.y)}`,
         },
       },
     },
@@ -503,16 +518,16 @@ function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
       </div>
 
       {/* ── Gráfico: parcelas por fase ─────────────────────────────── */}
-      <Section title="Parcela Mensal por Fase">
+      <Section title="Evolução da Parcela Mensal (com reajuste INCC)">
         <div className="h-48 sm:h-64 w-full">
-          <Bar data={chartData} options={chartOptions} />
+          <Line data={chartData} options={chartOptions} />
         </div>
       </Section>
 
       {/* ── Gráfico: desembolso acumulado ─────────────────────────── */}
       <Section title="Desembolso Acumulado ao Longo do Tempo">
         <div className="h-48 sm:h-64 w-full">
-          <Bar data={lineData} options={{ ...lineOptions, datasets: lineData.datasets } as never} />
+          <Line data={lineData} options={lineOptions as never} />
         </div>
         <p className="text-xs text-muted-foreground">A curva verde (com lance) fica abaixo da vermelha (sem lance) após a contemplação, representando a economia real.</p>
       </Section>

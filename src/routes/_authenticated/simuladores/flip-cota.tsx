@@ -20,7 +20,8 @@ import {
 import { Bar } from "react-chartjs-2";
 import { ArrowLeft, Zap, TrendingUp, Coins, BarChart2, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, RpChartImage, C } from "@/components/RpShell";
+import { captureChart } from "@/lib/capture-charts";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -117,7 +118,7 @@ function FlipCotaPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFFlipDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    () => results ? <PDFFlipDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("flip-rentab")} /> : null,
     "Flip_Cota_Consorcio.pdf",
   );
 
@@ -456,7 +457,7 @@ function ResultsFlip({ r, inputs }: { r: FlipCotaResults; inputs: FlipCotaInputs
 
       {/* ── Gráfico ──────────────────────────────────────────────────── */}
       <Section title="Demonstrativo de Rentabilidade">
-        <div className="h-56 sm:h-72">
+        <div className="h-56 sm:h-72" data-chart="flip-rentab">
           <Bar data={chartData} options={chartOptions} />
         </div>
       </Section>
@@ -505,8 +506,8 @@ function ResultsFlip({ r, inputs }: { r: FlipCotaResults; inputs: FlipCotaInputs
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFFlipDoc({ r, inputs, clientName }: {
-  r: FlipCotaResults; inputs: FlipCotaInputs; clientName?: string;
+function PDFFlipDoc({ r, inputs, clientName, chartImg }: {
+  r: FlipCotaResults; inputs: FlipCotaInputs; clientName?: string; chartImg?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -537,6 +538,8 @@ function PDFFlipDoc({ r, inputs, clientName }: {
           <RpMetric label="ROI no período" value={`${r.roiTotal.toFixed(1)}%`} description={`Em apenas ${inputs.mesContemplacao} meses`} color={r.roiTotal >= 0 ? C.green : C.red} />
         </RpMetricRow>
       </RpSection>
+
+      <RpChartImage src={chartImg} title="Demonstrativo de Rentabilidade" height={120} />
 
       <RpInsight
         emoji="🔄"

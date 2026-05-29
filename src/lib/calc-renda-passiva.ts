@@ -1,6 +1,9 @@
 // ─── Simulador de Renda Passiva com Consórcio ────────────────────────────────
 // Responde: "O consórcio pode se pagar sozinho com a renda do aluguel?"
-// Calcula fluxo de caixa mês a mês, ROI e compara com CDB/Selic.
+// Foco: rendimento do aluguel + valor patrimonial; e crédito rendendo CDI vs
+// parcela rendendo INCC. (Não comparar as parcelas aplicadas em CDB.)
+
+import { simularConsorcio } from "./consorcio-core";
 
 export type UsoCreditoContemplado = "compra_imovel" | "credito_rende_cdi";
 
@@ -102,35 +105,32 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
     usoCreditoContemplado,
   } = i;
 
-  // Carta corrigida pelo INCC no mês da contemplação
-  const cartaAtualizada = cartaCredito * Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemplacao / 12);
-
   const prazo = Math.max(prazoMeses, 1);
   const mesContemp = Math.min(Math.max(mesContemplacao, 1), prazo);
 
-  // ── Lance ────────────────────────────────────────────────────────────────
-  const lanceEmbR = cartaCredito * (percLance / 100);
-  const lanceProprio = lanceProprioR;
-  const lanceTotalR = lanceEmbR + lanceProprio;
+  // ── Núcleo: consórcio com parcela e saldo derivados do crédito atualizado ──
+  const sim = simularConsorcio({
+    credito: cartaCredito,
+    taxaAdm: taxaAdmTotal,
+    prazo,
+    inccAnual: taxaAtualizacaoAnual,
+    mesContemplacao: mesContemp,
+    lanceEmbutidoPerc: percLance,
+    lanceProprioR,
+    abatimentoEmbutido: "saldoDevedor",
+    amortizacao: "parcela",
+  });
 
-  // ── Parcelas ────────────────────────────────────────────────────────────
-  const taxaAdmFrac = taxaAdmTotal / 100;
-  const valorPlano = cartaCredito * (1 + taxaAdmFrac);
-  const parcelaPadrao = valorPlano / prazo;
-
-  // Saldo do plano na contemplação (não re-aplica taxaAdm — já está embutida no plano)
-  const parcelasRestantes = Math.max(prazo - mesContemp, 0);
-  const saldoPlanoContemp = Math.max(valorPlano - parcelaPadrao * mesContemp, 0);
-  const saldoPlanoPosLance = Math.max(saldoPlanoContemp - lanceTotalR, 0);
-  const parcelaPosLance = parcelasRestantes > 0 ? saldoPlanoPosLance / parcelasRestantes : 0;
-  const saldoDevedorPosLance = saldoPlanoPosLance;
+  const cartaAtualizada = sim.creditoAtualizadoContemplacao;
+  const lanceEmbR = sim.lanceEmbutidoR;
+  const lanceProprio = sim.lanceProprioR;
+  const parcelaPadrao = sim.parcelaInicial;
+  const parcelaPosLance = sim.parcelaPosLance;
+  const saldoDevedorPosLance = sim.saldoDevedorPosLance;
 
   // ── Taxas mensais ────────────────────────────────────────────────────────
-  const reajusteMensal = Math.pow(1 + reajusteAluguelAnual / 100, 1 / 12) - 1;
   const valorizMensal = Math.pow(1 + valorizacaoAnual / 100, 1 / 12) - 1;
   const cdiMensal = Math.pow(1 + taxaCDIAnual / 100, 1 / 12) - 1;
-
-  const inccMensal = Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, 1 / 12) - 1;
 
   // ── Simulação mês a mês ──────────────────────────────────────────────────
   const timeline: MesRenda[] = [];
@@ -139,28 +139,13 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
   let fluxoAcum = 0;
   let mesFluxoNeutro: number | null = null;
 
-  // Parcelas correntes — corrigidas pelo INCC no aniversário do grupo (a cada 12 meses)
-  let parcelaPadraoAtual = parcelaPadrao;
-  let parcelaPosLanceAtual = parcelaPosLance;
-
   // Crédito aplicado no CDI (só para cenário credito_rende_cdi, após contemplação)
   let creditoCDIAcum = 0;
   const isCDI = usoCreditoContemplado === "credito_rende_cdi";
 
   for (let m = 1; m <= prazo; m++) {
-    // Correção anual pelo INCC no aniversário do grupo (a cada 12 meses, exceto no 1º)
-    if (m > 1 && (m - 1) % 12 === 0) {
-      parcelaPadraoAtual *= (1 + (taxaAtualizacaoAnual || 0) / 100);
-      parcelaPosLanceAtual *= (1 + (taxaAtualizacaoAnual || 0) / 100);
-    }
-
-    // Parcela do consórcio (corrigida pelo INCC)
-    let parcelaCons = 0;
-    if (m <= mesContemp) {
-      parcelaCons = parcelaPadraoAtual;
-    } else {
-      parcelaCons = parcelaPosLanceAtual;
-    }
+    // Parcela do consórcio do núcleo (já reajustada pelo INCC)
+    const parcelaCons = sim.timeline[m - 1]?.parcela ?? 0;
 
     // Lance próprio no mês da contemplação; crédito começa a render CDI
     if (m === mesContemp) {

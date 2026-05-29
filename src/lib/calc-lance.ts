@@ -2,6 +2,8 @@
 // Responde: "O que preciso dar de lance para ser contemplado no mês X?"
 // e mostra a economia real vs. esperar contemplação aleatória.
 
+import { simularConsorcio } from "./consorcio-core";
+
 export interface LanceInputs {
   cartaCredito: number;        // Valor da carta de crédito (R$)
   taxaAdmTotal: number;        // Taxa de administração total (% — ex: 18%)
@@ -76,95 +78,60 @@ export function calcLance(i: LanceInputs): LanceResults {
     lanceProprioR,
     tipoLance,
     mesContemplacaoLance,
-    mesSemLance,
     tipoAbatimentoLance,
     taxaAtualizacaoAnual,
   } = i;
 
-  // Carta corrigida pelo INCC no mês da contemplação
-  const cartaAtualizada = cartaCredito * Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemplacaoLance / 12);
-
   const prazo = Math.max(prazoMeses, 1);
   const mesLance = Math.min(Math.max(mesContemplacaoLance, 1), prazo);
-  const mesSL = Math.min(Math.max(mesSemLance, 1), prazo);
 
-  // ── Parcela padrão ──────────────────────────────────────────────────────
-  // Valor do plano = carta × (1 + taxa_adm %)
-  // Parcela mensal = valor_plano / prazo
-  const taxaAdmFrac = taxaAdmTotal / 100;
-  const valorPlano = cartaCredito * (1 + taxaAdmFrac);
-  const parcelaPadrao = valorPlano / prazo;
+  // Lance embutido / próprio conforme o tipo selecionado
+  const usaEmbutido = tipoLance === "embutido" || tipoLance === "combinado";
+  const usaProprio = tipoLance === "proprio" || tipoLance === "combinado";
+  const percEmb = usaEmbutido ? percLanceEmb : 0;
+  const lanceProprio = usaProprio ? lanceProprioR : 0;
 
-  // ── Lance ────────────────────────────────────────────────────────────────
-  let lanceEmbR = 0;
-  let lanceProprio = 0;
+  // ── Cenário COM LANCE ──────────────────────────────────────────────────────
+  // A parcela é derivada do crédito ATUALIZADO pelo INCC (núcleo); o lance
+  // amortiza o saldo devedor e (no modo "credito") reduz o crédito líquido.
+  const comLance = simularConsorcio({
+    credito: cartaCredito,
+    taxaAdm: taxaAdmTotal,
+    prazo,
+    inccAnual: taxaAtualizacaoAnual,
+    mesContemplacao: mesLance,
+    lanceEmbutidoPerc: percEmb,
+    lanceProprioR: lanceProprio,
+    abatimentoEmbutido: tipoAbatimentoLance,
+    amortizacao: "parcela",
+  });
 
-  if (tipoLance === "embutido" || tipoLance === "combinado") {
-    lanceEmbR = cartaCredito * (percLanceEmb / 100);
-  }
-  if (tipoLance === "proprio" || tipoLance === "combinado") {
-    lanceProprio = lanceProprioR;
-  }
-  if (tipoLance === "proprio") {
-    // only próprio, no embutido
-    lanceEmbR = 0;
-    lanceProprio = lanceProprioR;
-  }
+  // ── Cenário SEM LANCE ──────────────────────────────────────────────────────
+  // Paga a parcela padrão (reajustada pelo INCC) por todo o prazo.
+  const semLance = simularConsorcio({
+    credito: cartaCredito,
+    taxaAdm: taxaAdmTotal,
+    prazo,
+    inccAnual: taxaAtualizacaoAnual,
+    mesContemplacao: prazo, // sem lance: contemplação não antecipa nada
+  });
 
+  const cartaAtualizada = comLance.creditoAtualizadoContemplacao;
+  const parcelaPadrao = comLance.parcelaInicial;
+  const parcelaPosLance = comLance.parcelaPosLance;
+  const saldoDevedorPosLance = comLance.saldoDevedorPosLance;
+
+  const lanceEmbR = comLance.lanceEmbutidoR;
   const lanceTotalR = lanceEmbR + lanceProprio;
-  const percLanceTotalSobreCarta = cartaCredito > 0 ? (lanceTotalR / cartaCredito) * 100 : 0;
+  const percLanceTotalSobreCarta = cartaAtualizada > 0 ? (lanceTotalR / cartaAtualizada) * 100 : 0;
+  const creditoLiquido = comLance.creditoLiquido;
 
-  // Crédito líquido depende do tipo de abatimento:
-  //   "credito"       → lance embutido reduz o crédito recebido (o cliente recebe menos carta)
-  //   "saldoDevedor"  → o cliente recebe a carta cheia, o lance só reduz o saldo devedor
-  let creditoLiquido: number;
-
-  if (tipoAbatimentoLance === "credito") {
-    creditoLiquido = Math.max(cartaCredito - lanceEmbR, 0);
-  } else {
-    creditoLiquido = cartaCredito; // recebe a carta cheia
-  }
-
-  // ── Parcela pós-contemplação (saldo do plano) ────────────────────────────
-  // O valor total do plano = carta × (1 + taxaAdm). As parcelas já pagas reduzem
-  // esse saldo. O lance é deduzido do saldo restante no plano.
-  // Não re-aplicamos taxaAdm — ela já está embutida no saldo do plano.
   const parcelasRestantes = prazo - mesLance;
-  const saldoPlanoContemplacaoRaw = valorPlano - parcelaPadrao * mesLance;
-  const saldoPlanoNaContemplacao = Math.max(saldoPlanoContemplacaoRaw, 0);
-  const saldoAposLance = Math.max(saldoPlanoNaContemplacao - lanceTotalR, 0);
-  const parcelaPosLance = parcelasRestantes > 0 ? saldoAposLance / parcelasRestantes : 0;
 
-  // saldoDevedorPosLance = saldo do plano após o lance (em termos de plano, não de carta)
-  const saldoDevedorPosLance = saldoAposLance;
-
-  // ── Totais ───────────────────────────────────────────────────────────────
-  // Sem lance: paga parcela padrão por todo o prazo
-  const totalSemLance = parcelaPadrao * prazo;
-
-  // Com lance:
-  //   - Parcelas pré-contemplação (meses 1 → mesLance): parcela padrão
-  //   - Desembolso do lance próprio no mês da contemplação
-  //   - Parcelas pós-contemplação: parcela reduzida × parcelasRestantes
-  //   (lance embutido não é desembolso adicional — vem da própria carta)
-  const parcelasPre = parcelaPadrao * mesLance;
-  const parcelasPos = parcelaPosLance * parcelasRestantes;
-  const totalComLance = parcelasPre + lanceProprio + parcelasPos;
-
+  // ── Totais (a partir das timelines reajustadas — fonte única) ──────────────
+  const totalSemLance = semLance.totalParcelas;
+  const totalComLance = comLance.desembolsoTotal;
   const economia = totalSemLance - totalComLance;
-
-  // ── Break-even ───────────────────────────────────────────────────────────
-  // Mês a partir da contemplação em que a economia acumulada de parcelas
-  // supera o desembolso do lance próprio.
-  let breakEvenMes: number | null = null;
-  if (lanceProprio > 0) {
-    const economiaParcelaMes = parcelaPadrao - parcelaPosLance;
-    if (economiaParcelaMes > 0) {
-      const mesesParaRecuperar = Math.ceil(lanceProprio / economiaParcelaMes);
-      const breakEvenAbsoluto = mesLance + mesesParaRecuperar;
-      breakEvenMes = breakEvenAbsoluto <= prazo ? breakEvenAbsoluto : null;
-    }
-  }
 
   // ── Timeline mês a mês ───────────────────────────────────────────────────
   const timeline: MesData[] = [];
@@ -172,30 +139,28 @@ export function calcLance(i: LanceInputs): LanceResults {
   let acumComLance = 0;
 
   for (let m = 1; m <= prazo; m++) {
-    // Sem lance: parcela padrão sempre
-    acumSemLance += parcelaPadrao;
-
-    // Com lance:
-    if (m <= mesLance) {
-      // Pré-contemplação: parcela padrão
-      acumComLance += parcelaPadrao;
-    } else if (m === mesLance + 1) {
-      // Contemplação: adiciona lance próprio e a primeira parcela pós
-      acumComLance += lanceProprio + parcelaPosLance;
-    } else {
-      acumComLance += parcelaPosLance;
-    }
-
-    // A parcela exibida no mês
-    const parcelaComLanceMes = m <= mesLance ? parcelaPadrao : parcelaPosLance;
+    const semM = semLance.timeline[m - 1];
+    const comM = comLance.timeline[m - 1];
+    acumSemLance += semM?.parcela ?? 0;
+    acumComLance += comM?.desembolsoMes ?? 0;
 
     timeline.push({
       mes: m,
-      parcelaSemLance: parcelaPadrao,
-      parcelaComLance: parcelaComLanceMes,
+      parcelaSemLance: semM?.parcela ?? 0,
+      parcelaComLance: comM?.parcela ?? 0,
       desembolsoAcumSemLance: acumSemLance,
       desembolsoAcumComLance: acumComLance,
     });
+  }
+
+  // ── Break-even ───────────────────────────────────────────────────────────
+  // Primeiro mês em que o desembolso acumulado COM lance ≤ SEM lance.
+  let breakEvenMes: number | null = null;
+  if (lanceProprio > 0) {
+    const cruzamento = timeline.find(
+      (t) => t.mes > mesLance && t.desembolsoAcumComLance <= t.desembolsoAcumSemLance,
+    );
+    breakEvenMes = cruzamento ? cruzamento.mes : null;
   }
 
   return {

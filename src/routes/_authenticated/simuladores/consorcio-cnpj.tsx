@@ -22,7 +22,8 @@ import {
   ArrowLeft, ArrowRight, BookOpen, Building2, Coins, TrendingDown, TrendingUp,
 } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, RpChartImage, C } from "@/components/RpShell";
+import { captureChart } from "@/lib/capture-charts";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -106,7 +107,7 @@ function ConsorcioCNPJPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFCnpjDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    () => results ? <PDFCnpjDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("cnpj-parcelas")} /> : null,
     "consorcio-cnpj.pdf",
   );
 
@@ -396,7 +397,7 @@ function ConsorcioCNPJPage() {
           {/* Gráfico */}
           {chartData && (
             <Section title="Parcelas: Bruta × Líquida × Financiamento">
-              <div className="h-52 sm:h-64">
+              <div className="h-52 sm:h-64" data-chart="cnpj-parcelas">
                 <Bar data={chartData} options={chartOptions} />
               </div>
             </Section>
@@ -432,7 +433,7 @@ function ConsorcioCNPJPage() {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFCnpjDoc({ r, inputs, clientName }: {
+function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
   r: ConsorcioCNPJResults;
   inputs: {
     cartaCredito: number;
@@ -449,9 +450,11 @@ function PDFCnpjDoc({ r, inputs, clientName }: {
     [key: string]: unknown;
   };
   clientName?: string;
+  chartImg?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  const aliquotaTotal = inputs.aliquotaIRPJ + inputs.aliquotaCSLL;
+  // A alíquota efetiva vem do resultado (0 no Lucro Presumido — sem dedução direta).
+  const aliquotaTotal = r.aliquotaEfetivaTotal;
   const regimeLabel = inputs.regimeTributario === "presumido" ? "Lucro Presumido" : "Lucro Real";
 
   return (
@@ -473,20 +476,39 @@ function PDFCnpjDoc({ r, inputs, clientName }: {
         ["Valorização do bem", `${inputs.valorizacaoAnual}% a.a.`],
       ]} />
 
-      <RpSection title="Benefício Fiscal Mensal" description="O que o consórcio custa de verdade para a empresa, depois do abatimento fiscal:">
-        <RpMetricRow>
-          <RpMetric label="Parcela bruta" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Valor nominal da parcela antes do benefício fiscal" color={C.navy} />
-          <RpMetric label="Economia fiscal mensal" value={fmtBRL(r.economiaFiscalMensal)} description={`${aliquotaTotal}% sobre a parcela — imposto que nao e pago`} color={C.green} />
-          <RpMetric label="Parcela líquida (custo real)" value={fmtBRL(r.parcelaLiquidaConsorcio)} description="O que a empresa realmente desembolsa por mes" color={C.amber} />
-        </RpMetricRow>
-      </RpSection>
+      {r.beneficioFiscalAtivo ? (
+        <>
+          <RpSection title="Benefício Fiscal Mensal (Lucro Real)" description="O que o consórcio custa de verdade para a empresa, depois do abatimento fiscal:">
+            <RpMetricRow>
+              <RpMetric label="Parcela bruta" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Valor nominal da parcela antes do benefício fiscal" color={C.navy} />
+              <RpMetric label="Economia fiscal mensal" value={fmtBRL(r.economiaFiscalMensal)} description={`${aliquotaTotal}% sobre a taxa de adm. — imposto que não é pago`} color={C.green} />
+              <RpMetric label="Parcela líquida (custo real)" value={fmtBRL(r.parcelaLiquidaConsorcio)} description="O que a empresa realmente desembolsa por mês" color={C.amber} />
+            </RpMetricRow>
+          </RpSection>
 
-      <RpInsight
-        emoji="🏢"
-        title="O Estado financia parte do seu consórcio"
-        body={`No ${regimeLabel}, as parcelas de consorcio sao dedutiveis como despesa operacional. Isso significa que ${aliquotaTotal}% de cada parcela e subsidiado pelo imposto que voce deixa de pagar. Resultado: parcela bruta de ${fmtBRL(r.parcelaBrutaConsorcio)} vira custo real de ${fmtBRL(r.parcelaLiquidaConsorcio)} — economia fiscal de ${fmtBRL(r.economiaFiscalMensal)}/mes.`}
-        variant="primary"
-      />
+          <RpInsight
+            title="O Estado patrocina parte do seu consórcio"
+            body={`No Lucro Real, a taxa de administração do consórcio é despesa operacional dedutível. Isso significa que o Estado patrocina até ${aliquotaTotal}% do custo da taxa via redução de IRPJ + CSLL. Ao longo do plano, a empresa deixa de pagar ${fmtBRL(r.totalEconomiaFiscalConsorcio)} de imposto — reduzindo o custo real da operação.`}
+            variant="primary"
+          />
+        </>
+      ) : (
+        <>
+          <RpSection title="Vantagem PJ (Lucro Presumido)" description="No Lucro Presumido o imposto incide sobre o faturamento — NÃO há dedução direta. O benefício é de caixa e de balanço:">
+            <RpMetricRow>
+              <RpMetric label="Parcela do consórcio" value={fmtBRL(r.parcelaBrutaConsorcio)} description="Sem dedução fiscal direta neste regime" color={C.navy} />
+              <RpMetric label="Preservação de caixa" value="Capital de giro intacto" description="Compra patrimônio sem retirar milhões do caixa de uma vez" color={C.green} />
+              <RpMetric label="Balanço (SCR)" value="Rating intocado" description="Entra como Investimento (Ativo), não como dívida no Banco Central" color={C.green} />
+            </RpMetricRow>
+          </RpSection>
+
+          <RpInsight
+            title="Lucro Presumido: vantagem patrimonial, não fiscal"
+            body={`No Lucro Presumido o imposto é sobre o faturamento, então não há abatimento direto das parcelas. A vantagem é estratégica: preservação de caixa (o dinheiro continua rendendo na atividade-fim) e balanço limpo — até a contemplação o consórcio entra como Investimento, e não como dívida no SCR do Banco Central, mantendo o rating bancário da empresa intocado para captar capital de giro.`}
+            variant="primary"
+          />
+        </>
+      )}
 
       <RpSection title="Consórcio PJ vs. Financiamento PJ" description="Comparativo de custo total entre as duas alternativas:">
         <RpKVList rows={[
@@ -503,14 +525,15 @@ function PDFCnpjDoc({ r, inputs, clientName }: {
         ]} />
       </RpSection>
 
+      <RpChartImage src={chartImg} title="Parcelas: Bruta × Líquida × Financiamento" height={140} />
+
       <RpInsight
-        emoji="📊"
         title={`Consórcio é ${r.percentualEconomia.toFixed(1)}% mais barato que o financiamento PJ`}
-        body={`O financiamento PJ cobra juros sobre o saldo devedor — quanto mais voce deve, mais voce paga. O consorcio nao tem juros: voce paga apenas a taxa de administracao diluida nas parcelas, e ainda deduz tudo do imposto. A combinacao de ausencia de juros + beneficio fiscal resulta em ${fmtBRL(r.economiaTotalVsFinanciamento)} a mais no caixa da empresa.`}
+        body={`O financiamento PJ cobra juros sobre o saldo devedor — quanto mais você deve, mais você paga. O consórcio não tem juros: você paga apenas a taxa de administração diluída nas parcelas${r.beneficioFiscalAtivo ? ", e ainda deduz a taxa de adm. do imposto" : ""}. O resultado é ${fmtBRL(r.economiaTotalVsFinanciamento)} a mais no caixa da empresa.`}
         variant="success"
       />
 
-      <RpFooter note="Beneficio fiscal calculado com base na dedutibildiade das parcelas como despesa operacional nos regimes de Lucro Presumido e Lucro Real. Consulte o contador da empresa para validar o enquadramento especifico." />
+      <RpFooter note="Benefício fiscal calculado conforme o regime: no Lucro Real a taxa de administração é despesa operacional dedutível (abate IRPJ + CSLL); no Lucro Presumido o imposto incide sobre o faturamento e não há dedução direta — o ganho é de caixa e de balanço. Consulte o contador da empresa para validar o enquadramento específico." />
     </RpDoc>
   );
 }

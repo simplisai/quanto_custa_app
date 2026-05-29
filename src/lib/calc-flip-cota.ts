@@ -6,6 +6,13 @@
 // lucro      = valorVenda - desembolsoTotal
 // TIR mensal = (valorVenda / desembolsoTotal)^(1/mesContemplacao) - 1
 
+import {
+  simularConsorcio,
+  tirMensalSimples,
+  anualFromMensal,
+  type ConsorcioMes,
+} from "./consorcio-core";
+
 export interface FlipCotaInputs {
   cartaCredito: number;         // Valor do crédito original (R$)
   prazo: number;                // Prazo do plano (meses)
@@ -35,6 +42,7 @@ export interface FlipCotaResults {
   roiTotal: number;             // ROI total (%)
   paybackMes: number;           // Mês estimado de payback (= mesContemplacao, pois recebe tudo na venda)
   multAtualizacao: number;      // Multiplicador INCC aplicado
+  timeline: ConsorcioMes[];     // Evolução mês a mês (parcela reajustada, crédito corrigido)
 }
 
 export const defaultFlipCotaInputs: FlipCotaInputs = {
@@ -64,51 +72,51 @@ export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
     taxaAtualizacaoAnual,
   } = i;
 
-  // Taxa de atualização anual (INCC) — corrige a carta no momento da contemplação
-  const multAtualizacao = Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemplacao / 12);
-
   const prazoSafe = Math.max(prazo, 1);
   const mesContemp = Math.min(Math.max(mesContemplacao, 1), prazoSafe);
+  const multAtualizacao = Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemp / 12);
 
-  // ── Parcelas ─────────────────────────────────────────────────────────────
-  const taxaTotal = taxaAdm + fundoReserva;
-  const custoTotalPlano = cartaCredito * (1 + taxaTotal / 100);
-  const parcelaCheia = custoTotalPlano / prazoSafe;
-  const parcelaEfetiva = meiaParcela ? parcelaCheia / 2 : parcelaCheia;
-  const valorPagoParcelas = parcelaEfetiva * mesContemp;
+  // ── Núcleo: simula a cota com parcela e crédito atualizados pelo INCC ──────
+  // O lance embutido reduz o crédito líquido; o lance próprio é desembolso real.
+  const sim = simularConsorcio({
+    credito: cartaCredito,
+    taxaAdm,
+    fundoReserva,
+    prazo: prazoSafe,
+    inccAnual: taxaAtualizacaoAnual,
+    mesContemplacao: mesContemp,
+    lanceEmbutidoPerc: tipoLance === "embutido" ? lancePerc : 0,
+    lanceProprioR: tipoLance === "proprio" ? cartaCredito * (lancePerc / 100) : 0,
+    meiaParcela,
+    horizonteMeses: mesContemp, // o operador paga só até contemplar e vende
+  });
 
-  // ── Lance ─────────────────────────────────────────────────────────────────
-  let creditoLiquido = cartaCredito;
-  let desembolsoLance = 0;
+  const parcelaCheia = sim.parcelaCheiaInicial;
+  const parcelaEfetiva = sim.parcelaInicial;
 
-  if (lancePerc > 0) {
-    if (tipoLance === "embutido") {
-      // Lance embutido: abate do crédito líquido (não é desembolso extra)
-      creditoLiquido = cartaCredito - cartaCredito * (lancePerc / 100);
-    } else {
-      // Lance próprio: desembolso real do operador
-      desembolsoLance = cartaCredito * (lancePerc / 100);
-    }
-  }
+  // Parcelas EFETIVAMENTE pagas até a contemplação (já reajustadas pelo INCC) —
+  // corrige o bug de desembolso subestimado.
+  const valorPagoParcelas = sim.timeline
+    .filter((t) => t.mes <= mesContemp)
+    .reduce((acc, t) => acc + t.parcela, 0);
 
-  // ── Desembolso total ─────────────────────────────────────────────────────
+  const desembolsoLance = tipoLance === "proprio" ? cartaCredito * (lancePerc / 100) : 0;
+
+  // ── Crédito atualizado e crédito líquido (após lance embutido) ────────────
+  const creditoLiquido = sim.creditoLiquido / multAtualizacao; // valor nominal líquido (sem INCC)
+  const creditoAtualizado = sim.creditoLiquido; // já corrigido pelo INCC na contemplação
+
+  // ── Desembolso total real ──────────────────────────────────────────────────
   const desembolsoTotal = valorPagoParcelas + desembolsoLance;
 
   // ── Venda com ágio ───────────────────────────────────────────────────────
-  // A carta é corrigida pelo INCC no momento da contemplação
-  const creditoAtualizado = creditoLiquido * multAtualizacao;
-  // O ágio é a % sobre o crédito ATUALIZADO que o comprador paga como prêmio
   const valorVenda = creditoAtualizado * (agioVenda / 100);
-  const precoVendaTotal = creditoAtualizado + valorVenda; // total que o comprador paga
+  const precoVendaTotal = creditoAtualizado + valorVenda;
   const lucroLiquido = valorVenda - desembolsoTotal;
 
   // ── TIR mensal ───────────────────────────────────────────────────────────
-  // TIR = (valorVenda / desembolsoTotal)^(1/mesContemplacao) - 1
-  let tirMensal = 0;
-  if (desembolsoTotal > 0 && valorVenda > 0 && mesContemp > 0) {
-    tirMensal = (Math.pow(valorVenda / desembolsoTotal, 1 / mesContemp) - 1) * 100;
-  }
-  const tirAnual = (Math.pow(1 + tirMensal / 100, 12) - 1) * 100;
+  const tirMensal = tirMensalSimples(desembolsoTotal, valorVenda, mesContemp);
+  const tirAnual = anualFromMensal(tirMensal);
   const roiTotal = desembolsoTotal > 0 ? (lucroLiquido / desembolsoTotal) * 100 : 0;
 
   return {
@@ -127,5 +135,6 @@ export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
     roiTotal,
     paybackMes: mesContemp,
     multAtualizacao,
+    timeline: sim.timeline,
   };
 }

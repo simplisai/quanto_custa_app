@@ -91,7 +91,7 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
     horizonteAnos, valorizacaoAnual, cdiAnual,
     taxaAdmConsorcio, prazoConsorcio, percLance, percLanceEmb,
     mesContemplacaoPrimeira, intervaloCotasMeses,
-    aliquotaEfetiva,
+    regimeTributario, aliquotaEfetiva,
   } = i;
 
   const horizonteMeses = horizonteAnos * 12;
@@ -197,8 +197,14 @@ export function calcMetaPatrimonial(i: MetaPatrimonialInputs): MetaPatrimonialRe
   const metaAtingida = patrimonioResultante >= patrimonioAlvo;
   const deficitR = metaAtingida ? 0 : patrimonioAlvo - patrimonioResultante;
 
-  // Benefício fiscal: parcelas são dedutíveis como despesa operacional (PJ)
-  const economiaFiscalTotal = totalInvestido * ((aliquotaEfetiva || 0) / 100);
+  // Benefício fiscal: só no Lucro Real a taxa de adm é dedutível como despesa
+  // operacional (abate IRPJ/CSLL). Presumido/Simples/Nenhum → sem abatimento direto.
+  const beneficioFiscalAtivo = regimeTributario === "real";
+  // A dedução incide sobre a parte de TAXA DE ADM embutida no investimento.
+  const fracTaxaNoInvest = taxaAdmConsorcio / (100 + taxaAdmConsorcio);
+  const economiaFiscalTotal = beneficioFiscalAtivo
+    ? totalInvestido * fracTaxaNoInvest * ((aliquotaEfetiva || 0) / 100)
+    : 0;
   const custoRealTotal = Math.max(totalInvestido - economiaFiscalTotal, 0);
 
   return {

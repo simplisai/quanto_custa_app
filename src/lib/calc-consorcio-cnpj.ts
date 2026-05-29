@@ -3,6 +3,8 @@
 // reduzindo IRPJ/CSLL e o custo real da operação.
 // Compara consórcio PJ vs. financiamento PJ (com juros + IOF).
 
+import { simularConsorcio } from "./consorcio-core";
+
 export type RegimeTributario = "presumido" | "real";
 
 export interface ConsorcioCNPJInputs {
@@ -25,6 +27,7 @@ export interface ConsorcioCNPJInputs {
 
   // Premissas
   valorizacaoAnual: number;      // Valorização anual do bem (%)
+  taxaAtualizacaoAnual?: number; // Atualização anual da carta pelo INCC (% a.a.) — default 4
 }
 
 export interface CNPJMesData {
@@ -55,7 +58,12 @@ export interface ConsorcioCNPJResults {
   // Comparativos
   economiaTotalVsFinanciamento: number;
   percentualEconomia: number;
-  aliquotaEfetivaTotal: number;   // IRPJ + CSLL
+  aliquotaEfetivaTotal: number;   // IRPJ + CSLL (alíquota de dedução; 0 no presumido)
+
+  // Regime fiscal
+  regimeTributario: RegimeTributario;
+  beneficioFiscalAtivo: boolean;  // true só no Lucro Real (há abatimento de imposto)
+  percentualPatrocinadoEstado: number; // % do custo da taxa que o Estado "paga" (Lucro Real)
 
   // Patrimônio
   valorBemFinalConsorcio: number;
@@ -78,6 +86,7 @@ export const defaultCNPJInputs: ConsorcioCNPJInputs = {
   aliquotaCSLL: 9,
   lucroMensalEmpresa: 50_000,
   valorizacaoAnual: 6,
+  taxaAtualizacaoAnual: 4,
 };
 
 export function calcConsorcioCNPJ(i: ConsorcioCNPJInputs): ConsorcioCNPJResults {
@@ -85,44 +94,61 @@ export function calcConsorcioCNPJ(i: ConsorcioCNPJInputs): ConsorcioCNPJResults 
     cartaCredito, taxaAdmConsorcio, prazoConsorcio,
     percLance, mesContemplacaoConsorcio,
     taxaJurosMensalFin, prazoFinanciamentoMeses,
+    regimeTributario,
     aliquotaIRPJ, aliquotaCSLL,
     valorizacaoAnual,
   } = i;
 
-  const taxaAdmFrac = taxaAdmConsorcio / 100;
-  const aliquotaEfetivaTotal = aliquotaIRPJ + aliquotaCSLL; // %
-  const aliquotaFrac = aliquotaEfetivaTotal / 100;
   const taxaJurosFrac = taxaJurosMensalFin / 100;
   const valorizMensal = Math.pow(1 + valorizacaoAnual / 100, 1 / 12) - 1;
+  const inccAnual = i.taxaAtualizacaoAnual ?? 4;
 
-  // ── Consórcio PJ ───────────────────────────────────────────────────────────
-  const valorPlano = cartaCredito * (1 + taxaAdmFrac);
-  const parcelaBrutaConsorcio = valorPlano / prazoConsorcio;
+  // ── Regime fiscal ────────────────────────────────────────────────────────
+  // Lucro Real: taxa adm + seguros são despesa operacional dedutível → abate
+  //   IRPJ + CSLL (Estado "patrocina" até ~34% do custo da taxa).
+  // Lucro Presumido: imposto incide sobre faturamento → NÃO há dedução direta.
+  //   O benefício é de caixa/balanço (SCR intocado), economia fiscal = 0.
+  const beneficioFiscalAtivo = regimeTributario === "real";
+  const aliquotaEfetivaTotal = beneficioFiscalAtivo ? aliquotaIRPJ + aliquotaCSLL : 0; // %
+  const aliquotaFrac = aliquotaEfetivaTotal / 100;
 
+  // ── Consórcio PJ (núcleo: parcela derivada do crédito atualizado pelo INCC) ──
+  const sim = simularConsorcio({
+    credito: cartaCredito,
+    taxaAdm: taxaAdmConsorcio,
+    prazo: prazoConsorcio,
+    inccAnual,
+    mesContemplacao: mesContemplacaoConsorcio,
+    lanceEmbutidoPerc: percLance,
+    abatimentoEmbutido: "saldoDevedor",
+    amortizacao: "parcela",
+  });
+
+  const parcelaBrutaConsorcio = sim.parcelaInicial;
+  const parcelaBrutaPosLance = sim.parcelaPosLance;
   const lanceR = cartaCredito * (percLance / 100);
-  const saldoPosLance = Math.max(cartaCredito - lanceR, 0);
-  const prazoPos = prazoConsorcio - mesContemplacaoConsorcio;
-  const parcelaBrutaPosLance =
-    prazoPos > 0
-      ? (saldoPosLance * (1 + taxaAdmFrac)) / prazoConsorcio
-      : 0;
+  const prazoPos = Math.max(prazoConsorcio - mesContemplacaoConsorcio, 0);
 
-  // Economia fiscal: a parcela do consórcio é dedutível → reduz base de IRPJ+CSLL
-  const economiaFiscalMensal = parcelaBrutaConsorcio * aliquotaFrac;
-  const economiaFiscalPosLance = parcelaBrutaPosLance * aliquotaFrac;
+  // A dedução fiscal incide apenas sobre a TAXA DE ADMINISTRAÇÃO embutida na
+  // parcela (parte que é despesa operacional), não sobre a amortização do bem.
+  const fracTaxaNaParcela = taxaAdmConsorcio / (100 + taxaAdmConsorcio);
+  const economiaFiscalMensal = parcelaBrutaConsorcio * fracTaxaNaParcela * aliquotaFrac;
+  const economiaFiscalPosLance = parcelaBrutaPosLance * fracTaxaNaParcela * aliquotaFrac;
   const parcelaLiquidaConsorcio = parcelaBrutaConsorcio - economiaFiscalMensal;
   const parcelaLiquidaPosLance = parcelaBrutaPosLance - economiaFiscalPosLance;
 
-  const totalBrutoConsorcio =
-    parcelaBrutaConsorcio * mesContemplacaoConsorcio +
-    lanceR +
-    parcelaBrutaPosLance * prazoPos;
+  // Totais reais a partir da timeline reajustada
+  const totalBrutoConsorcio = sim.desembolsoTotal;
 
-  const totalEconomiaFiscalConsorcio =
-    economiaFiscalMensal * mesContemplacaoConsorcio +
-    economiaFiscalPosLance * prazoPos;
+  // Economia fiscal total = soma da economia mês a mês (parte taxa adm × alíquota)
+  const totalEconomiaFiscalConsorcio = beneficioFiscalAtivo
+    ? sim.timeline.reduce((acc, t) => acc + t.parcela * fracTaxaNaParcela * aliquotaFrac, 0)
+    : 0;
 
   const totalLiquidoConsorcio = totalBrutoConsorcio - totalEconomiaFiscalConsorcio;
+
+  // % do custo da taxa de administração que o Estado "patrocina" via dedução
+  const percentualPatrocinadoEstado = beneficioFiscalAtivo ? aliquotaEfetivaTotal : 0;
 
   // ── Financiamento PJ ───────────────────────────────────────────────────────
   // Price simplificado
@@ -155,8 +181,9 @@ export function calcConsorcioCNPJ(i: ConsorcioCNPJInputs): ConsorcioCNPJResults 
 
   const prazoTL = Math.min(prazoAnalise, 240);
   for (let m = 1; m <= prazoTL; m++) {
-    const parcelaMesCons = m <= mesContemplacaoConsorcio ? parcelaBrutaConsorcio : parcelaBrutaPosLance;
-    const economiaFiscalMes = parcelaMesCons * aliquotaFrac;
+    // Parcela do consórcio do núcleo (reajustada pelo INCC)
+    const parcelaMesCons = sim.timeline[m - 1]?.parcela ?? 0;
+    const economiaFiscalMes = parcelaMesCons * fracTaxaNaParcela * aliquotaFrac;
     const parcelaLiquidaMes = parcelaMesCons - economiaFiscalMes;
 
     // Financiamento: juros sobre saldo + amortização
@@ -189,6 +216,9 @@ export function calcConsorcioCNPJ(i: ConsorcioCNPJInputs): ConsorcioCNPJResults 
     economiaTotalVsFinanciamento,
     percentualEconomia,
     aliquotaEfetivaTotal,
+    regimeTributario,
+    beneficioFiscalAtivo,
+    percentualPatrocinadoEstado,
     valorBemFinalConsorcio,
     valorBemFinalFinanciamento,
     timeline,
