@@ -50,18 +50,34 @@ function FormulariosPage() {
     if (!user) return
     setCreating(true)
     try {
-      // Generate slug via RPC
-      const { data: slug } = await supabase.rpc('generate_form_slug', {
-        p_title: 'Novo Formulário',
-        p_user_id: user.id,
-      })
+      let slug = ''
+      let isUnique = false
+      let attempts = 0
+      
+      while (!isUnique && attempts < 10) {
+        slug = Math.floor(1000 + Math.random() * 9000).toString()
+        const { data: existing } = await supabase
+          .from('form_templates')
+          .select('id')
+          .eq('slug', slug)
+          .maybeSingle()
+          
+        if (!existing) {
+          isUnique = true
+        }
+        attempts++
+      }
+
+      if (!isUnique) {
+        throw new Error('Não foi possível gerar um identificador único. Tente novamente.')
+      }
 
       const { data, error } = await supabase
         .from('form_templates')
         .insert({
           user_id: user.id,
           title: 'Novo Formulário',
-          slug: slug as string,
+          slug: slug,
           fields: [
             { key: 'nome', label: 'Qual é o seu nome completo?', category: 'contato', type: 'text', required: true, fixed: true },
             { key: 'email', label: 'Qual é o seu e-mail?', category: 'contato', type: 'email', required: true, fixed: true, hint: 'Usaremos para entrar em contato' },

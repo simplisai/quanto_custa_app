@@ -68,6 +68,13 @@ Deno.serve(async (req) => {
     // Build profile_data: everything except the contact fields
     const { nome: _n, email: _e, whatsapp: _w, ...profileData } = responses
 
+    // Format all responses to be appended to notes
+    const formattedResponses = Object.entries(responses)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join('\n')
+    
+    const newNotes = `Respostas do formulário (${form.title}):\n${formattedResponses}`
+
     // 3. Upsert client (match by email + owner)
     let clientId: string | null = null
 
@@ -75,7 +82,7 @@ Deno.serve(async (req) => {
       // Try to find existing client with same email
       const { data: existingClient } = await supabase
         .from('clients')
-        .select('id')
+        .select('id, notes')
         .eq('user_id', form.user_id)
         .eq('email', email)
         .maybeSingle()
@@ -88,6 +95,7 @@ Deno.serve(async (req) => {
             name: nome,
             phone: whatsapp || null,
             profile_data: profileData,
+            notes: existingClient.notes ? `${existingClient.notes}\n\n${newNotes}` : newNotes,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existingClient.id)
@@ -103,6 +111,7 @@ Deno.serve(async (req) => {
             email: email || null,
             phone: whatsapp || null,
             profile_data: profileData,
+            notes: newNotes,
           })
           .select('id')
           .single()
@@ -118,6 +127,7 @@ Deno.serve(async (req) => {
           name: nome,
           phone: whatsapp || null,
           profile_data: profileData,
+          notes: newNotes,
         })
         .select('id')
         .single()

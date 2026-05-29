@@ -50,16 +50,51 @@ function AdminSuporte() {
   const [newStatus, setNewStatus] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const load = () => {
-    supabase
-      .from('support_tickets')
-      .select('*, profiles(email)')
-      .order('created_at', { ascending: false })
-      .limit(100)
-      .then(({ data }) => {
-        setTickets((data ?? []) as unknown as Ticket[])
+  const load = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100)
+
+      if (error) {
+        console.error("Error loading tickets:", error)
+        toast.error("Erro ao carregar tickets: " + error.message)
+        setTickets([])
         setLoading(false)
-      })
+        return
+      }
+
+      // Fetch profiles for the tickets
+      const userIds = [...new Set((data || []).map((t) => t.user_id))]
+      
+      let profilesMap: Record<string, string> = {}
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .in('id', userIds)
+          
+        if (profilesData) {
+          profilesMap = profilesData.reduce((acc, p) => {
+            acc[p.id] = p.email
+            return acc
+          }, {} as Record<string, string>)
+        }
+      }
+
+      const ticketsWithProfiles = (data || []).map((t) => ({
+        ...t,
+        profiles: profilesMap[t.user_id] ? { email: profilesMap[t.user_id] } : null
+      }))
+
+      setTickets(ticketsWithProfiles as unknown as Ticket[])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])

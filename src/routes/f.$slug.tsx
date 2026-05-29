@@ -39,6 +39,11 @@ function PublicQuizPage() {
   }, [slug])
 
   async function loadForm() {
+    if (!/^\d{4}$/.test(slug)) {
+      setLoadState('not_found')
+      return
+    }
+
     const { data, error } = await supabase
       .from('form_templates')
       .select('id, title, description, slug, fields, theme_color, is_active')
