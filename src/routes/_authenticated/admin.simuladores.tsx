@@ -6,7 +6,7 @@ import { OPERATIONS } from "@/lib/operations";
 import { SEED_CONFIGS } from "@/lib/simulator-seed-configs";
 import type { SimulatorConfigRow } from "@/lib/simulator-config.types";
 import {
-  Calculator, ChevronRight, CheckCircle2, Code2, Sparkles, RefreshCw,
+  Calculator, ChevronRight, CheckCircle2, Code2, Sparkles, RefreshCw, BookOpen,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/simuladores")({
@@ -93,6 +93,13 @@ function AdminSimuladoresPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Link
+            to="/admin/campos"
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-accent"
+          >
+            <BookOpen className="h-3.5 w-3.5 text-primary" />
+            Campos Canônicos
+          </Link>
           <button
             onClick={loadData}
             disabled={loading}

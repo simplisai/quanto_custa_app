@@ -1,0 +1,226 @@
+
+# 📑 PROMPT DE EXECUÇÃO: CORREÇÃO DOS SIMULADORES PATRIMONIAIS
+
+Você é um engenheiro de software sênior e matemático financeiro especialista em sistemas de consórcio e crédito imobiliário. Sua tarefa é corrigir bugs lógicos, distorções matemáticas de reajustes e travamentos de renderização nos simuladores patrimoniais.
+
+Siga estritamente o **Gabarito de Fórmulas Canônicas**, a **Lógica de Correção por Arquivo** e as regras de tratamento de dados especificadas abaixo.
+
+---
+
+## 🧮 GABARITO DE FÓRMULAS CANÔNICAS (REFERÊNCIA MATEMÁTICA)
+
+Todas as correções de código devem se basear exatamente no seguinte modelo matemático de precificação e amortização:
+
+* **Atualização do Crédito por Aniversário (Degrau Anual):**
+
+$$C_{aniv}(m) = C_0 \times \left(1 + \frac{i_{incc}}{100}\right)^{\lfloor \frac{\max(m, 1) - 1}{12} \rfloor}$$
+
+
+* **Atualização Contínua do Crédito (Pro-rata tempo):**
+
+$$C_{cont}(m) = C_0 \times \left(1 + \frac{i_{incc}}{100}\right)^{\frac{m}{12}}$$
+
+
+* **Saldo Devedor Total do Plano com Taxas:**
+
+$$SD_{plano}(m) = C_{aniv}(m) \times \left(1 + \frac{tx_{adm} + tx_{fr}}{100}\right)$$
+
+
+* **Amortização do Saldo Devedor Pós-Lance (O Bug do Core):**
+Independentemente do tipo de recebimento do crédito, o saldo devedor na contemplação ($mc$) deve deduzir o lance total amortizável ($L_{proprio} + L_{embutido}$):
+
+$$SD_{pos} = \max(SD_{contemplacao} - L_{totalAmortiza}, 0)$$
+
+
+* **Recálculo de Parcela Reduzida (Mantendo o Prazo):**
+
+$$P_{posBase} = \frac{SD_{pos}}{prazo - mc}$$
+
+
+* **Abatimento Fiscal Mensal (Lucro Real PJ):**
+
+$$Eco_{fiscal}(m) = P_{bruta}(m) \times \left(\frac{tx_{adm}}{100 + tx_{adm}}\right) \times \left(\frac{\alpha_{IRPJ} + \alpha_{CSLL}}{100}\right)$$
+
+
+* **Taxa Interna de Retorno Mensal (TIR do Flip):**
+
+$$TIR_{mensal} = \left(\frac{V_{venda}}{Des_{total}}\right)^{\frac{1}{mc}} - 1$$
+
+
+
+---
+
+## 🏗️ PLANO DE CORREÇÃO SPRINT: LÓGICA PASSO A PASSO POR ARQUIVO
+
+### 🌐 Camada Global de Exportação de PDF e Gráficos
+
+#### Problema
+
+O sistema trava, congela a thread principal ou corrompe caracteres ao exportar relatórios.
+
+#### O que fazer
+
+1. **Em `capture-charts.ts`:** Adicione uma trava de segurança (*guard clause*) antes da execução do método `ctx.drawImage`. Se `canvas.width === 0` ou `canvas.height === 0` (gráfico oculto ou não renderizado), retorne `null` imediatamente para evitar loops infinitos no Web Worker.
+2. **Nos componentes de PDF (`.tsx`):** Remova toda e qualquer acentuação direta em formato de prosa (ex: `patrimônio`, `evolução`) dentro de strings estáticas das tags `<RpInsight>`, `<RpText>` ou `<RpHeader>`, substituindo-as por caracteres limpos ou configurando explicitamente a injeção do subset de fontes UTF-8 no topo do renderizador `@react-pdf/renderer`.
+
+---
+
+### 🛡️ Motor Central: `consorcio-core.ts`
+
+#### Problema
+
+O lance embutido é ignorado na amortização da dívida quando a modalidade `"credito"` é ativada, gerando parcelas pós-contemplação artificialmente altas.
+
+#### O que fazer
+
+* **Refatore a linha 147:** Altere a atribuição da variável `lanceTotalAmortiza` para consolidar a soma dos dois aportes obrigatoriamente:
+```typescript
+// Alterar de:
+const lanceTotalAmortiza = lanceProprioR + (abatimentoEmbutido === "saldoDevedor" ? lanceEmbutidoR : 0);
+// Para:
+const lanceTotalAmortiza = lanceProprioR + lanceEmbutidoR;
+
+```
+
+
+Isso garante que o saldo devedor pós-lance reflita a redução real da dívida amortizada no grupo.
+
+---
+
+### 1. Calculadora Patrimonial: `calculator.ts`
+
+#### Problemas
+
+O Poder de Compra Líquido congela no primeiro ano por erro de índice, o custo do lance embutido não abate o Custo Total do quadro principal e os cards exibem nomenclaturas comerciais redundantes.
+
+#### O que fazer
+
+1. **Corrija a linha 116:** Ajuste o cálculo do reajuste anual para evitar arredondamento zerado no mês de aniversário da cota:
+```typescript
+// Mudar para rastreamento exato do mês corrente do loop:
+const anosPassados = Math.floor((m - 1) / 12);
+
+```
+
+
+2. **Corrija o acumulador `tCons`:** Deduza explicitamente o valor do lance embutido (`valorEmbReajustado`) do somatório do custo final do consórcio, garantindo que o quadro exiba o Custo Líquido Real.
+3. **Ajuste de Visualização (UI):** Remova os blocos intermediários de parcelas brutas e exiba **apenas o Custo Real Líquido final (Z)**.
+
+---
+
+### 2. Alavancagem / Flip de Cota: `calc-flip-cota.ts` e `flip-cota.tsx`
+
+#### Problema
+
+O crédito é atualizado mês a mês nas projeções, mas o resumo exibe as parcelas iniciais congeladas, apresentando um desembolso total subestimado e distorcendo o lucro real e a TIR.
+
+#### O que fazer
+
+1. **Em `calc-flip-cota.ts`:** Pare de retornar propriedades estáticas como `sim.parcelaInicial`. Refatore as variáveis `parcelaCheia` e `parcelaEfetiva` para lerem de forma dinâmica o valor correspondente ao mês exato da contemplação contido no vetor `sim.timeline[mesContemp - 1].parcela`.
+2. **No Layout do PDF:** Insira o gráfico demonstrativo de rentabilidade capturado via `captureChart("flip-rentab")` no template do documento e utilize espaçamentos compactos (`padding` de no máximo 4px) para condensar o relatório inteiro em exatamente **uma única folha**.
+
+---
+
+### 3. Simulador de Lance: `calc-lance.ts` e `lance.tsx`
+
+#### Problemas
+
+A taxa de administração e o reajuste anual não são refletidos na evolução de parcelas e o tipo de gráfico está defasado.
+
+#### O que fazer
+
+1. **Em `calc-lance.ts`:** Force o cenário comparativo a mapear mensalmente os reajustes compostos do INCC tanto para a timeline `comLance` quanto para a timeline `semLance`. O cálculo da parcela deve passar obrigatoriamente pela multiplicação da taxa de administração diluída pelo crédito corrigido.
+2. **Em `lance.tsx`:** Substitua o componente de visualização `<Bar />` por um componente de linhas contínuas `<Line data={chartData} options={chartOptions} />` para desenhar o cruzamento exato do break-even de desembolso acumulado.
+
+---
+
+### 4. Aluguel vs. Consórcio: `calc-aluguel-vs-consorcio.ts`
+
+#### Problema
+
+A parcela pós-contemplação e a valorização imobiliária ficam travadas com base no saldo devedor inicial, gerando subestimação patrimonial.
+
+#### O que fazer
+
+* **Refatore a linha 105:** Altere a base de cálculo da projeção imobiliária. O crescimento patrimonial composto do ativo deve incidir sobre o valor real de compra corrigido na contemplação (`sim.creditoAtualizadoContemplacao`), e não sobre a `cartaCredito` nominal estática de início de contrato:
+```typescript
+// Alterar para:
+patrimonioConsMes = sim.creditoAtualizadoContemplacao * Math.pow(1 + valorizMensal, m - mesContemp);
+
+```
+
+
+
+---
+
+### 5. Renda Passiva com Consórcio: `calc-renda-passiva.ts` e `renda-passiva.tsx`
+
+#### Problemas
+
+Gráfico exibe parcelas lineares (sem reajuste), distorção visual severa na linha do CDI e presença de comparativo concorrente indesejado.
+
+#### O que fazer
+
+1. **Altere a chamada do Motor:** Passe o parâmetro explícito `horizonteMeses: prazo` para a função `simularConsorcio`, forçando o preenchimento dos reajustes de aniversário anuais até o encerramento do plano.
+2. **Corrija a distorção do CDI em `renda-passiva.tsx` (Linha 280):** Remova o fator de divisão indevido que achata o gráfico. A linha de patrimônio acumulado em renda fixa deve exibir o valor de liquidez real bruto:
+```typescript
+// Alterar de:
+data: sampled.map((d) => d.creditoCDI / Math.max(r.prazoMeses, 1))
+// Para:
+data: sampled.map((d) => d.creditoCDI)
+
+```
+
+
+3. **Remova o Comparativo do CDB:** Delete os campos `cdbFuturo` e `vantagemVsCDB` do arquivo de cálculo e da interface, focando o resultado estritamente no rendimento imobiliário e no spread.
+4. **Gráfico Dinâmico Condicional:** Utilize uma instrução lógica estrutural para renderizar apenas o gráfico correspondente à estratégia pós-contemplação selecionada pelo usuário (`compra_imovel` ou `credito_rende_cdi`), ocultando o bloco inativo para otimizar o visual do PDF.
+
+---
+
+### 6. Saída do Financiamento: `calc-saida-financiamento.ts` e `saida-financiamento.tsx`
+
+#### Problemas
+
+O saldo devedor exibido omite taxas administrativas, impossibilita estratégias combinadas por travas estáticas (*hardcoded*) e omite os quadros de custos consolidados no relatório.
+
+#### O que fazer
+
+1. **Substitua o cálculo de interface em `saida-financiamento.tsx`:** Altere o valor do card de saldo residual pós-contemplação para ler diretamente a propriedade matemática estruturada vinda do motor:
+```typescript
+// Alterar para ler a variável real que contempla as taxas administrativas:
+value={fmtBRL(results.saldoDevedorPosLance)}
+
+```
+
+
+2. **Desbloqueie a Estratégia Combinada:** Em `calc-saida-financiamento.ts`, mude o parâmetro fixo `abatimentoEmbutido: "credito"` para responder dinamicamente à variável de escolha do usuário `tipoAbatimento`, permitindo a fusão de lance próprio com lance embutido.
+3. **Inclusão de Quadros no PDF:** Injete os blocos estruturais de "Resumo Pós-Contemplação", "Custo Total" e "Patrimônio Final" dentro da seção de resultados da migração no arquivo do relatório.
+
+---
+
+### 7. Meta Patrimonial: `calc-meta-patrimonial.ts` e `meta-patrimonial.tsx`
+
+#### Problemas
+
+Cálculos isolados sem INCC, estouro visual de números grandes nos quadros da interface e erro ortográfico crítico recorrente nos relatórios.
+
+#### O que fazer
+
+1. **Refatore a Arquitetura de Cálculo:** Elimine a rotina customizada isolada de frações de parcelas do arquivo `calc-meta-patrimonial.ts`. Reescreva o loop estrutural para importar e utilizar a função padrão `simularConsorcio`, garantindo a aplicação nativa das correções de INCC e reajustes por aniversário ao longo do plano.
+2. **Remova o comparativo de aplicação mensal no CDB** para focar o interesse do cliente unicamente no acúmulo de patrimônio real.
+3. **Injete o Benefício Fiscal no PDF:** Mapeie o bloco estratégico detalhando o funcionamento tributário do Lucro Real e do Lucro Presumido, evidenciando a métrica de "Quanto o Estado patrocina da sua cota".
+4. **Ajuste o Design Visual (CSS):** No componente de cartão `<KPI>`, adicione as classes de estilo `break-words`, `overflow-hidden` e reduza o tamanho fixo da fonte dos números para `text-sm sm:text-base` para comportar valores na casa dos milhões sem quebrar o layout.
+5. **Correção Ortográfica Urgente:** Corrija o caractere corrompido de codificação em todas as ocorrências de strings de relatórios:
+```text
+// Alterar de:
+"<ÆPor que consórcio para construir patrimônio? "
+// Para:
+"Por que consórcio para construir patrimônio?"
+
+```
+
+
+
+---
+
+Execute as refatorações mantendo a compatibilidade com a biblioteca de componentes visuais do sistema e respeitando estritamente a tipagem TypeScript definida em cada interface de entrada e saída.

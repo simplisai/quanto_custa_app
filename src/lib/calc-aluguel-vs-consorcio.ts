@@ -1,21 +1,27 @@
 // ─── Simulador Aluguel vs Consórcio ──────────────────────────────────────────
 // Responde: "Você está jogando dinheiro fora pagando aluguel?"
 // Mostra o custo total do aluguel vs. o patrimônio gerado pelo consórcio.
+//
+// Fonte única de verdade: simularConsorcio() gera a timeline completa mensal.
+// Os KPI cards e o gráfico leem exatamente os mesmos dados.
 
-import { simularConsorcio } from "./consorcio-core";
+import {
+  simularConsorcio,
+  valorFuturo,
+} from "./consorcio-core";
 
 export interface AluguelInputs {
-  aluguelAtual: number;          // Aluguel atual (R$/mês)
-  reajusteAluguelAnual: number;  // Reajuste anual do aluguel (% — ex: 5)
-  horizonte: number;             // Horizonte de análise (anos — ex: 20)
-  cartaCredito: number;          // Valor da carta de crédito / imóvel desejado (R$)
-  taxaAdmTotal: number;          // Taxa de administração total (%)
-  prazoMeses: number;            // Prazo do grupo (meses)
-  percLance: number;             // Lance ofertado (% da carta)
-  lanceProprioR: number;         // Lance em recursos próprios (R$)
-  mesContemplacao: number;       // Mês de contemplação estimado
-  valorizacaoAnual: number;      // Valorização anual esperada do imóvel (% — ex: 6)
-  taxaAtualizacaoAnual: number;  // Atualização anual da carta pelo INCC (% a.a. — ex: 4)
+  aluguelAtual: number;
+  reajusteAluguelAnual: number;
+  horizonte: number;
+  cartaCredito: number;
+  taxaAdmTotal: number;
+  prazoMeses: number;
+  percLance: number;
+  lanceProprioR: number;
+  mesContemplacao: number;
+  valorizacaoAnual: number;
+  taxaAtualizacaoAnual: number;
 }
 
 export interface MesAluguel {
@@ -23,41 +29,30 @@ export interface MesAluguel {
   aluguelMes: number;
   aluguelAcum: number;
   parcelaCons: number;
-  patrimonioConsorcio: number;  // 0 antes da contemplação; cresce após
+  patrimonioConsorcio: number;
   saldoDevedorCons: number;
 }
 
 export interface AluguelResults {
-  // ── Aluguel ─────────────────────────────────────────────────────────────
   totalAluguel: number;
-  patrimônioAluguel: number;  // Sempre 0
-
-  // ── Consórcio ────────────────────────────────────────────────────────────
+  patrimônioAluguel: number;
   parcelaPadrao: number;
   parcelaPosLance: number;
-  totalConsorcio: number;        // Parcelas + lance próprio
+  totalConsorcio: number;
   lanceEmbR: number;
   lanceProprio: number;
   saldoDevedorPosLance: number;
-
-  // ── Imóvel ──────────────────────────────────────────────────────────────
-  valorImovelFinal: number;      // Carta corrigida pela valorização
-  patrimonioConsorcio: number;   // = valorImovelFinal
-
-  // ── Comparativo ─────────────────────────────────────────────────────────
-  vantagemPatrimonial: number;   // patrimonioConsorcio - 0
-  custoCons: number;             // totalConsorcio (custo líquido do consórcio)
-  diferencaCusto: number;        // totalAluguel - totalConsorcio
-  cartaAtualizada: number;       // Carta corrigida pelo INCC na contemplação
-
-  // ── Break-even ──────────────────────────────────────────────────────────
-  breakEvenMes: number | null;   // Mês em que patrimônio consórcio > acumulado aluguel
-
-  // ── Timeline ────────────────────────────────────────────────────────────
+  valorImovelFinal: number;
+  patrimonioConsorcio: number;
+  vantagemPatrimonial: number;
+  custoCons: number;
+  diferencaCusto: number;
+  cartaAtualizada: number;
+  breakEvenMes: number | null;
   timeline: MesAluguel[];
-
-  // Configurações usadas
   horizonteMeses: number;
+  /** Diretriz D: P_liq − C_atualizado (sobra/déficit de crédito na contemplação) */
+  saldoCaixa: number;
 }
 
 export const defaultAluguelInputs: AluguelInputs = {
@@ -75,80 +70,66 @@ export const defaultAluguelInputs: AluguelInputs = {
 };
 
 export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
-  const {
-    aluguelAtual,
-    reajusteAluguelAnual,
-    horizonte,
-    cartaCredito,
-    taxaAdmTotal,
-    prazoMeses,
-    percLance,
-    lanceProprioR,
-    mesContemplacao,
-    valorizacaoAnual,
-    taxaAtualizacaoAnual,
-  } = i;
+  const T = Math.max(i.horizonte, 1);
+  const horizonteMeses = T * 12;
+  const prazo = Math.max(i.prazoMeses, 1);
+  const mc = Math.min(Math.max(i.mesContemplacao, 1), prazo);
+  const iAlug = i.reajusteAluguelAnual / 100;
+  const vAnual = i.valorizacaoAnual / 100;
+  const vMensal = Math.pow(1 + vAnual, 1 / 12) - 1;
 
-  const horizonteMeses = Math.max(horizonte, 1) * 12;
-  const prazo = Math.max(prazoMeses, 1);
-  const mesContemp = Math.min(Math.max(mesContemplacao, 1), prazo);
-
-  // ── Núcleo: consórcio com parcela e saldo derivados do crédito atualizado ──
-  // O lance (percLance) abate o saldo devedor; lance próprio é desembolso real.
+  // ── Simulação mensal do consórcio (fonte única) ───────────────────────────
   const sim = simularConsorcio({
-    credito: cartaCredito,
-    taxaAdm: taxaAdmTotal,
+    credito: i.cartaCredito,
+    taxaAdm: i.taxaAdmTotal,
     prazo,
-    inccAnual: taxaAtualizacaoAnual,
-    mesContemplacao: mesContemp,
-    lanceEmbutidoPerc: percLance,
-    lanceProprioR,
-    abatimentoEmbutido: "saldoDevedor",
+    inccAnual: i.taxaAtualizacaoAnual,
+    mesContemplacao: mc,
+    lanceEmbutidoPerc: i.percLance,
+    lanceProprioR: i.lanceProprioR,
     amortizacao: "parcela",
     horizonteMeses,
   });
 
-  const cartaAtualizada = sim.creditoAtualizadoContemplacao;
+  // KPIs derivados da timeline (cards == gráfico garantido)
+  const parcelaPadrao = sim.parcelaNominal;
+  const parcelaPosLance = sim.parcelaReduzida;
   const lanceEmbR = sim.lanceEmbutidoR;
   const lanceProprio = sim.lanceProprioR;
-  const parcelaPadrao = sim.parcelaInicial;
-  const parcelaPosLance = sim.parcelaPosLance;
-  const saldoDevedorPosLance = sim.saldoDevedorPosLance;
-  const totalConsorcio = sim.desembolsoTotal;
+  const saldoDevedorPosLance = sim.saldoDevedor;
+  // Total_Cons (Diretriz 4) = soma de TODOS os custos do consórcio ao longo do
+  // plano (parcelas indexadas ao INCC + lances) → totalPagamentos.
+  const totalConsorcio = sim.totalPagamentos;
+  const cartaAtualizada = sim.cartaCorrigida;
 
-  // ── Totais ───────────────────────────────────────────────────────────────
-  let totalAluguel = 0;
-  let aluguelMesAtual = aluguelAtual;
-
+  // ── Timeline mensal: aluguel + patrimônio consórcio ───────────────────────
   const timeline: MesAluguel[] = [];
+  let aluguelMesAtual = i.aluguelAtual;
   let aluguelAcum = 0;
+  let totalAluguel = 0;
   let breakEvenMes: number | null = null;
 
-  // Valorização mensal do imóvel
-  const valorizMensal = Math.pow(1 + valorizacaoAnual / 100, 1 / 12) - 1;
-
   for (let m = 1; m <= horizonteMeses; m++) {
-    // Reajuste anual do aluguel pelo INCC/índice de reajuste
+    // Reajuste anual do aluguel
     if (m > 1 && (m - 1) % 12 === 0) {
-      aluguelMesAtual = aluguelMesAtual * (1 + reajusteAluguelAnual / 100);
+      aluguelMesAtual *= (1 + iAlug);
     }
-
-    // Parcela do consórcio neste mês (do núcleo — já reajustada pelo INCC)
-    const parcelaCons = sim.timeline[m - 1]?.parcela ?? 0;
-    const saldoDevedorMes = sim.timeline[m - 1]?.saldoDevedor ?? 0;
 
     aluguelAcum += aluguelMesAtual;
     totalAluguel += aluguelMesAtual;
 
-    // Patrimônio do consórcio: 0 antes da contemplação; imóvel (valorizado) após
-    let patrimonioConsMes = 0;
-    if (m >= mesContemp) {
-      const mesesPosContemp = m - mesContemp;
-      patrimonioConsMes = sim.creditoAtualizadoContemplacao * Math.pow(1 + valorizMensal, mesesPosContemp);
+    // Parcela do consórcio (da timeline do simulador — fonte única)
+    const simMes = sim.timeline[m - 1];
+    const parcelaCons = simMes?.parcela ?? 0;
+    const saldoDevedorMes = simMes?.saldoPlano ?? 0;
+
+    // Patrimônio imobiliário: 0 antes da contemplação; carta valorizada após
+    let patrimonioConsorcioMes = 0;
+    if (m >= mc) {
+      patrimonioConsorcioMes = i.cartaCredito * Math.pow(1 + vMensal, m - mc);
     }
 
-    // Break-even: primeiro mês em que patrimônio consórcio >= custo aluguel acumulado
-    if (breakEvenMes === null && patrimonioConsMes > 0 && patrimonioConsMes >= aluguelAcum) {
+    if (breakEvenMes === null && patrimonioConsorcioMes > 0 && patrimonioConsorcioMes >= aluguelAcum) {
       breakEvenMes = m;
     }
 
@@ -157,14 +138,13 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
       aluguelMes: aluguelMesAtual,
       aluguelAcum,
       parcelaCons,
-      patrimonioConsorcio: patrimonioConsMes,
-      saldoDevedorCons: m < mesContemp ? cartaCredito : saldoDevedorMes,
+      patrimonioConsorcio: patrimonioConsorcioMes,
+      saldoDevedorCons: m < mc ? i.cartaCredito : saldoDevedorMes,
     });
   }
 
-  // Valor do imóvel no futuro (ao final do horizonte)
-  const valorImovelFinal = timeline[timeline.length - 1].patrimonioConsorcio;
-  const patrimonioConsorcio = valorImovelFinal;
+  const valorImovelFinal = valorFuturo(i.cartaCredito, vAnual, T);
+  const vantagemPatrimonial = valorImovelFinal - totalConsorcio + totalAluguel;
 
   return {
     totalAluguel,
@@ -176,13 +156,14 @@ export function calcAluguelVsConsorcio(i: AluguelInputs): AluguelResults {
     lanceProprio,
     saldoDevedorPosLance,
     valorImovelFinal,
-    patrimonioConsorcio,
-    vantagemPatrimonial: patrimonioConsorcio,
+    patrimonioConsorcio: valorImovelFinal,
+    vantagemPatrimonial,
     custoCons: totalConsorcio,
     diferencaCusto: totalAluguel - totalConsorcio,
     cartaAtualizada,
     breakEvenMes,
     timeline,
     horizonteMeses,
+    saldoCaixa: sim.saldoCaixa,
   };
 }

@@ -110,7 +110,12 @@ function MetaPatrimonialPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFMetaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("meta-cotas")} /> : null,
+    () => results ? <PDFMetaDoc
+      r={results} inputs={inputs}
+      clientName={clients.find((c) => c.id === selectedClientId)?.name}
+      chartImg={captureChart("meta-cotas")}
+      chartMeta={captureChart("meta-progresso")}
+    /> : null,
     "meta-patrimonial.pdf",
   );
 
@@ -428,7 +433,7 @@ function MetaPatrimonialPage() {
             </div>
           </Section>
 
-          {/* Gráfico */}
+          {/* Gráfico: cotas */}
           {chartData && (
             <Section title="Carta × Valor Final por Cota">
               <div className="h-52 sm:h-64" data-chart="meta-cotas">
@@ -436,6 +441,9 @@ function MetaPatrimonialPage() {
               </div>
             </Section>
           )}
+
+          {/* Novo: Progresso para a Meta */}
+          <ChartProgressoMeta r={results} inputs={inputs} />
 
           {/* Ações */}
           <div className="flex flex-wrap gap-3">
@@ -466,8 +474,59 @@ function MetaPatrimonialPage() {
   );
 }
 
+// ─── Gráfico: Progresso para a Meta ──────────────────────────────────────────
+// Barra de progresso visual: patrimônio atingido vs meta. Simples e impactante.
+type MetaInputsChartProps = {
+  modo: ModoMeta;
+  patrimonioAlvoR: number;
+  rendaMensalAlvoR: number;
+  yeildAluguelPerc: number;
+  [key: string]: unknown;
+};
+function ChartProgressoMeta({ r, inputs }: { r: MetaPatrimonialResults; inputs: MetaInputsChartProps }) {
+  const meta = inputs.modo === "renda" && inputs.yeildAluguelPerc > 0
+    ? inputs.rendaMensalAlvoR / (inputs.yeildAluguelPerc / 100)
+    : inputs.patrimonioAlvoR;
+  const atingido = Math.min(r.patrimonioTotalFinal, meta * 1.5);
+  const data = {
+    labels: ["Meta de Patrimônio", "Patrimônio Atingido"],
+    datasets: [{
+      label: "Valor (R$)",
+      data: [meta, atingido],
+      backgroundColor: ["rgba(107,114,128,0.5)", r.metaAtingida ? "rgba(34,197,94,0.85)" : "rgba(234,179,8,0.85)"],
+      borderRadius: 8,
+      borderSkipped: false as const,
+    }],
+  };
+  const opts = {
+    indexAxis: "y" as const,
+    responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (c: { raw: unknown }) => fmtBRL(c.raw as number) } },
+    },
+    scales: {
+      x: { ticks: { callback: (v: unknown) => { const n = Number(v); return n >= 1e6 ? `R$${(n/1e6).toFixed(1)}M` : `R$${(n/1e3).toFixed(0)}k`; } } },
+      y: { grid: { display: false } },
+    },
+  };
+  return (
+    <Section title={r.metaAtingida ? "✅ Meta Atingida" : "⚠️ Progresso para a Meta"}>
+      <div className="h-32 sm:h-40 w-full" data-chart="meta-progresso">
+        <Bar data={data} options={opts} />
+      </div>
+      <div className="flex items-center gap-2 rounded-xl p-3 text-sm font-extrabold" style={{ backgroundColor: r.metaAtingida ? "rgba(34,197,94,0.1)" : "rgba(234,179,8,0.1)", color: r.metaAtingida ? "#179a47" : "#b45309" }}>
+        {r.metaAtingida
+          ? `🏆 Com ${r.numCotas} cotas você atinge ${fmtBRL(r.patrimonioTotalFinal)} — meta superada!`
+          : `⚠️ Faltam ${fmtBRL(r.deficitR)} para atingir a meta. Considere mais cotas ou horizonte maior.`
+        }
+      </div>
+    </Section>
+  );
+}
+
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
+function PDFMetaDoc({ r, inputs, clientName, chartImg, chartMeta }: {
   r: MetaPatrimonialResults;
   inputs: {
     modo: ModoMeta;
@@ -485,6 +544,7 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
   };
   clientName?: string;
   chartImg?: string | null;
+  chartMeta?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const metaLabel = inputs.modo === "patrimonio" ? fmtBRL(inputs.patrimonioAlvoR) : `${fmtBRL(inputs.rendaMensalAlvoR)}/mes`;
@@ -550,7 +610,8 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg }: {
         </RpSection>
       ) : null}
 
-      <RpChartImage src={chartImg} title="Carta × Valor Final por Cota" height={140} />
+      <RpChartImage src={chartMeta} title="Progresso para a Meta Patrimonial" height={90} />
+      <RpChartImage src={chartImg} title="Carta × Valor Final por Cota" height={130} />
 
       <RpSection title="Plano de Cotas" description="Cada cota e seu resultado esperado:">
         {r.cotas.map((c) => (

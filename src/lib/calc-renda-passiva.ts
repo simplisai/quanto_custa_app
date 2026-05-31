@@ -1,71 +1,66 @@
 // ─── Simulador de Renda Passiva com Consórcio ────────────────────────────────
-// Responde: "O consórcio pode se pagar sozinho com a renda do aluguel?"
-// Foco: rendimento do aluguel + valor patrimonial; e crédito rendendo CDI vs
-// parcela rendendo INCC. (Não comparar as parcelas aplicadas em CDB.)
+// Foco: rendimento com aluguel + valor patrimonial do imóvel;
+//       e crédito rendendo CDI vs parcela corrigida pelo INCC.
+//
+// CORREÇÃO CDI: a capitalização do crédito no CDI inicia a partir do valor da
+// carta JÁ CORRIGIDO PELO INCC na data da contemplação (cartaAtualizada),
+// nunca pelo valor nominal retroativo de início do contrato.
+//
+// Fonte única de verdade: simularConsorcio() mensal → KPI cards == gráficos.
 
-import { simularConsorcio } from "./consorcio-core";
+import {
+  simularConsorcio,
+  valorFuturo,
+} from "./consorcio-core";
 
 export type UsoCreditoContemplado = "compra_imovel" | "credito_rende_cdi";
 
 export interface RendaPassivaInputs {
-  cartaCredito: number;          // Valor da carta de crédito (R$)
-  taxaAdmTotal: number;          // Taxa de administração total (%)
-  prazoMeses: number;            // Prazo do grupo (meses)
-  percLance: number;             // Lance ofertado (% da carta)
-  lanceProprioR: number;         // Lance em recursos próprios (R$)
-  mesContemplacao: number;       // Mês estimado de contemplação
-  rendaAluguelMensal: number;    // Renda de aluguel mensal esperada (R$)
-  reajusteAluguelAnual: number;  // Reajuste anual do aluguel (% — ex: 5)
-  valorizacaoAnual: number;      // Valorização anual do imóvel (% — ex: 6)
-  taxaCDIAnual: number;          // Taxa CDI anual comparativa (% — ex: 13)
-  taxaAtualizacaoAnual: number;  // Taxa de atualização anual da carta (INCC, % a.a.)
-  usoCreditoContemplado: UsoCreditoContemplado; // "compra_imovel" | "credito_rende_cdi"
+  cartaCredito: number;
+  taxaAdmTotal: number;
+  prazoMeses: number;
+  percLance: number;
+  lanceProprioR: number;
+  mesContemplacao: number;
+  rendaAluguelMensal: number;
+  reajusteAluguelAnual: number;
+  valorizacaoAnual: number;
+  taxaCDIAnual: number;
+  taxaAtualizacaoAnual: number;
+  usoCreditoContemplado: UsoCreditoContemplado;
 }
 
 export interface MesRenda {
   mes: number;
-  parcelaCons: number;           // Saída: parcela do consórcio (corrigida pelo INCC anualmente)
-  rendaAluguel: number;          // Entrada: aluguel recebido (0 antes da contemplação)
-  fluxoLiquido: number;          // rendaAluguel - parcelaCons
-  fluxoAcum: number;             // Fluxo líquido acumulado
-  totalInvestido: number;        // Desembolso acumulado (parcelas + lance)
-  patrimonioImóvel: number;      // Valor do imóvel valorizado (0 antes da contemplação)
-  patrimonioTotal: number;       // imóvel + fluxo positivo acumulado
-  creditoCDI: number;            // Crédito rendendo CDI (cenário credito_rende_cdi, 0 caso contrário)
+  parcelaCons: number;
+  rendaAluguel: number;
+  fluxoLiquido: number;
+  fluxoAcum: number;
+  totalInvestido: number;
+  patrimonioImóvel: number;
+  patrimonioTotal: number;
+  creditoCDI: number;
 }
 
 export interface RendaPassivaResults {
-  // ── Inputs calculados ────────────────────────────────────────────────────
   parcelaPadrao: number;
   parcelaPosLance: number;
   lanceEmbR: number;
   lanceProprio: number;
   saldoDevedorPosLance: number;
-
-  // ── Totais ───────────────────────────────────────────────────────────────
-  totalInvestido: number;        // Parcelas + lance próprio
-  totalRendaGerada: number;      // Soma de todos os aluguéis recebidos
-  valorImovelFinal: number;      // Imóvel corrigido pela valorização
-  patrimonioFinal: number;       // Imóvel + saldo positivo do fluxo
-
-  // ── ROI ──────────────────────────────────────────────────────────────────
-  retornoTotalR: number;         // patrimonioFinal - totalInvestido
-  roiPercentual: number;         // (retornoTotalR / totalInvestido) × 100
-  roiAnual: number;              // Taxa equivalente anual
-
-  // ── Taxa de atualização ──────────────────────────────────────────────────
-  cartaAtualizada: number;       // Carta corrigida pelo INCC na contemplação
-
-  // ── Ponto de equilíbrio de fluxo ─────────────────────────────────────────
-  mesFluxoNeutro: number | null; // Primeiro mês em que aluguel ≥ parcela
-
-  // ── Cenário CDI (crédito rende CDI, parcela sobe com INCC) ───────────────
-  creditoFinalComCDI: number;    // Crédito acumulado com CDI ao final
-  totalParcelasComINCC: number;  // Total de parcelas pagas corrigidas pelo INCC
-  spreadCDIvsINCC: number;       // creditoFinalComCDI - totalParcelasComINCC - lanceProprio
-  lucroEstrategiaCDI: number;    // Lucro líquido do esquema CDI vs INCC
-
-  // ── Timeline ────────────────────────────────────────────────────────────
+  totalInvestido: number;
+  totalRendaGerada: number;
+  valorImovelFinal: number;
+  patrimonioFinal: number;
+  retornoTotalR: number;
+  roiPercentual: number;
+  roiAnual: number;
+  cartaAtualizada: number;
+  mesFluxoNeutro: number | null;
+  creditoFinalComCDI: number;
+  totalParcelasComINCC: number;
+  spreadCDIvsINCC: number;
+  lucroEstrategiaCDI: number;
   timeline: MesRenda[];
   prazoMeses: number;
 }
@@ -86,102 +81,88 @@ export const defaultRendaPassivaInputs: RendaPassivaInputs = {
 };
 
 export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
-  const {
-    cartaCredito,
-    taxaAdmTotal,
-    prazoMeses,
-    percLance,
-    lanceProprioR,
-    mesContemplacao,
-    rendaAluguelMensal,
-    reajusteAluguelAnual,
-    valorizacaoAnual,
-    taxaCDIAnual,
-    taxaAtualizacaoAnual,
-    usoCreditoContemplado,
-  } = i;
+  const N = Math.max(i.prazoMeses, 1);
+  const mc = Math.min(Math.max(i.mesContemplacao, 1), N);
+  const vMensal  = Math.pow(1 + i.valorizacaoAnual / 100, 1 / 12) - 1;
+  const cdiMensal = Math.pow(1 + i.taxaCDIAnual / 100, 1 / 12) - 1;
+  const iAlug    = i.reajusteAluguelAnual / 100;
+  const isCDI    = i.usoCreditoContemplado === "credito_rende_cdi";
 
-  const prazo = Math.max(prazoMeses, 1);
-  const mesContemp = Math.min(Math.max(mesContemplacao, 1), prazo);
-
-  // ── Núcleo: consórcio com parcela e saldo derivados do crédito atualizado ──
+  // ── Simulação mensal do consórcio ────────────────────────────────────────
   const sim = simularConsorcio({
-    credito: cartaCredito,
-    taxaAdm: taxaAdmTotal,
-    prazo,
-    inccAnual: taxaAtualizacaoAnual,
-    mesContemplacao: mesContemp,
-    lanceEmbutidoPerc: percLance,
-    lanceProprioR,
-    abatimentoEmbutido: "saldoDevedor",
-    amortizacao: "parcela",
-    horizonteMeses: prazo,
+    credito:           i.cartaCredito,
+    taxaAdm:           i.taxaAdmTotal,
+    prazo:             N,
+    inccAnual:         i.taxaAtualizacaoAnual,
+    mesContemplacao:   mc,
+    lanceEmbutidoPerc: i.percLance,
+    lanceProprioR:     i.lanceProprioR,
+    amortizacao:       "parcela",
   });
 
-  const cartaAtualizada = sim.creditoAtualizadoContemplacao;
-  const lanceEmbR = sim.lanceEmbutidoR;
-  const lanceProprio = sim.lanceProprioR;
-  const parcelaPadrao = sim.parcelaInicial;
-  const parcelaPosLance = sim.parcelaPosLance;
-  const saldoDevedorPosLance = sim.saldoDevedorPosLance;
+  // KPIs derivados da timeline
+  const parcelaPadrao       = sim.parcelaNominal;
+  const parcelaPosLance     = sim.parcelaReduzida;
+  const lanceEmbR           = sim.lanceEmbutidoR;
+  const lanceProprio        = sim.lanceProprioR;
+  const saldoDevedorPosLance = sim.saldoDevedor;
 
-  // ── Taxas mensais ────────────────────────────────────────────────────────
-  const valorizMensal = Math.pow(1 + valorizacaoAnual / 100, 1 / 12) - 1;
-  const cdiMensal = Math.pow(1 + taxaCDIAnual / 100, 1 / 12) - 1;
+  // Crédito corrigido pelo INCC na data da contemplação (base do CDI)
+  // CORREÇÃO: usa o valor da carta atualizada pelos reajustes anuais até mc,
+  // não o valor nominal de início do contrato.
+  const cartaAtualizada = sim.cartaCorrigida;
 
-  // ── Simulação mês a mês ──────────────────────────────────────────────────
+  // ── Simulação mês a mês ─────────────────────────────────────────────────
   const timeline: MesRenda[] = [];
-  let totalInvestido = 0;
+  let totalInvestido   = 0;
   let totalRendaGerada = 0;
-  let fluxoAcum = 0;
+  let fluxoAcum        = 0;
+  let rendaAcum        = 0; // aluguel BRUTO acumulado (Diretriz 5: Caixa_Aluguel)
   let mesFluxoNeutro: number | null = null;
+  // CDI: inicia com o crédito JÁ corrigido pelo INCC na contemplação
+  let creditoCDIAcum   = 0;
 
-  // Crédito aplicado no CDI (só para cenário credito_rende_cdi, após contemplação)
-  let creditoCDIAcum = 0;
-  const isCDI = usoCreditoContemplado === "credito_rende_cdi";
-
-  for (let m = 1; m <= prazo; m++) {
-    // Parcela do consórcio do núcleo (já reajustada pelo INCC)
-    const parcelaCons = sim.timeline[m - 1]?.parcela ?? 0;
+  for (let m = 1; m <= N; m++) {
+    const simMes = sim.timeline[m - 1];
+    const parcelaCons = simMes?.parcela ?? 0;
 
     // Lance próprio no mês da contemplação; crédito começa a render CDI
-    if (m === mesContemp) {
+    if (m === mc) {
       totalInvestido += lanceProprio;
-      // Correção: Inicializar o CDI com o crédito já atualizado pelo INCC na data de contemplação
-      if (isCDI) creditoCDIAcum = cartaAtualizada;
+      if (isCDI) {
+        // Base do CDI = carta corrigida pelo INCC acumulado até a contemplação
+        creditoCDIAcum = cartaAtualizada;
+      }
     }
 
-    // CDI: crédito cresce mensalmente (só após contemplação, cenário CDI)
-    if (isCDI && m > mesContemp) {
+    // CDI: cresce mensalmente após contemplação
+    if (isCDI && m > mc) {
       creditoCDIAcum *= (1 + cdiMensal);
     }
 
-    // Renda de aluguel (só após contemplação, apenas no cenário compra_imovel)
+    // Renda de aluguel (só no cenário compra_imovel, após contemplação)
     let renda = 0;
-    if (!isCDI && m > mesContemp) {
-      const anosPosCont = Math.floor((m - mesContemp - 1) / 12);
-      renda = rendaAluguelMensal * Math.pow(1 + reajusteAluguelAnual / 100, anosPosCont);
+    if (!isCDI && m > mc) {
+      const anosPosCont = Math.floor((m - mc - 1) / 12);
+      renda = i.rendaAluguelMensal * Math.pow(1 + iAlug, anosPosCont);
       totalRendaGerada += renda;
+      rendaAcum += renda;
     }
 
-    // Fluxo líquido (entrada - saída)
     const fluxoLiquido = renda - parcelaCons;
     fluxoAcum += fluxoLiquido;
     totalInvestido += parcelaCons;
 
-    // Patrimônio do imóvel (após contemplação, valorização mensal)
+    // Patrimônio do imóvel após contemplação
     let patrimonioImovel = 0;
-    if (!isCDI && m >= mesContemp) {
-      const mesesPosContemp = m - mesContemp;
-      patrimonioImovel = cartaCredito * Math.pow(1 + valorizMensal, mesesPosContemp);
+    if (!isCDI && m >= mc) {
+      patrimonioImovel = i.cartaCredito * Math.pow(1 + vMensal, m - mc);
     }
 
-    // Patrimônio total
-    const caixaExtra = Math.max(fluxoAcum, 0);
-    const patrimonioTotal = isCDI ? creditoCDIAcum : patrimonioImovel + caixaExtra;
+    // Diretriz 5: Pat = V_futuro(imóvel) + Caixa_Aluguel (aluguel BRUTO acumulado)
+    const patrimonioTotal = isCDI ? creditoCDIAcum : patrimonioImovel + rendaAcum;
 
-    // Ponto de equilíbrio de fluxo (compra_imovel)
-    if (!isCDI && mesFluxoNeutro === null && m > mesContemp && renda >= parcelaCons) {
+    if (!isCDI && mesFluxoNeutro === null && m > mc && renda >= parcelaCons) {
       mesFluxoNeutro = m;
     }
 
@@ -198,27 +179,27 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
     });
   }
 
-  // ── Resultados finais ────────────────────────────────────────────────────
-  const valorImovelFinal = cartaCredito * Math.pow(1 + valorizacaoAnual / 100, prazo / 12);
-  const caixaFinal = Math.max(fluxoAcum, 0);
-  const patrimonioFinal = valorImovelFinal + caixaFinal;
+  // ── Resultados finais derivados da timeline ───────────────────────────────
+  const ultimoMes = timeline[timeline.length - 1];
+  // Diretriz 5: valorização incide só sobre os meses pós-contemplação (T_pos = N − mc),
+  // eliminando a "rentabilidade fantasma" dos meses de espera.
+  const valorImovelFinal = valorFuturo(i.cartaCredito, i.valorizacaoAnual / 100, (N - mc) / 12);
+  const creditoFinalComCDI = isCDI ? (ultimoMes?.creditoCDI ?? 0) : 0;
+  // Diretriz 5: Pat_final = V_futuro + Caixa_Aluguel (aluguel bruto acumulado)
+  const patrimonioFinal = isCDI ? creditoFinalComCDI : valorImovelFinal + totalRendaGerada;
 
   const retornoTotalR = patrimonioFinal - totalInvestido;
   const roiPercentual = totalInvestido > 0 ? (retornoTotalR / totalInvestido) * 100 : 0;
-  const anos = prazo / 12;
+  const anos = N / 12;
   const roiAnual =
     totalInvestido > 0 && patrimonioFinal > 0
-      ? (Math.pow(patrimonioFinal / totalInvestido, 1 / anos) - 1) * 100
-      : 0;
+      ? (Math.pow(patrimonioFinal / totalInvestido, 1 / anos) - 1) * 100 : 0;
 
-  // ── Cenário CDI: resultado final a partir da timeline já calculada ──────────
-  const creditoFinalComCDI = isCDI
-    ? (timeline[timeline.length - 1]?.creditoCDI ?? 0)
-    : 0;
-  const totalParcelasComINCC = isCDI ? totalInvestido : 0;
-
-  const lucroEstrategiaCDI = creditoFinalComCDI - totalParcelasComINCC - lanceProprio;
-  const spreadCDIvsINCC = creditoFinalComCDI - totalParcelasComINCC;
+  // Σ parcelas pagas (sem o lance próprio, que já está em totalInvestido)
+  const totalParcelasComINCC = isCDI ? Math.max(totalInvestido - lanceProprio, 0) : 0;
+  // Lucro real da estratégia CDI = patrimônio final − tudo que foi investido (parcelas + lance)
+  const lucroEstrategiaCDI   = creditoFinalComCDI - totalInvestido;
+  const spreadCDIvsINCC      = creditoFinalComCDI - totalParcelasComINCC;
 
   return {
     parcelaPadrao,
@@ -240,6 +221,6 @@ export function calcRendaPassiva(i: RendaPassivaInputs): RendaPassivaResults {
     spreadCDIvsINCC,
     lucroEstrategiaCDI,
     timeline,
-    prazoMeses: prazo,
+    prazoMeses: N,
   };
 }

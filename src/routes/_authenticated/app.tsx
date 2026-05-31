@@ -11,12 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement,
-  Title, Tooltip, Legend, Filler,
+  BarElement, Title, Tooltip, Legend, Filler,
 } from "chart.js";
-import { Line } from "react-chartjs-2";
-import { RpDoc, RpHeader, RpSection, RpMetric, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
+import { Line, Bar } from "react-chartjs-2";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpPremises, RpKVList, RpFooter, RpMetricRow, RpChartImage, C } from "@/components/RpShell";
+import { captureChart } from "@/lib/capture-charts";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
 export const Route = createFileRoute("/_authenticated/app")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -112,7 +113,13 @@ function CalculatorPage() {
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const { exportPDF, isExporting } = usePdfExport(
-    () => results ? <PDFReportDoc r={results} usoCredito={usoCredito} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    () => results ? <PDFReportDoc
+      r={results} usoCredito={usoCredito} inputs={inputs}
+      clientName={clients.find((c) => c.id === selectedClientId)?.name}
+      chartTermometro={captureChart("app-termometro")}
+      chartParcelas={captureChart("app-parcelas")}
+      chartPatrimonio={captureChart("app-patrimonio")}
+    /> : null,
     "Relatorio_Inteligencia_Imobiliaria.pdf",
   );
 
@@ -406,7 +413,7 @@ function CalculatorPage() {
 
       {results && (
         <ResultsView r={results} usoCredito={usoCredito} valorImovel={inputs.valorImovel}
-          entrada={inputs.entrada} credito={inputs.creditoCons} />
+          entrada={inputs.entrada} credito={inputs.creditoCons} inputs={inputs} />
       )}
 
     </div>
@@ -438,11 +445,14 @@ function Toggle<T extends string>({ value, onChange, opts }: { value: T; onChang
   );
 }
 
-function ResultsView({ r, usoCredito, valorImovel, entrada, credito }: {
+function ResultsView({ r, usoCredito, valorImovel, entrada, credito, inputs }: {
   r: CalcResults; usoCredito: "comprar" | "patrimonio"; valorImovel: number; entrada: number; credito: number;
+  inputs: CalcInputs;
 }) {
   return (
     <div className="space-y-6">
+      {/* ── Termômetro de Custo Total ──────────────────────────────── */}
+      <ChartTermometro r={r} />
       <div className="grid gap-3 sm:grid-cols-3">
         <Card title="Financiamento SAC" value={fmtBRL(r.tSAC)} className="from-danger to-destructive" />
         <Card title="Financiamento PRICE" value={fmtBRL(r.tPrice)} className="from-warning to-[oklch(0.55_0.18_45)]" />
@@ -519,6 +529,55 @@ function Analytic({ title, rows }: { title: string; rows: [string, string, strin
   );
 }
 
+// ─── Termômetro de Custo Total ────────────────────────────────────────────────
+// Mostra lado a lado SAC, PRICE e Consórcio — o cliente vê de uma vez qual é menor.
+function ChartTermometro({ r }: { r: CalcResults }) {
+  const dados = [
+    { label: "Financiamento SAC", valor: r.tSAC, cor: "rgba(220,38,38,0.85)" },
+    { label: "Financiamento PRICE", valor: r.tPrice, cor: "rgba(234,179,8,0.85)" },
+    { label: "Consórcio", valor: r.tCons, cor: "rgba(26,42,108,0.85)" },
+  ].sort((a, b) => b.valor - a.valor); // mais caro no topo
+
+  const data = {
+    labels: dados.map((d) => d.label),
+    datasets: [{
+      label: "Custo Total",
+      data: dados.map((d) => d.valor),
+      backgroundColor: dados.map((d) => d.cor),
+      borderRadius: 8,
+      borderSkipped: false as const,
+    }],
+  };
+  const opts = {
+    indexAxis: "y" as const,
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 600 },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (c: { raw: unknown }) => `Total: ${fmtBRL(c.raw as number)}` } },
+    },
+    scales: {
+      x: { ticks: { callback: (v: unknown) => { const n = Number(v); return n >= 1e6 ? `R$${(n/1e6).toFixed(1)}M` : `R$${(n/1e3).toFixed(0)}k`; } } },
+      y: { grid: { display: false } },
+    },
+  };
+
+  const economia = Math.max(r.tSAC, r.tPrice) - r.tCons;
+
+  return (
+    <Section title="🏆 Termômetro de Custo Total">
+      <div className="h-40 sm:h-48 w-full" data-chart="app-termometro">
+        <Bar data={data} options={opts} />
+      </div>
+      <div className="flex items-center justify-center gap-2 rounded-xl bg-success/10 py-2 px-3 text-sm font-extrabold text-success">
+        💰 O consórcio é {fmtBRL(economia)} mais barato que o financiamento mais caro
+      </div>
+      <p className="text-xs text-muted-foreground text-center">Barras menores = menos dinheiro gasto. O consórcio não tem juros — você paga só a taxa de administração.</p>
+    </Section>
+  );
+}
+
 function ChartParcelas({ r }: { r: CalcResults }) {
   const maxLen = Math.max(r.parcelasSAC.length, r.parcelasPrice.length, r.parcelasCons.length, 1);
   const labels = Array.from({ length: maxLen }, (_, i) => i + 1);
@@ -555,10 +614,11 @@ function ChartParcelas({ r }: { r: CalcResults }) {
     plugins: { tooltip: { callbacks: { label: (ctx: unknown) => { const c = ctx as { dataset: { label: string }; parsed: { y: number } }; return c.dataset.label + ": " + fmtBRL(c.parsed.y); } } } },
   };
   return (
-    <Section title="Parcelas + Saldo Devedor do Consórcio ao Longo do Tempo">
+    <Section title="Evolução das Parcelas ao Longo do Tempo">
       <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
-        <div className="h-48 sm:h-72 w-full"><Line data={data} options={options} /></div>
+        <div className="h-48 sm:h-72 w-full" data-chart="app-parcelas"><Line data={data} options={options} /></div>
       </div>
+      <p className="text-xs text-muted-foreground">O financiamento começa mais caro e cai lentamente. O consórcio começa menor e é estável.</p>
     </Section>
   );
 }
@@ -580,20 +640,24 @@ function ChartAlavancagem({ r }: { r: CalcResults }) {
     plugins: { tooltip: { callbacks: { label: (ctx: unknown) => { const c = ctx as { dataset: { label: string }; parsed: { y: number } }; return c.dataset.label + ": " + fmtBRL(c.parsed.y); } } } },
   };
   return (
-    <Section title="Evolução Patrimonial vs Custo Global (Consórcio)" accent>
+    <Section title="Patrimônio vs Custo Global Acumulado (Consórcio)" accent>
       <div className="rounded-xl border border-border bg-card p-3 sm:p-4">
-        <div className="h-48 sm:h-72 w-full"><Line data={data} options={options} /></div>
+        <div className="h-48 sm:h-72 w-full" data-chart="app-patrimonio"><Line data={data} options={options} /></div>
       </div>
+      <p className="text-xs text-muted-foreground">Linha verde = patrimônio acumulado (imóvel + CDI). Quando cruza a linha vermelha = retorno positivo.</p>
     </Section>
   );
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFReportDoc({ r, usoCredito, inputs, clientName }: {
+function PDFReportDoc({ r, usoCredito, inputs, clientName, chartTermometro, chartParcelas, chartPatrimonio }: {
   r: CalcResults;
   usoCredito: "comprar" | "patrimonio";
   inputs: CalcInputs;
   clientName?: string;
+  chartTermometro?: string | null;
+  chartParcelas?: string | null;
+  chartPatrimonio?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -654,6 +718,10 @@ function PDFReportDoc({ r, usoCredito, inputs, clientName }: {
           { label: usoCredito === "patrimonio" ? "Patrimônio Total (CDI + Carta)" : "Patrimônio CDI Final", value: fmtBRL(r.patrimonioConsTotal), color: C.green },
         ]} />
       </RpSection>
+
+      <RpChartImage src={chartTermometro} title="Termômetro de Custo Total: SAC × PRICE × Consórcio" height={100} />
+      <RpChartImage src={chartParcelas} title="Evolução das Parcelas ao Longo do Tempo" height={120} />
+      <RpChartImage src={chartPatrimonio} title="Patrimônio vs Custo Global Acumulado" height={120} />
 
       <RpFooter note="O custo global inclui entrada + parcelas + ITBI/cartório + custo de aluguel durante a espera (consorcio). O patrimonio do consorcio representa a entrada aplicada em CDI ate a contemplacao. Simulacao elaborada com base nas premissas declaradas — resultados reais podem variar conforme condições de mercado." />
     </RpDoc>

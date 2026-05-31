@@ -107,7 +107,7 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
         <Icon className={`h-4 w-4 ${ic[variant]}`} />
         <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">{label}</span>
       </div>
-      <div className="text-xl sm:text-2xl font-extrabold">{value}</div>
+      <div className="min-w-0 overflow-hidden text-lg sm:text-xl font-extrabold break-all">{value}</div>
       {sub && <div className="mt-1 text-xs opacity-60">{sub}</div>}
     </div>
   );

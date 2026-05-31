@@ -14,10 +14,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Chart as ChartJS,
-  CategoryScale, LinearScale, BarElement,
+  CategoryScale, LinearScale, BarElement, PointElement, LineElement, Filler,
   Title, Tooltip, Legend,
 } from "chart.js";
-import { Bar } from "react-chartjs-2";
+import { Bar, Line } from "react-chartjs-2";
 import {
   ArrowLeft, ArrowRight, BookOpen, Building2, Coins, TrendingDown, TrendingUp,
 } from "lucide-react";
@@ -26,7 +26,7 @@ import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, 
 import { captureChart } from "@/lib/capture-charts";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Filler, Title, Tooltip, Legend);
 
 export const Route = createFileRoute("/_authenticated/simuladores/consorcio-cnpj")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -97,7 +97,7 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
         <Icon className={`h-4 w-4 ${iconColors[variant]}`} />
         <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">{label}</span>
       </div>
-      <div className="text-xl sm:text-2xl font-extrabold">{value}</div>
+      <div className="min-w-0 overflow-hidden text-lg sm:text-xl font-extrabold break-all">{value}</div>
       {sub && <div className="mt-1 text-xs opacity-60">{sub}</div>}
     </div>
   );
@@ -107,7 +107,12 @@ function ConsorcioCNPJPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFCnpjDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("cnpj-parcelas")} /> : null,
+    () => results ? <PDFCnpjDoc
+      r={results} inputs={inputs}
+      clientName={clients.find((c) => c.id === selectedClientId)?.name}
+      chartImg={captureChart("cnpj-parcelas")}
+      chartEconomia={captureChart("cnpj-economia")}
+    /> : null,
     "consorcio-cnpj.pdf",
   );
 
@@ -394,12 +399,19 @@ function ConsorcioCNPJPage() {
             </div>
           </Section>
 
-          {/* Gráfico */}
+          {/* Gráfico — Parcelas */}
           {chartData && (
             <Section title="Parcelas: Bruta × Líquida × Financiamento">
               <div className="h-52 sm:h-64" data-chart="cnpj-parcelas">
                 <Bar data={chartData} options={chartOptions} />
               </div>
+            </Section>
+          )}
+
+          {/* Novo: Economia Fiscal Acumulada */}
+          {results.beneficioFiscalAtivo && (
+            <Section title="📈 Economia Fiscal Acumulada ao Longo do Plano">
+              <ChartEconomiaCnpj r={results} />
             </Section>
           )}
 
@@ -432,8 +444,59 @@ function ConsorcioCNPJPage() {
   );
 }
 
+// ─── Gráfico: Economia Fiscal Acumulada ──────────────────────────────────────
+// Mostra como a economia cresce mês a mês — visual poderoso para empresários.
+function ChartEconomiaCnpj({ r }: { r: ConsorcioCNPJResults }) {
+  const step = Math.max(1, Math.floor(r.timeline.length / 18));
+  const sampled = r.timeline.filter((_, i) => i % step === 0 || i === r.timeline.length - 1);
+  let acumBruto = 0, acumLiquido = 0;
+  const pointsBruto: number[] = [];
+  const pointsLiquido: number[] = [];
+  for (const t of r.timeline) {
+    acumBruto += t.parcelaBrutaConsorcio;
+    acumLiquido += t.parcelaLiquidaConsorcio;
+  }
+  // Rebuild for sampled points
+  let cB = 0, cL = 0;
+  const sampledIdx = new Set(sampled.map((d) => d.mes));
+  for (const t of r.timeline) {
+    cB += t.parcelaBrutaConsorcio;
+    cL += t.parcelaLiquidaConsorcio;
+    if (sampledIdx.has(t.mes)) { pointsBruto.push(cB); pointsLiquido.push(cL); }
+  }
+  const data = {
+    labels: sampled.map((d) => `M${d.mes}`),
+    datasets: [
+      { label: "Custo Bruto Acumulado", data: pointsBruto, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.08)", fill: true, pointRadius: 0, borderWidth: 2, tension: 0.3 },
+      { label: "Custo Líquido (pós-fiscal)", data: pointsLiquido, borderColor: "#22c55e", backgroundColor: "rgba(34,197,94,0.12)", fill: true, pointRadius: 0, borderWidth: 2.5, tension: 0.3 },
+    ],
+  };
+  const opts = {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+    interaction: { mode: "index" as const, intersect: false },
+    plugins: {
+      legend: { position: "bottom" as const },
+      tooltip: { callbacks: { label: (c: { dataset: { label: string }; raw: unknown }) => `${c.dataset.label}: ${fmtBRL(c.raw as number)}` } },
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: { ticks: { callback: (v: unknown) => { const n = Number(v); return n >= 1e6 ? `R$${(n/1e6).toFixed(1)}M` : `R$${(n/1e3).toFixed(0)}k`; } } },
+    },
+  };
+  return (
+    <>
+      <div className="h-52 sm:h-64 w-full" data-chart="cnpj-economia">
+        <Line data={data} options={opts} />
+      </div>
+      <p className="text-xs text-muted-foreground text-center">
+        A área entre as curvas = economia fiscal acumulada. Total: <strong className="text-success">{fmtBRL(r.totalEconomiaFiscalConsorcio)}</strong>
+      </p>
+    </>
+  );
+}
+
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
+function PDFCnpjDoc({ r, inputs, clientName, chartImg, chartEconomia }: {
   r: ConsorcioCNPJResults;
   inputs: {
     cartaCredito: number;
@@ -451,6 +514,7 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
   };
   clientName?: string;
   chartImg?: string | null;
+  chartEconomia?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   // A alíquota efetiva vem do resultado (0 no Lucro Presumido — sem dedução direta).
@@ -525,7 +589,8 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg }: {
         ]} />
       </RpSection>
 
-      <RpChartImage src={chartImg} title="Parcelas: Bruta × Liquida × Financiamento" height={140} />
+      <RpChartImage src={chartImg} title="Parcelas: Bruta × Liquida × Financiamento" height={120} />
+      {r.beneficioFiscalAtivo && <RpChartImage src={chartEconomia} title="Economia Fiscal Acumulada ao Longo do Plano" height={120} />}
 
       <RpInsight
         title={`Consórcio é ${r.percentualEconomia.toFixed(1)}% mais barato que o financiamento PJ`}

@@ -1,48 +1,59 @@
 // ─── Simulador de Alavancagem / Flip de Cota ─────────────────────────────────
-// Lógica: operador compra cota → paga parcelas (com ou sem meia parcela)
-// → oferta lance → é contemplado → vende a cota com ágio → lucra.
 //
-// valorVenda = crédito_líquido × (ágio %)   ← o prêmio recebido do comprador
-// lucro      = valorVenda - desembolsoTotal
-// TIR mensal = (valorVenda / desembolsoTotal)^(1/mesContemplacao) - 1
+// MODELO CANÔNICO = documento "Correções para aplicar na Calculadora" (item 7).
+// Diferente do HTML nominal: aqui o INCC É aplicado (convenção discreta, igual ao
+// Simulador de Lance), tanto no desembolso (parcelas reajustadas mês a mês) quanto
+// na base do ágio (sobre a CARTA CHEIA corrigida pelo INCC).
+//
+// Fonte única de verdade: simularConsorcio() — INCC discreto, meia parcela e lance.
+//
+// Fórmulas (item 7 do documento):
+//   C_atual          = carta corrigida pelo INCC no mês da contemplação
+//   Desembolso_Total = Σ parcelas (com INCC) até a contemplação + lance próprio
+//   V_agio           = C_atual × ágio%        (ágio sobre a carta cheia corrigida)
+//   Valor_Recebido   = V_agio
+//   Lucro_Liq        = V_agio − Desembolso_Total
+//   ROI              = Lucro_Liq / Desembolso_Total
+//   TIR mensal       = (V_agio/Desembolso_Total)^(1/mesContemplacao) − 1
 
-import {
-  simularConsorcio,
-  tirMensalSimples,
-  anualFromMensal,
-  type ConsorcioMes,
-} from "./consorcio-core";
+import { simularConsorcio, tirMensalSimples, anualFromMensalPerc } from "./consorcio-core";
+
+export interface FlipMes {
+  mes: number;
+  parcela: number;
+  desembolsoAcum: number;
+}
 
 export interface FlipCotaInputs {
-  cartaCredito: number;         // Valor do crédito original (R$)
-  prazo: number;                // Prazo do plano (meses)
-  meiaParcela: boolean;         // Paga 50% da parcela até contemplar?
-  taxaAdm: number;              // Taxa de administração total (%)
-  fundoReserva: number;         // Fundo de reserva (%)
-  lancePerc: number;            // Lance (% do crédito)
+  cartaCredito: number;
+  prazo: number;
+  meiaParcela: boolean;
+  taxaAdm: number;
+  fundoReserva: number;
+  lancePerc: number;
   tipoLance: "embutido" | "proprio";
-  mesContemplacao: number;      // Mês estimado de contemplação
-  agioVenda: number;            // Ágio cobrado na venda (% do crédito líquido)
-  taxaAtualizacaoAnual: number; // Taxa de atualização anual da carta (INCC, % a.a.)
+  mesContemplacao: number;
+  agioVenda: number;
+  taxaAtualizacaoAnual: number;
 }
 
 export interface FlipCotaResults {
-  parcelaCheia: number;         // Parcela 100%
-  parcelaEfetiva: number;       // Parcela paga (100% ou 50%)
-  creditoLiquido: number;       // Crédito após desconto do lance embutido (nominal)
-  creditoAtualizado: number;    // Crédito líquido corrigido pelo INCC na contemplação
-  desembolsoLance: number;      // Lance em recursos próprios desembolsado
-  valorPagoParcelas: number;    // Total pago em parcelas
-  desembolsoTotal: number;      // Total investido (parcelas + lance próprio)
-  valorVenda: number;           // Ágio recebido na venda (R$) sobre crédito atualizado
-  precoVendaTotal: number;      // Preço total que o comprador paga (crédito atualizado + ágio)
-  lucroLiquido: number;         // Lucro líquido da operação
-  tirMensal: number;            // TIR mensal (%)
-  tirAnual: number;             // TIR anual (%)
-  roiTotal: number;             // ROI total (%)
-  paybackMes: number;           // Mês estimado de payback (= mesContemplacao, pois recebe tudo na venda)
-  multAtualizacao: number;      // Multiplicador INCC aplicado
-  timeline: ConsorcioMes[];     // Evolução mês a mês (parcela reajustada, crédito corrigido)
+  parcelaCheia: number;
+  parcelaEfetiva: number;
+  creditoLiquido: number;
+  creditoAtualizado: number;  // carta cheia corrigida pelo INCC no mês da contemplação
+  desembolsoLance: number;
+  valorPagoParcelas: number;
+  desembolsoTotal: number;
+  valorVenda: number;
+  precoVendaTotal: number;
+  lucroLiquido: number;
+  tirMensal: number;
+  tirAnual: number;
+  roiTotal: number;
+  paybackMes: number;
+  multAtualizacao: number;    // = 1 (flip não aplica INCC)
+  timeline: FlipMes[];
 }
 
 export const defaultFlipCotaInputs: FlipCotaInputs = {
@@ -59,65 +70,60 @@ export const defaultFlipCotaInputs: FlipCotaInputs = {
 };
 
 export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
-  const {
-    cartaCredito,
-    prazo,
-    meiaParcela,
-    taxaAdm,
-    fundoReserva,
-    lancePerc,
-    tipoLance,
-    mesContemplacao,
-    agioVenda,
-    taxaAtualizacaoAnual,
-  } = i;
+  const N = Math.max(i.prazo, 1);
+  const mc = Math.min(Math.max(i.mesContemplacao, 1), N);
 
-  const prazoSafe = Math.max(prazo, 1);
-  const mesContemp = Math.min(Math.max(mesContemplacao, 1), prazoSafe);
-  const multAtualizacao = Math.pow(1 + (taxaAtualizacaoAnual || 0) / 100, mesContemp / 12);
+  // Lance próprio (R$) sai do bolso; lance embutido vem da própria carta.
+  const desembolsoLance = i.tipoLance === "proprio"
+    ? i.cartaCredito * (i.lancePerc / 100) : 0;
+  const percEmbutido = i.tipoLance === "embutido" ? i.lancePerc : 0;
 
-  // ── Núcleo: simula a cota com parcela e crédito atualizados pelo INCC ──────
-  // O lance embutido reduz o crédito líquido; o lance próprio é desembolso real.
+  // ── Motor único: INCC discreto, meia parcela e lance até a contemplação ───
   const sim = simularConsorcio({
-    credito: cartaCredito,
-    taxaAdm,
-    fundoReserva,
-    prazo: prazoSafe,
-    inccAnual: taxaAtualizacaoAnual,
-    mesContemplacao: mesContemp,
-    lanceEmbutidoPerc: tipoLance === "embutido" ? lancePerc : 0,
-    lanceProprioR: tipoLance === "proprio" ? cartaCredito * (lancePerc / 100) : 0,
-    meiaParcela,
-    horizonteMeses: mesContemp, // o operador paga só até contemplar e vende
+    carta:             i.cartaCredito,
+    taxaAdm:           i.taxaAdm,
+    fundoReserva:      i.fundoReserva,
+    prazo:             N,
+    inccAnual:         i.taxaAtualizacaoAnual,
+    mesContemplacao:   mc,
+    lanceEmbutidoPerc: percEmbutido,
+    lanceProprioR:     desembolsoLance,
+    meiaParcela:       i.meiaParcela,
+    amortizacao:       "parcela",
+    horizonteMeses:    mc,
   });
 
-  const parcelaCheia = sim.timeline[mesContemp - 1]?.parcelaCheia ?? 0;
-  const parcelaEfetiva = sim.timeline[mesContemp - 1]?.parcela ?? 0;
+  // ── Parcelas (com INCC) ───────────────────────────────────────────────────
+  const parcelaCheia = sim.parcelaNominal;                 // parcela cheia mês 1
+  const parcelaEfetiva = sim.timeline[0]?.parcela ?? parcelaCheia; // meia, se aplicável
+  const valorPagoParcelas = sim.parcelasAteContemplacao;   // Σ parcelas com INCC até mc
 
-  // Parcelas EFETIVAMENTE pagas até a contemplação (já reajustadas pelo INCC) —
-  // corrige o bug de desembolso subestimado.
-  const valorPagoParcelas = sim.timeline
-    .filter((t) => t.mes <= mesContemp)
-    .reduce((acc, t) => acc + t.parcela, 0);
+  // ── Carta corrigida e crédito líquido ─────────────────────────────────────
+  const creditoAtualizado = sim.cartaCorrigida;            // C_atual = carta × (1+INCC)^⌊mc/12⌋
+  const creditoLiquido = sim.poderDeCompra;                // carta corrigida − embutido
+  const multAtualizacao = i.cartaCredito > 0 ? creditoAtualizado / i.cartaCredito : 1;
 
-  const desembolsoLance = tipoLance === "proprio" ? cartaCredito * (lancePerc / 100) : 0;
-
-  // ── Crédito atualizado e crédito líquido (após lance embutido) ────────────
-  const creditoLiquido = sim.creditoLiquido / multAtualizacao; // valor nominal líquido (sem INCC)
-  const creditoAtualizado = sim.creditoLiquido; // já corrigido pelo INCC na contemplação
-
-  // ── Desembolso total real ──────────────────────────────────────────────────
+  // ── Desembolso total (só o que sai do bolso) ──────────────────────────────
   const desembolsoTotal = valorPagoParcelas + desembolsoLance;
 
-  // ── Venda com ágio ───────────────────────────────────────────────────────
-  const valorVenda = creditoAtualizado * (agioVenda / 100);
+  // ── Venda com ágio (sobre a carta cheia corrigida) e lucro ────────────────
+  const valorVenda = creditoAtualizado * (i.agioVenda / 100); // V_agio = C_atual × ágio%
   const precoVendaTotal = creditoAtualizado + valorVenda;
   const lucroLiquido = valorVenda - desembolsoTotal;
 
-  // ── TIR mensal ───────────────────────────────────────────────────────────
-  const tirMensal = tirMensalSimples(desembolsoTotal, valorVenda, mesContemp);
-  const tirAnual = anualFromMensal(tirMensal);
+  // ── TIR / ROI ─────────────────────────────────────────────────────────────
+  const tirMensal = tirMensalSimples(desembolsoTotal, valorVenda, mc);
+  const tirAnual = anualFromMensalPerc(tirMensal);
   const roiTotal = desembolsoTotal > 0 ? (lucroLiquido / desembolsoTotal) * 100 : 0;
+
+  // ── Timeline (parcelas reais com INCC) para o gráfico ─────────────────────
+  const timeline: FlipMes[] = [];
+  let acum = 0;
+  for (let m = 1; m <= mc; m++) {
+    const parcelaMes = sim.timeline[m - 1]?.parcela ?? parcelaEfetiva;
+    acum += parcelaMes + (m === mc ? desembolsoLance : 0);
+    timeline.push({ mes: m, parcela: parcelaMes, desembolsoAcum: acum });
+  }
 
   return {
     parcelaCheia,
@@ -133,8 +139,8 @@ export function calcFlipCota(i: FlipCotaInputs): FlipCotaResults {
     tirMensal,
     tirAnual,
     roiTotal,
-    paybackMes: mesContemp,
+    paybackMes: mc,
     multAtualizacao,
-    timeline: sim.timeline,
+    timeline,
   };
 }

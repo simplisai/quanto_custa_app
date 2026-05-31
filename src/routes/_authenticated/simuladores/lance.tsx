@@ -9,17 +9,18 @@ import { useAuth } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Chart as ChartJS,
-  CategoryScale, LinearScale, PointElement, LineElement,
+  CategoryScale, LinearScale, PointElement, LineElement, BarElement,
   Title, Tooltip, Legend, Filler,
 } from "chart.js";
-import { Line } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import { ArrowLeft, Target, TrendingDown, Coins, CalendarCheck, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpFooter, RpMetricRow, RpKVList, C } from "@/components/RpShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpFooter, RpMetricRow, RpKVList, RpChartImage, C } from "@/components/RpShell";
 import { View as RpView, Text as RpText } from "@react-pdf/renderer";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
+import { captureChart } from "@/lib/capture-charts";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
 export const Route = createFileRoute("/_authenticated/simuladores/lance")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -99,7 +100,7 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
         <Icon className={`h-4 w-4 ${iconColors[variant]}`} />
         <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">{label}</span>
       </div>
-      <div className="text-xl sm:text-2xl font-extrabold">{value}</div>
+      <div className="min-w-0 overflow-hidden text-lg sm:text-xl font-extrabold break-all">{value}</div>
       {sub && <div className="mt-1 text-xs opacity-60">{sub}</div>}
     </div>
   );
@@ -110,7 +111,13 @@ function SimuladorLancePage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFLanceDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    () => results ? <PDFLanceDoc
+      r={results} inputs={inputs}
+      clientName={clients.find((c) => c.id === selectedClientId)?.name}
+      chartCusto={captureChart("lance-custo")}
+      chartParcelas={captureChart("lance-parcelas")}
+      chartDesembolso={captureChart("lance-desembolso")}
+    /> : null,
     "Simulador_Lance_Consorcio.pdf",
   );
 
@@ -389,6 +396,44 @@ function SimuladorLancePage() {
   );
 }
 
+// ─── Gráfico: Impacto do Lance no Custo Total ────────────────────────────────
+// Mostra de forma visual simples: lance pequeno → grande economia.
+function ChartCustoTotal({ r }: { r: LanceResults }) {
+  const economia = r.economia;
+  const data = {
+    labels: ["Total sem Lance", "Lance Investido", "Total com Lance"],
+    datasets: [{
+      label: "Valores (R$)",
+      data: [r.totalSemLance, r.lanceTotalR, r.totalComLance],
+      backgroundColor: ["rgba(239,68,68,0.85)", "rgba(234,179,8,0.85)", "rgba(34,197,94,0.85)"],
+      borderRadius: 8,
+      borderSkipped: false as const,
+    }],
+  };
+  const opts = {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (c: { raw: unknown }) => fmtBRL(c.raw as number) } },
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: { ticks: { callback: (v: unknown) => { const n = Number(v); return n >= 1e6 ? `R$${(n/1e6).toFixed(1)}M` : `R$${(n/1e3).toFixed(0)}k`; } } },
+    },
+  };
+  return (
+    <Section title="💡 Impacto do Lance no Custo Total">
+      <div className="h-52 sm:h-64 w-full" data-chart="lance-custo">
+        <Bar data={data} options={opts} />
+      </div>
+      <div className="flex items-center gap-2 rounded-xl bg-success/10 p-3 text-sm font-extrabold text-success">
+        💰 Investindo {fmtBRL(r.lanceTotalR)} no lance, você economiza {fmtBRL(economia)} no total
+      </div>
+      <p className="text-xs text-muted-foreground text-center">Barra amarela = o que você investe no lance. Barra verde = custo final (menor). A diferença para a barra vermelha = sua economia.</p>
+    </Section>
+  );
+}
+
 // ─── Results Component ────────────────────────────────────────────────────────
 function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
   // Evolução da parcela mês a mês (amostrada) — mostra o reajuste pelo INCC
@@ -517,16 +562,20 @@ function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
         )}
       </div>
 
+      {/* ── Novo: Impacto Visual no Custo Total ─────────────────── */}
+      <ChartCustoTotal r={r} />
+
       {/* ── Gráfico: parcelas por fase ─────────────────────────────── */}
       <Section title="Evolução da Parcela Mensal (com reajuste INCC)">
-        <div className="h-48 sm:h-64 w-full">
+        <div className="h-48 sm:h-64 w-full" data-chart="lance-parcelas">
           <Line data={chartData} options={chartOptions} />
         </div>
+        <p className="text-xs text-muted-foreground">A linha verde (com lance) fica abaixo da vermelha após a contemplação — parcela menor pelo restante do contrato.</p>
       </Section>
 
       {/* ── Gráfico: desembolso acumulado ─────────────────────────── */}
       <Section title="Desembolso Acumulado ao Longo do Tempo">
-        <div className="h-48 sm:h-64 w-full">
+        <div className="h-48 sm:h-64 w-full" data-chart="lance-desembolso">
           <Line data={lineData} options={lineOptions as never} />
         </div>
         <p className="text-xs text-muted-foreground">A curva verde (com lance) fica abaixo da vermelha (sem lance) após a contemplação, representando a economia real.</p>
@@ -574,8 +623,11 @@ function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFLanceDoc({ r, inputs, clientName }: {
+function PDFLanceDoc({ r, inputs, clientName, chartCusto, chartParcelas, chartDesembolso }: {
   r: LanceResults; inputs: LanceInputs; clientName?: string;
+  chartCusto?: string | null;
+  chartParcelas?: string | null;
+  chartDesembolso?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const reducaoParcela = r.parcelaPadrao - r.parcelaPosLance;
@@ -663,6 +715,10 @@ function PDFLanceDoc({ r, inputs, clientName }: {
           variant="success"
         />
       ) : null}
+
+      <RpChartImage src={chartCusto} title="Impacto do Lance no Custo Total" height={130} />
+      <RpChartImage src={chartParcelas} title="Evolução da Parcela Mensal" height={120} />
+      <RpChartImage src={chartDesembolso} title="Desembolso Acumulado: Com vs Sem Lance" height={120} />
 
       <RpFooter />
     </RpDoc>

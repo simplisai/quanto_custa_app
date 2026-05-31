@@ -609,6 +609,18 @@ function AuthLayout() {
     if (!whitelisted) nav({ to: "/assinatura" });
   }, [loading, isAuthenticated, isAccessBlocked, loc.pathname, nav]);
 
+  // Atribuição de indicação (rede secundária, cobre OAuth e confirmação de e-mail):
+  // se houver código no localStorage, vincula no servidor (idempotente) e limpa.
+  useEffect(() => {
+    if (loading || !isAuthenticated || !user?.id) return;
+    const code = readReferralCode();
+    if (!code) return;
+    supabase
+      .rpc("apply_referral", { p_referral_code: code, p_referred_user_id: user.id, p_source: "client" })
+      .then(() => clearReferralCode())
+      .catch(() => { /* idempotente — mantém o código para nova tentativa */ });
+  }, [loading, isAuthenticated, user?.id]);
+
   // Fecha o drawer mobile ao navegar
   useEffect(() => { setMobileOpen(false); }, [loc.pathname]);
 

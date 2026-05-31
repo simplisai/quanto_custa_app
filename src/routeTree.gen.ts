@@ -41,6 +41,7 @@ import { Route as AuthenticatedAdminFinanceiroRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminAssinaturasRouteImport } from './routes/_authenticated/admin.assinaturas'
 import { Route as AuthenticatedAdminSimuladoresRouteImport } from './routes/_authenticated/admin.simuladores'
 import { Route as AuthenticatedAdminSimuladoresSlugRouteImport } from './routes/_authenticated/admin.simuladores.$slug'
+import { Route as AuthenticatedAdminCamposRouteImport } from './routes/_authenticated/admin.campos'
 import { Route as AuthenticatedIndicarRouteImport } from './routes/_authenticated/indicar'
 import { Route as AuthenticatedFormulariosRouteImport } from './routes/_authenticated/formularios'
 import { Route as AuthenticatedFormulariosIdRouteImport } from './routes/_authenticated/formularios.$id'
@@ -241,6 +242,12 @@ const AuthenticatedAdminSimuladoresSlugRoute =
     path: '/admin/simuladores/$slug',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminCamposRoute =
+  AuthenticatedAdminCamposRouteImport.update({
+    id: '/_authenticated/admin/campos',
+    path: '/admin/campos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -278,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
   '/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
+  '/admin/campos': typeof AuthenticatedAdminCamposRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -314,6 +322,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
   '/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
+  '/admin/campos': typeof AuthenticatedAdminCamposRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -353,6 +362,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
   '/_authenticated/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
+  '/_authenticated/admin/campos': typeof AuthenticatedAdminCamposRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -392,6 +402,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/simuladores'
     | '/admin/simuladores/$slug'
+    | '/admin/campos'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -428,6 +439,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/simuladores'
     | '/admin/simuladores/$slug'
+    | '/admin/campos'
   id:
     | '__root__'
     | '/'
@@ -466,6 +478,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/'
     | '/_authenticated/admin/simuladores'
     | '/_authenticated/admin/simuladores/$slug'
+    | '/_authenticated/admin/campos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -732,6 +745,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSimuladoresSlugRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/campos': {
+      id: '/_authenticated/admin/campos'
+      path: '/admin/campos'
+      fullPath: '/admin/campos'
+      preLoaderRoute: typeof AuthenticatedAdminCamposRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -780,6 +800,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
   AuthenticatedAdminSimuladoresRoute: typeof AuthenticatedAdminSimuladoresRoute
   AuthenticatedAdminSimuladoresSlugRoute: typeof AuthenticatedAdminSimuladoresSlugRoute
+  AuthenticatedAdminCamposRoute: typeof AuthenticatedAdminCamposRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -806,6 +827,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
   AuthenticatedAdminSimuladoresRoute: AuthenticatedAdminSimuladoresRoute,
   AuthenticatedAdminSimuladoresSlugRoute: AuthenticatedAdminSimuladoresSlugRoute,
+  AuthenticatedAdminCamposRoute: AuthenticatedAdminCamposRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

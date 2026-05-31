@@ -1,288 +1,352 @@
-// ─── Núcleo de Matemática Financeira do Consórcio ────────────────────────────
-// FONTE ÚNICA DE VERDADE para todos os simuladores.
+// ─── Núcleo de Matemática Financeira — Motor Mensal Unificado ─────────────────
 //
-// Regras canônicas (validadas pelo especialista do domínio):
+// FONTE ÚNICA DE VERDADE. Todos os simuladores derivam KPIs e timelines daqui.
 //
-//   crédito atualizado (INCC) + taxa adm + fundo reserva = saldo devedor
-//   saldo devedor / prazo = parcela
-//   meia parcela = parcela / 2
-//   parcela = crédito atualizado × (1 + taxa adm) / prazo
+// NOMENCLATURA CANÔNICA (alinhada com Validador Matemático e Quanto Custa v7.4):
 //
-// Princípios que evitam os bugs recorrentes:
-//   1. A parcela e o saldo devedor são SEMPRE derivados do crédito ATUALIZADO
-//      pelo INCC — nunca do crédito nominal congelado.
-//   2. O reajuste do INCC ocorre no aniversário do grupo (a cada 12 meses).
-//   3. Os campos-resumo dos simuladores DEVEM ser lidos da timeline gerada aqui,
-//      garantindo uma única fonte de verdade (quadros == gráficos).
-//   4. Lance embutido reduz o CRÉDITO LÍQUIDO (poder de compra); lance próprio
-//      amortiza o SALDO DEVEDOR (reduz prazo = mantém parcela; reduz parcela =
-//      mantém prazo).
+//   carta            = valor nominal da carta de crédito
+//   cartaCorrigida   = carta × (1+INCC)^anosCompletos  (aniversários do grupo)
+//   poderDeCompra    = cartaCorrigida − lanceEmbutidoR  (o que o cliente realmente compra)
+//   parcelaNominal   = (carta × (1+TA)) / N             (parcela no mês 1)
+//   parcelaReduzida  = saldo pós-lance / meses restantes (parcela após o lance)
+//   saldoDevedor     = saldo do plano após aplicar o lance
+//   parcelasAteContemplacao = Σ parcelas pagas do mês 1 até mc (inclusive)
+//
+// DOIS CONCEITOS DE "TOTAL" (a principal fonte de confusão anterior):
+//
+//   custoGlobal   = parcelasAteContemplacao + lanceProprioR + saldoDevedor
+//                   ↑ snapshot na contemplação — mesma lógica dos 2 HTMLs de referência:
+//                     Lance Validator: totalDesembolsado = parcelas + lance + saldo
+//                     Quanto Custa v7.4: tCons = parcelas + lance + saldo
+//                   Usado em: comparativos (SAC vs PRICE vs Consórcio, com/sem lance)
+//
+//   totalPagamentos = Σ(desembolsoMes) ao longo de TODOS os meses do plano
+//                   Usado em: ROI de longo prazo, renda passiva, meta patrimonial
+//
+// INCC: capitalização composta anual aplicada de forma DISCRETA (saltos).
+//   → Convenção canônica (Validador HTML): reajuste nos aniversários do grupo,
+//     gatilho m % 12 === 0 (meses 12, 24, 36…), aplicado no início do mês.
+//   → cartaCorrigida = carta × (1+INCC)^⌊mc/12⌋
+//   KPI e timeline usam EXATAMENTE a mesma base discreta (coerência total).
+//
+// Lance embutido: reduz o poderDeCompra (não sai do bolso — é abatido da carta recebida).
+// Lance próprio:  sai do bolso no mês da contemplação; amortiza o saldoDevedor.
 
-/** Quantos aniversários (reajustes anuais) já ocorreram ao chegar no mês `mes`.
- *  Meses 1–12 → 0 reajustes; 13–24 → 1; e assim por diante. */
-export function aniversariosAte(mes: number): number {
-  return Math.floor((Math.max(mes, 1) - 1) / 12);
+// ── Primitivos matemáticos (exportados para helpers e testes) ──────────────────
+
+/** Parcela Price: C × j / (1 − (1+j)^−N).  j = juros mensal em fração. */
+export function parcelaPrice(credito: number, jurosMensalFrac: number, prazo: number): number {
+  const N = Math.max(prazo, 1);
+  if (jurosMensalFrac <= 0) return credito / N;
+  return credito * (jurosMensalFrac / (1 - Math.pow(1 + jurosMensalFrac, -N)));
 }
 
-/** Correção contínua de um valor por uma taxa anual ao longo de `meses`.
- *  Ex.: crédito no momento da contemplação. */
-export function corrigirContinuo(valor: number, taxaAnualPerc: number, meses: number): number {
-  return valor * Math.pow(1 + (taxaAnualPerc || 0) / 100, meses / 12);
+/**
+ * Carta corrigida pelo INCC na data da contemplação.
+ *
+ * CONVENÇÃO DISCRETA (igual ao Validador Matemático HTML e ao loop mensal):
+ *   O INCC é aplicado em SALTOS nos aniversários do grupo (meses 12, 24, 36…),
+ *   gatilho m % 12 === 0. Logo, no mês mc já incidiram ⌊mc/12⌋ reajustes.
+ *
+ *   Fator_incc = (1 + I_incc)^⌊mc/12⌋
+ *   C_atualizado = C_n × Fator_incc
+ *
+ *   mc=6  → carta × 1.04^0  = carta × 1.00000  (nenhum aniversário ainda)
+ *   mc=11 → carta × 1.04^0  = carta × 1.00000
+ *   mc=12 → carta × 1.04^1  = carta × 1.04000  (1 aniversário)
+ *   mc=24 → carta × 1.04^2  = carta × 1.08160  (2 aniversários)
+ *   mc=25 → carta × 1.04^2  = carta × 1.08160
+ */
+export function cartaCorrigidaFn(carta: number, inccAnualFrac: number, mc: number): number {
+  return carta * Math.pow(1 + inccAnualFrac, Math.floor(Math.max(mc, 0) / 12));
 }
 
-/** Correção por aniversário (degraus anuais) — usada nas parcelas mês a mês. */
-export function corrigirAniversario(valor: number, taxaAnualPerc: number, mes: number): number {
-  return valor * Math.pow(1 + (taxaAnualPerc || 0) / 100, aniversariosAte(mes));
+/** Alias de retrocompatibilidade para `cartaCorrigidaFn`. */
+export const creditoAtualizado = cartaCorrigidaFn;
+
+/** Valor futuro: V × (1+v)^anos.  v = taxa anual em fração. */
+export function valorFuturo(valor: number, taxaAnualFrac: number, anos: number): number {
+  return valor * Math.pow(1 + taxaAnualFrac, Math.max(anos, 0));
 }
 
-/** Conversão de taxa anual (%) para fator mensal equivalente. */
-export function mensalFromAnual(taxaAnualPerc: number): number {
-  return Math.pow(1 + (taxaAnualPerc || 0) / 100, 1 / 12) - 1;
+/**
+ * Soma PG anual fechada.  base = valor anual inicial; i = taxa anual frac; T = anos.
+ * Total = base × ((1+i)^T − 1) / i   (se i=0: base × T)
+ */
+export function somaPGAnual(baseAnual: number, taxaAnualFrac: number, anos: number): number {
+  const T = Math.max(anos, 0);
+  if (taxaAnualFrac === 0) return baseAnual * T;
+  return baseAnual * ((Math.pow(1 + taxaAnualFrac, T) - 1) / taxaAnualFrac);
 }
 
-/** Saldo devedor = crédito atualizado × (1 + (taxaAdm + fundoReserva)/100). */
-export function saldoDevedorPlano(
-  creditoAtualizado: number,
-  taxaAdmPerc: number,
-  fundoReservaPerc = 0,
-): number {
-  return creditoAtualizado * (1 + (taxaAdmPerc + fundoReservaPerc) / 100);
-}
-
-/** Parcela = crédito atualizado × (1 + taxa total) / prazo (meia parcela opcional). */
-export function valorParcela(
-  creditoAtualizado: number,
-  taxaTotalPerc: number,
-  prazo: number,
-  opts: { meiaParcela?: boolean } = {},
-): number {
-  const prazoSafe = Math.max(prazo, 1);
-  const cheia = saldoDevedorPlano(creditoAtualizado, taxaTotalPerc) / prazoSafe;
-  return opts.meiaParcela ? cheia / 2 : cheia;
-}
-
-/** TIR mensal de uma operação de entrada única → saída única. */
-export function tirMensalSimples(
-  desembolso: number,
-  retorno: number,
-  meses: number,
-): number {
+/** TIR mensal de entrada→saída única: (ret/des)^(1/m) − 1, em %. */
+export function tirMensalSimples(desembolso: number, retorno: number, meses: number): number {
   if (desembolso <= 0 || retorno <= 0 || meses <= 0) return 0;
   return (Math.pow(retorno / desembolso, 1 / meses) - 1) * 100;
 }
 
-/** TIR mensal a partir de um vetor de fluxos de caixa (fluxos[0] = mês 0).
- *  Método de bisseção — robusto e sem dependências externas. */
-export function tirMensalFluxos(fluxos: number[]): number {
-  const vpl = (taxa: number) =>
-    fluxos.reduce((acc, f, t) => acc + f / Math.pow(1 + taxa, t), 0);
-  // Precisa haver ao menos um fluxo negativo e um positivo
-  const temNeg = fluxos.some((f) => f < 0);
-  const temPos = fluxos.some((f) => f > 0);
-  if (!temNeg || !temPos) return 0;
-  let lo = -0.9999;
-  let hi = 1; // 100% a.m. — limite superior generoso
-  let fLo = vpl(lo);
-  let fHi = vpl(hi);
-  if (fLo * fHi > 0) return 0; // sem raiz no intervalo
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2;
-    const fMid = vpl(mid);
-    if (Math.abs(fMid) < 1e-7) return mid * 100;
-    if (fLo * fMid < 0) {
-      hi = mid;
-      fHi = fMid;
-    } else {
-      lo = mid;
-      fLo = fMid;
-    }
-  }
-  return ((lo + hi) / 2) * 100;
-}
-
-export function anualFromMensal(taxaMensalPerc: number): number {
+/** Taxa mensal (%) → anual equivalente (%). */
+export function anualFromMensalPerc(taxaMensalPerc: number): number {
   return (Math.pow(1 + taxaMensalPerc / 100, 12) - 1) * 100;
 }
 
-// ─── Simulação completa de uma cota de consórcio ─────────────────────────────
-
-export interface ConsorcioParams {
-  credito: number;              // Crédito nominal da carta (R$)
-  taxaAdm: number;              // Taxa de administração (%)
-  fundoReserva?: number;        // Fundo de reserva (%) — default 0
-  prazo: number;                // Prazo do grupo (meses)
-  inccAnual: number;            // Atualização anual da carta pelo INCC (% a.a.)
-  mesContemplacao: number;      // Mês estimado de contemplação
-  lanceEmbutidoPerc?: number;   // Lance embutido (% da carta)
-  lanceProprioR?: number;       // Lance próprio (R$) — sempre amortiza o saldo devedor
-  // Como o lance embutido atua:
-  //   "credito"      → reduz o crédito líquido (poder de compra); NÃO amortiza saldo (default)
-  //   "saldoDevedor" → cliente recebe a carta cheia; o embutido amortiza o saldo devedor
-  abatimentoEmbutido?: "credito" | "saldoDevedor";
-  amortizacao?: "prazo" | "parcela"; // Como o lance amortiza o saldo (default "parcela")
-  meiaParcela?: boolean;        // Paga meia parcela até a contemplação
-  horizonteMeses?: number;      // Quantos meses gerar na timeline (default = prazo)
+/** Parcela nominal inicial: (C×(1+TA))/N. */
+export function parcelaNominalFn(carta: number, taxaAdmFrac: number, prazo: number): number {
+  return (carta * (1 + taxaAdmFrac)) / Math.max(prazo, 1);
 }
 
-export interface ConsorcioMes {
+/** Alias de compatibilidade. */
+export const parcelaPadrao = parcelaNominalFn;
+
+// ── Interface da linha do tempo mensal ───────────────────────────────────────
+
+export interface SimMes {
   mes: number;
-  creditoCorrigido: number;  // Crédito corrigido pelo INCC neste mês
-  parcela: number;           // Parcela efetivamente paga no mês (já reajustada; meia se aplicável)
-  parcelaCheia: number;      // Parcela integral do mês (sem meia parcela)
-  saldoDevedor: number;      // Saldo devedor ao final do mês
-  desembolsoMes: number;     // Desembolso real do mês (parcela + lance próprio no mês da contemplação)
-  contemplado: boolean;      // Já foi contemplado neste mês?
+  cartaCorrigida: number;  // carta × (1+INCC)^k  (k = aniversários acumulados)
+  parcelaNominal: number;  // parcela cheia do mês (cresce com INCC nos aniversários)
+  parcela: number;         // parcela efetivamente paga (meia ou reduzida pós-lance)
+  saldoPlano: number;      // saldo residual do plano ao final do mês
+  desembolsoMes: number;   // saída de caixa: parcela + lanceProprioR (no mc)
+  contemplado: boolean;
 }
 
-export interface ConsorcioResumo {
-  taxaTotal: number;                    // taxaAdm + fundoReserva
-  creditoAtualizadoContemplacao: number; // Crédito corrigido pelo INCC na contemplação
-  creditoLiquido: number;               // Crédito disponível após lance embutido (poder de compra)
-  lanceEmbutidoR: number;               // Lance embutido em R$ (sobre crédito atualizado)
-  lanceProprioR: number;                // Lance próprio em R$
-  parcelaInicial: number;               // Parcela paga no mês 1
-  parcelaCheiaInicial: number;          // Parcela integral no mês 1 (sem meia)
-  parcelaContemplacao: number;          // Parcela integral no mês da contemplação
-  parcelaPosLance: number;              // Parcela após aplicar o lance próprio
-  saldoDevedorContemplacao: number;     // Saldo devedor no mês da contemplação (antes do lance)
-  saldoDevedorPosLance: number;         // Saldo devedor após o lance próprio
-  prazoPosLance: number;                // Prazo restante após o lance
-  desembolsoTotal: number;              // Soma real de todos os desembolsos (parcelas + lance próprio)
-  totalParcelas: number;                // Soma apenas das parcelas pagas
-  timeline: ConsorcioMes[];
+// ── Interface do resumo derivado ──────────────────────────────────────────────
+
+export interface SimResult {
+  /** Timeline mês a mês — FONTE ÚNICA. Cards e gráficos leem daqui. */
+  timeline: SimMes[];
+
+  // ── Campos renomeados conforme nomenclatura canônica ──────────────────────
+  taxaTotal: number;                  // taxaAdm + fundoReserva (%)
+  parcelaNominal: number;             // parcela no mês 1 (era: parcelaPadrao)
+  parcelaReduzida: number;            // parcela pós-lance (era: parcelaPosLance)
+  cartaCorrigida: number;             // carta × (1+INCC)^k na contemplação (era: creditoAtualizadoContemplacao)
+  poderDeCompra: number;              // cartaCorrigida − lanceEmbutidoR (era: creditoLiquido)
+  lanceEmbutidoR: number;
+  lanceProprioR: number;
+  saldoAntesLance: number;            // saldo do plano ANTES de aplicar o lance (era: saldoDevedorContemplacao)
+  saldoDevedor: number;               // saldo do plano APÓS o lance (era: saldoDevedorPosLance)
+  prazoPosLance: number;              // meses restantes após a contemplação
+
+  // ── NOVOS campos canônicos ─────────────────────────────────────────────────
+  /** Soma das parcelas pagas do mês 1 até o mês da contemplação (inclusive). */
+  parcelasAteContemplacao: number;
+  /**
+   * CUSTO GLOBAL — SNAPSHOT na contemplação (gabarito do Validador HTML):
+   *   custoGlobal = parcelasAteContemplacao + lanceProprioR + saldoDevedor
+   * É o "Total Desembolsado (Custo Real)" do Validador e o `tCons` do Quanto Custa.
+   * Use em COMPARATIVOS de antecipação (Simulador de Lance: com vs. sem lance).
+   * ATENÇÃO: é DIFERENTE de `totalPagamentos` (≠ soma do plano inteiro).
+   */
+  custoGlobal: number;
+  /**
+   * TOTAL DE PAGAMENTOS — soma de TODOS os desembolsos mensais ao longo do
+   * plano inteiro (Σ desembolsoMes). Use em custo total de longo prazo
+   * (Aluguel vs Consórcio, Meta Patrimonial, Saída de Financiamento, CNPJ, ROI).
+   */
+  totalPagamentos: number;
+  /**
+   * SALDO DE CAIXA (Diretriz D): P_liq − C_atualizado
+   * Positivo = sobra de crédito além do custo da carta.
+   * Negativo = déficit (lance embutido reduziu o poder de compra abaixo da carta).
+   */
+  saldoCaixa: number;
+
+  // ── Aliases de retrocompatibilidade ───────────────────────────────────────
+  /** @deprecated use cartaCorrigida */
+  creditoAtualizadoContemplacao: number;
+  /** @deprecated use poderDeCompra */
+  creditoLiquido: number;
+  /** @deprecated use saldoDevedor */
+  saldoDevedorPosLance: number;
+  /** @deprecated use parcelaNominal */
+  parcelaPadrao: number;
+  /** @deprecated use parcelaReduzida */
+  parcelaPosLance: number;
+  /** @deprecated use totalPagamentos */
+  desembolsoTotal: number;
+  /** Soma apenas das parcelas (sem lanceProprioR). */
+  totalParcelas: number;
 }
 
-/**
- * Simula uma cota de consórcio mês a mês com reajuste de INCC no aniversário,
- * lance embutido (reduz crédito líquido) e lance próprio (amortiza saldo).
- * É a base de todos os simuladores — garante parcela e saldo devedor sempre
- * derivados do crédito ATUALIZADO.
- */
-export function simularConsorcio(p: ConsorcioParams): ConsorcioResumo {
-  const credito = Math.max(p.credito, 0);
-  const taxaTotal = (p.taxaAdm || 0) + (p.fundoReserva || 0);
-  const prazo = Math.max(Math.round(p.prazo), 1);
-  const incc = p.inccAnual || 0;
-  const mc = Math.min(Math.max(Math.round(p.mesContemplacao), 1), prazo);
-  const amortizacao = p.amortizacao ?? "parcela";
-  const horizonte = Math.max(p.horizonteMeses ?? prazo, prazo);
+// ── Parâmetros da simulação ───────────────────────────────────────────────────
 
-  // Crédito atualizado no momento da contemplação (correção contínua)
-  const creditoAtualizadoContemplacao = corrigirContinuo(credito, incc, mc);
+export interface SimParams {
+  /** Valor nominal da carta de crédito (R$). */
+  carta?: number;
+  /** @deprecated use carta */
+  credito?: number;
+  taxaAdm: number;                      // % total (ex.: 18)
+  fundoReserva?: number;                // % adicional (ex.: 1.5)
+  prazo: number;                        // meses do plano
+  inccAnual: number;                    // % a.a.
+  mesContemplacao: number;
+  /** Lance embutido (%): reduz o poderDeCompra. NÃO é desembolso de caixa. */
+  lanceEmbutidoPerc?: number;
+  /** Lance próprio (R$): desembolso real no mês da contemplação; amortiza o saldo. */
+  lanceProprioR?: number;
+  /** @deprecated ignorado */
+  abatimentoEmbutido?: "credito" | "saldoDevedor";
+  /** Como o lance amortiza o saldo: "parcela" (reduz parcela) | "prazo" (reduz prazo). */
+  amortizacao?: "parcela" | "prazo";
+  /** Se true, paga 50% da parcela nos meses anteriores à contemplação. */
+  meiaParcela?: boolean;
+  /**
+   * Limita a quantidade de meses gerados na timeline.
+   * Se omitido: gera até o prazo completo.
+   * Usado internamente (ex.: flip que só vai até a contemplação).
+   */
+  horizonteMeses?: number;
+}
 
-  // Lance embutido (sobre o crédito atualizado)
-  const abatimentoEmbutido = p.abatimentoEmbutido ?? "credito";
-  const lanceEmbutidoR = creditoAtualizadoContemplacao * ((p.lanceEmbutidoPerc || 0) / 100);
-  // "credito" → reduz poder de compra; "saldoDevedor" → recebe carta cheia
-  const creditoLiquido =
-    abatimentoEmbutido === "credito"
-      ? Math.max(creditoAtualizadoContemplacao - lanceEmbutidoR, 0)
-      : creditoAtualizadoContemplacao;
+// ── Motor central ─────────────────────────────────────────────────────────────
 
-  const lanceProprioR = Math.max(p.lanceProprioR || 0, 0);
+export function simularConsorcio(p: SimParams): SimResult {
+  const C = Math.max(p.carta ?? p.credito ?? 0, 0);
+  const TA = (p.taxaAdm || 0) / 100;
+  const FR = (p.fundoReserva || 0) / 100;
+  const taxaTotal = TA + FR;
+  const N = Math.max(Math.round(p.prazo), 1);
+  const incc = (p.inccAnual || 0) / 100;
+  const mc = Math.min(Math.max(Math.round(p.mesContemplacao), 1), N);
+  const amort = p.amortizacao ?? "parcela";
+  const H = p.horizonteMeses != null ? Math.max(p.horizonteMeses, 1) : N;
 
-  // Crédito corrigido por aniversário no mês da contemplação (degraus anuais)
-  const creditoAnivMc = corrigirAniversario(credito, incc, mc);
-  const valorPlanoMc = saldoDevedorPlano(creditoAnivMc, taxaTotal, 0);
-  const parcelaContemplacao = valorPlanoMc / prazo;
+  // ── Estado inicial ────────────────────────────────────────────────────────
+  let cartaBase = C;                         // cresce a cada aniversário (meses 13, 25…)
+  let saldoPlano = C * (1 + taxaTotal);      // saldo do plano; diminui com parcelas
+  let parcelaCheia = saldoPlano / N;         // parcela cheia; recalculada nos aniversários e pós-lance
 
-  // Saldo devedor na contemplação = fração restante do plano corrigido
-  const saldoDevedorContemplacao = valorPlanoMc * ((prazo - mc) / prazo);
+  const timeline: SimMes[] = [];
+  const lanceProprio = Math.max(p.lanceProprioR || 0, 0);
+  let lanceEmbutidoR = 0;
+  let cartaCorrigida = C;                    // carta no momento da contemplação
+  let poderDeCompra = C;
+  let saldoAntesLance = 0;
+  let saldoDevedorPosLance = 0;
+  let prazoPosLance = N - mc;
+  let parcelaReduzidaRef = 0;
 
-  // Lance próprio sempre amortiza o saldo; embutido amortiza só no modo "saldoDevedor"
-  const lanceTotalAmortiza = lanceProprioR + lanceEmbutidoR;
-  const saldoDevedorPosLance = Math.max(saldoDevedorContemplacao - lanceTotalAmortiza, 0);
+  for (let m = 1; m <= H; m++) {
+    // ── Reajuste anual: meses MÚLTIPLOS DE 12 (12, 24, 36…) ──────────────────
+    // Convenção canônica do Validador Matemático: gatilho m % 12 === 0,
+    // aplicado no INÍCIO do mês (antes de pagar a parcela daquele mês).
+    if (m > 1 && m % 12 === 0 && m <= N) {
+      cartaBase   *= (1 + incc);
+      saldoPlano  *= (1 + incc);
+      parcelaCheia *= (1 + incc);
+    }
 
-  let prazoPosLance: number;
-  let parcelaPosLanceBaseMc: number; // parcela pós-lance avaliada no mês da contemplação
-  const parcelasRestantes = prazo - mc;
-  if (amortizacao === "prazo") {
-    // Mantém a parcela cheia, reduz o prazo
-    prazoPosLance = parcelaContemplacao > 0 ? Math.ceil(saldoDevedorPosLance / parcelaContemplacao) : 0;
-    parcelaPosLanceBaseMc = parcelaContemplacao;
-  } else {
-    // Mantém o prazo restante, reduz a parcela
-    prazoPosLance = parcelasRestantes;
-    parcelaPosLanceBaseMc = parcelasRestantes > 0 ? saldoDevedorPosLance / parcelasRestantes : 0;
-  }
-
-  // Fator INCC por aniversário no mês da contemplação (para reajustar a parcela pós-lance)
-  const fatorAnivMc = Math.pow(1 + incc / 100, aniversariosAte(mc));
-
-  // ── Timeline mês a mês ─────────────────────────────────────────────────────
-  const timeline: ConsorcioMes[] = [];
-  let totalParcelas = 0;
-  let desembolsoTotal = 0;
-  // mês final de pagamento do consórcio (após contemplação)
-  const mesFimPagamento = amortizacao === "prazo" ? mc + prazoPosLance : prazo;
-
-  for (let m = 1; m <= horizonte; m++) {
-    const fatorAniv = Math.pow(1 + incc / 100, aniversariosAte(m));
-    const creditoCorrigido = credito * fatorAniv;
-    const valorPlanoM = saldoDevedorPlano(creditoCorrigido, taxaTotal, 0);
-    const parcelaCheia = valorPlanoM / prazo;
-
-    let parcela = 0;
-    let saldoDevedor = 0;
     const contemplado = m >= mc;
+    let parcelaMes: number;
+    let desembolsoMes: number;
 
-    if (m <= mc) {
-      // Pré-contemplação (inclui o mês da contemplação): parcela cheia (ou meia)
-      parcela = p.meiaParcela ? parcelaCheia / 2 : parcelaCheia;
-      saldoDevedor = valorPlanoM * ((prazo - m) / prazo);
-    } else if (m <= mesFimPagamento) {
-      // Pós-contemplação: parcela pós-lance, reajustada pelo INCC relativo à contemplação
-      parcela = parcelaPosLanceBaseMc * (fatorAniv / fatorAnivMc);
-      const mesesPagosPos = m - mc;
-      const mesesTotaisPos = mesFimPagamento - mc;
-      const fracaoRestante = mesesTotaisPos > 0 ? (mesesTotaisPos - mesesPagosPos) / mesesTotaisPos : 0;
-      saldoDevedor = saldoDevedorPosLance * (fatorAniv / fatorAnivMc) * fracaoRestante;
+    if (m < mc) {
+      // Pré-contemplação
+      parcelaMes    = p.meiaParcela ? parcelaCheia / 2 : parcelaCheia;
+      desembolsoMes = parcelaMes;
+      saldoPlano   -= parcelaMes;
+      if (saldoPlano < 0) saldoPlano = 0;
+
+    } else if (m === mc) {
+      // Mês da contemplação
+      parcelaMes = p.meiaParcela ? parcelaCheia / 2 : parcelaCheia;
+      saldoPlano -= parcelaMes;
+      if (saldoPlano < 0) saldoPlano = 0;
+
+      // INCC discreto: a carta no ato é o cartaBase já reajustado pelos
+      // aniversários (m % 12 === 0) ocorridos até mc — idêntico à timeline e
+      // ao Validador HTML. Equivale a C × (1+incc)^⌊mc/12⌋.
+      cartaCorrigida  = cartaBase;
+      // Diretriz B: L_valor = C_atualizado × L_%
+      lanceEmbutidoR  = cartaCorrigida * ((p.lanceEmbutidoPerc || 0) / 100);
+      // Diretriz C: P_liq = C_atualizado − L_valor
+      poderDeCompra   = Math.max(cartaCorrigida - lanceEmbutidoR, 0);
+
+      // O LANCE TOTAL (embutido + próprio) amortiza o saldo devedor do plano.
+      // Convenção canônica (Validador): saldo -= lanceEmbutido + lanceProprio.
+      // Só o lance PRÓPRIO sai do bolso (cash); o embutido vem da própria carta.
+      saldoAntesLance      = saldoPlano;
+      saldoPlano           = Math.max(saldoPlano - lanceEmbutidoR - lanceProprio, 0);
+      saldoDevedorPosLance = saldoPlano;
+
+      const mesesRestantes = N - mc;
+      prazoPosLance = mesesRestantes;
+      if (mesesRestantes > 0) {
+        if (amort === "parcela") {
+          parcelaCheia = saldoPlano / mesesRestantes;
+        } else {
+          prazoPosLance = parcelaCheia > 0 ? Math.ceil(saldoPlano / parcelaCheia) : 0;
+        }
+      } else {
+        parcelaCheia = 0;
+      }
+      parcelaReduzidaRef = parcelaCheia;
+      desembolsoMes = parcelaMes + lanceProprio;
+
     } else {
-      // Consórcio encerrado
-      parcela = 0;
-      saldoDevedor = 0;
+      // Pós-contemplação
+      const mesFim = amort === "prazo" ? mc + prazoPosLance : N;
+      if (m <= mesFim && saldoPlano > 0.01) {
+        parcelaMes = Math.min(parcelaCheia, saldoPlano);
+        saldoPlano -= parcelaMes;
+        if (saldoPlano < 0) saldoPlano = 0;
+      } else {
+        parcelaMes = 0;
+      }
+      desembolsoMes = parcelaMes;
     }
-
-    let desembolsoMes = parcela;
-    if (m === mc) desembolsoMes += lanceProprioR;
-
-    if (m <= mesFimPagamento) {
-      totalParcelas += parcela;
-    }
-    desembolsoTotal += desembolsoMes;
 
     timeline.push({
       mes: m,
-      creditoCorrigido,
-      parcela,
-      parcelaCheia,
-      saldoDevedor: Math.max(saldoDevedor, 0),
+      cartaCorrigida: cartaBase,
+      parcelaNominal: parcelaCheia,
+      parcela: parcelaMes,
+      saldoPlano: Math.max(saldoPlano, 0),
       desembolsoMes,
       contemplado,
     });
   }
 
-  const parcelaInicial = timeline[0]?.parcela ?? 0;
-  const parcelaCheiaInicial = timeline[0]?.parcelaCheia ?? 0;
-  // Parcela pós-lance "de referência" = primeira parcela após a contemplação
-  const parcelaPosLance =
-    timeline.find((t) => t.mes === mc + 1)?.parcela ?? parcelaPosLanceBaseMc;
+  // ── Resumo derivado 100% da timeline ─────────────────────────────────────
+  const parcelaNominal = timeline[0]?.parcelaNominal ?? 0;
+  const parcelaReduzida =
+    timeline.find(t => t.mes === mc + 1)?.parcela ?? parcelaReduzidaRef;
+
+  const parcelasAteContemplacao =
+    timeline.filter(t => t.mes <= mc).reduce((acc, t) => acc + t.parcela, 0);
+
+  const totalPagamentos = timeline.reduce((acc, t) => acc + t.desembolsoMes, 0);
+  // CUSTO GLOBAL = snapshot na contemplação (gabarito do Validador HTML):
+  //   parcelas pagas até a contemplação + lance próprio + saldo devedor pós-lance.
+  const custoGlobal = parcelasAteContemplacao + lanceProprio + saldoDevedorPosLance;
+  const totalParcelas   = timeline.reduce((acc, t) => acc + t.parcela, 0);
+  // Diretriz D: Saldo_caixa = P_liq − C_atualizado
+  const saldoCaixa = poderDeCompra - cartaCorrigida;
 
   return {
-    taxaTotal,
-    creditoAtualizadoContemplacao,
-    creditoLiquido,
-    lanceEmbutidoR,
-    lanceProprioR,
-    parcelaInicial,
-    parcelaCheiaInicial,
-    parcelaContemplacao,
-    parcelaPosLance,
-    saldoDevedorContemplacao,
-    saldoDevedorPosLance,
-    prazoPosLance,
-    desembolsoTotal,
-    totalParcelas,
     timeline,
+    taxaTotal,
+    parcelaNominal,
+    parcelaReduzida,
+    cartaCorrigida,
+    poderDeCompra,
+    lanceEmbutidoR,
+    lanceProprioR: lanceProprio,
+    saldoAntesLance,
+    saldoDevedor: saldoDevedorPosLance,
+    prazoPosLance,
+    parcelasAteContemplacao,
+    custoGlobal,
+    totalPagamentos,
+    totalParcelas,
+    saldoCaixa,
+    // aliases de retrocompatibilidade
+    creditoAtualizadoContemplacao: cartaCorrigida,
+    creditoLiquido:                poderDeCompra,
+    saldoDevedorPosLance,
+    parcelaPadrao:                 parcelaNominal,
+    parcelaPosLance:               parcelaReduzida,
+    desembolsoTotal:               totalPagamentos,
   };
 }

@@ -14,16 +14,17 @@ import { useAuth } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Chart as ChartJS,
-  CategoryScale, LinearScale, PointElement, LineElement,
+  CategoryScale, LinearScale, PointElement, LineElement, BarElement,
   Title, Tooltip, Legend, Filler,
 } from "chart.js";
-import { Line } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import { ArrowLeft, Home, TrendingUp, Scale, Clock, BookOpen } from "lucide-react";
 import { TemplatePicker, type TemplatePayload } from "@/components/TemplatePicker";
-import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, C } from "@/components/RpShell";
+import { RpDoc, RpHeader, RpSection, RpMetric, RpInsight, RpPremises, RpKVList, RpFooter, RpMetricRow, RpChartImage, C } from "@/components/RpShell";
+import { captureChart } from "@/lib/capture-charts";
 import { WhatsAppShareButton } from "@/components/WhatsAppShareButton";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
 export const Route = createFileRoute("/_authenticated/simuladores/aluguel-vs-consorcio")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -104,7 +105,7 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
         <Icon className={`h-4 w-4 ${iconColors[variant]}`} />
         <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">{label}</span>
       </div>
-      <div className="text-xl sm:text-2xl font-extrabold">{value}</div>
+      <div className="min-w-0 overflow-hidden text-lg sm:text-xl font-extrabold break-all">{value}</div>
       {sub && <div className="mt-1 text-xs opacity-60">{sub}</div>}
     </div>
   );
@@ -114,7 +115,12 @@ function AluguelVsConsorcioPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFAluguelDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} /> : null,
+    () => results ? <PDFAluguelDoc
+      r={results} inputs={inputs}
+      clientName={clients.find((c) => c.id === selectedClientId)?.name}
+      chartEvolucao={captureChart("avc-evolucao")}
+      chartComparativo={captureChart("avc-comparativo")}
+    /> : null,
     "Aluguel_vs_Consorcio.pdf",
   );
 
@@ -359,6 +365,62 @@ function AluguelVsConsorcioPage() {
   );
 }
 
+// ─── Gráfico: "Em X anos — O que você tem?" ──────────────────────────────────
+// Comparativo visual simples para pessoas sem formação financeira.
+function ChartComparativoSimples({ r, inputs }: { r: AluguelResults; inputs: AluguelInputs }) {
+  const data = {
+    labels: [`Aluguel (${inputs.horizonte} anos)`, `Consórcio (${inputs.horizonte} anos)`],
+    datasets: [
+      {
+        label: "Total Desembolsado (R$)",
+        data: [r.totalAluguel, r.totalConsorcio],
+        backgroundColor: ["rgba(239,68,68,0.85)", "rgba(26,42,108,0.8)"],
+        borderRadius: 8,
+        borderSkipped: false as const,
+        yAxisID: "y",
+      },
+      {
+        label: "Patrimônio Gerado (R$)",
+        data: [0, r.valorImovelFinal],
+        backgroundColor: ["rgba(239,68,68,0.2)", "rgba(34,197,94,0.85)"],
+        borderRadius: 8,
+        borderSkipped: false as const,
+        yAxisID: "y",
+      },
+    ],
+  };
+  const opts = {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+    plugins: {
+      legend: { position: "bottom" as const },
+      tooltip: { callbacks: { label: (c: { dataset: { label: string }; raw: unknown }) => `${c.dataset.label}: ${fmtBRL(c.raw as number)}` } },
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: { ticks: { callback: (v: unknown) => { const n = Number(v); return n >= 1e6 ? `R$${(n/1e6).toFixed(1)}M` : `R$${(n/1e3).toFixed(0)}k`; } } },
+    },
+  };
+  return (
+    <Section title={`🏠 Em ${inputs.horizonte} Anos: O Que Você Tem?`}>
+      <div className="h-56 sm:h-72 w-full" data-chart="avc-comparativo">
+        <Bar data={data} options={opts} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-destructive/8 p-3 text-center">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-destructive/70 mb-1">Aluguel</p>
+          <p className="text-lg font-extrabold text-danger">{fmtBRL(r.totalAluguel)}</p>
+          <p className="text-xs text-muted-foreground">pagos. Patrimônio: R$ 0</p>
+        </div>
+        <div className="rounded-xl bg-success/10 p-3 text-center">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-success/70 mb-1">Consórcio</p>
+          <p className="text-lg font-extrabold text-success">{fmtBRL(r.valorImovelFinal)}</p>
+          <p className="text-xs text-muted-foreground">de patrimônio</p>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 function ResultsAluguel({ r, inputs }: { r: AluguelResults; inputs: AluguelInputs }) {
   // Amostrar timeline (a cada 6 meses ou a cada 12 meses se longo)
   const step = inputs.horizonte > 10 ? 12 : 6;
@@ -436,9 +498,12 @@ function ResultsAluguel({ r, inputs }: { r: AluguelResults; inputs: AluguelInput
         <KPI icon={Clock} label="Ponto de virada" value={r.breakEvenMes ? `Mês ${r.breakEvenMes}` : "N/A"} sub="Patrimônio supera custo aluguel" variant="warning" />
       </div>
 
+      {/* ── Novo: Comparativo Visual Simples ──────────────────────── */}
+      <ChartComparativoSimples r={r} inputs={inputs} />
+
       {/* ── Gráfico de área ──────────────────────────────────────────── */}
       <Section title="Evolução: Aluguel Acumulado vs. Patrimônio no Consórcio">
-        <div className="h-52 sm:h-72 w-full">
+        <div className="h-52 sm:h-72 w-full" data-chart="avc-evolucao">
           <Line data={lineData} options={lineOptions} />
         </div>
         {r.breakEvenMes && (
@@ -486,8 +551,10 @@ function ResultsAluguel({ r, inputs }: { r: AluguelResults; inputs: AluguelInput
   );
 }
 
-function PDFAluguelDoc({ r, inputs, clientName }: {
+function PDFAluguelDoc({ r, inputs, clientName, chartEvolucao, chartComparativo }: {
   r: AluguelResults; inputs: AluguelInputs; clientName?: string;
+  chartEvolucao?: string | null;
+  chartComparativo?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const anosHorizonte = inputs.horizonte;
@@ -546,6 +613,9 @@ function PDFAluguelDoc({ r, inputs, clientName }: {
         body={`Voce paga aluguel porque parece mais seguro — mas a certeza do aluguel e a certeza de nao ter patrimônio. O consorcio tem uma incerteza de timing, mas a certeza do resultado: ao final de ${anosHorizonte} anos, voce tem um imovel. Com aluguel, voce tem o recibo do ultimo mes.`}
         variant="warning"
       />
+
+      <RpChartImage src={chartComparativo} title={`Em ${anosHorizonte} Anos: O Que Você Tem?`} height={120} />
+      <RpChartImage src={chartEvolucao} title="Evolução: Aluguel Acumulado vs Patrimônio" height={130} />
 
       <RpFooter note="Valores do aluguel projetados com reajuste composto anual. Valor do imovel projetado com valorizacao anual. Resultados reais podem variar conforme condições de mercado." />
     </RpDoc>

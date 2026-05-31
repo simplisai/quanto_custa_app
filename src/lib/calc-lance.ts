@@ -1,59 +1,46 @@
 // ─── Simulador de Lance ──────────────────────────────────────────────────────
-// Responde: "O que preciso dar de lance para ser contemplado no mês X?"
-// e mostra a economia real vs. esperar contemplação aleatória.
+// Fonte única de verdade: simularConsorcio() mensal para ambos os cenários.
+// KPI cards derivam 100% da timeline.
 
 import { simularConsorcio } from "./consorcio-core";
 
 export interface LanceInputs {
-  cartaCredito: number;        // Valor da carta de crédito (R$)
-  taxaAdmTotal: number;        // Taxa de administração total (% — ex: 18%)
-  prazoMeses: number;          // Prazo do grupo (meses)
-  percLanceEmb: number;        // Lance embutido (% da carta) — ex: 20
-  lanceProprioR: number;       // Lance próprio em R$
+  cartaCredito: number;
+  taxaAdmTotal: number;
+  prazoMeses: number;
+  percLanceEmb: number;
+  lanceProprioR: number;
   tipoLance: "embutido" | "proprio" | "combinado";
-  mesContemplacaoLance: number; // Mês-alvo de contemplação com lance
-  mesSemLance: number;         // Mês médio de contemplação sem lance (ex: prazo * 0.6)
-  tipoAbatimentoLance: "credito" | "saldoDevedor"; // Lance abate crédito recebido ou saldo devedor
-  taxaAtualizacaoAnual: number; // Taxa de atualização anual da carta (INCC, % a.a.)
+  mesContemplacaoLance: number;
+  mesSemLance: number;
+  tipoAbatimentoLance: "credito" | "saldoDevedor";
+  taxaAtualizacaoAnual: number;
 }
 
 export interface MesData {
   mes: number;
   parcelaSemLance: number;
-  parcelaComLance: number;     // pré-contemplação = mesma; pós = menor
+  parcelaComLance: number;
   desembolsoAcumSemLance: number;
   desembolsoAcumComLance: number;
 }
 
 export interface LanceResults {
-  // Parcelas
-  parcelaPadrao: number;       // Parcela sem lance (pré e pós, igual)
-  parcelaPosLance: number;     // Parcela após contemplação com lance
-
-  // Lance
-  lanceEmbR: number;           // Lance embutido em R$
-  lanceTotalR: number;         // Lance total = emb + próprio
-  percLanceTotalSobreCarta: number; // % total sobre a carta
-
-  // Crédito
-  creditoLiquido: number;      // Crédito disponível após lance (depende do tipoAbatimento)
-  cartaAtualizada: number;     // Carta de crédito corrigida pelo INCC na contemplação
-
-  // Totais
+  parcelaPadrao: number;
+  parcelaPosLance: number;
+  lanceEmbR: number;
+  lanceTotalR: number;
+  percLanceTotalSobreCarta: number;
+  creditoLiquido: number;
+  cartaAtualizada: number;
   totalSemLance: number;
   totalComLance: number;
   economia: number;
-
-  // Mês-a-mês
   timeline: MesData[];
-
-  // Break-even: mês em que a economia de parcelas cobre o lance próprio
   breakEvenMes: number | null;
-
-  // Detalhes
   saldoDevedorPosLance: number;
-  parcelesPre: number;         // Qtde de parcelas antes da contemplação com lance
-  parcelesPos: number;         // Qtde de parcelas após
+  parcelesPre: number;
+  parcelesPos: number;
 }
 
 export const defaultLanceInputs: LanceInputs = {
@@ -70,82 +57,69 @@ export const defaultLanceInputs: LanceInputs = {
 };
 
 export function calcLance(i: LanceInputs): LanceResults {
-  const {
-    cartaCredito,
-    taxaAdmTotal,
-    prazoMeses,
-    percLanceEmb,
-    lanceProprioR,
-    tipoLance,
-    mesContemplacaoLance,
-    tipoAbatimentoLance,
-    taxaAtualizacaoAnual,
-  } = i;
+  const N = Math.max(i.prazoMeses, 1);
+  const mLance = Math.min(Math.max(i.mesContemplacaoLance, 1), N);
+  const mSem = Math.min(Math.max(i.mesSemLance, 1), N);
 
-  const prazo = Math.max(prazoMeses, 1);
-  const mesLance = Math.min(Math.max(mesContemplacaoLance, 1), prazo);
+  const usaEmbutido = i.tipoLance === "embutido" || i.tipoLance === "combinado";
+  const usaProprio  = i.tipoLance === "proprio"  || i.tipoLance === "combinado";
+  const percEmb     = usaEmbutido ? i.percLanceEmb : 0;
+  const lanceProprio = usaProprio ? i.lanceProprioR : 0;
 
-  // Lance embutido / próprio conforme o tipo selecionado
-  const usaEmbutido = tipoLance === "embutido" || tipoLance === "combinado";
-  const usaProprio = tipoLance === "proprio" || tipoLance === "combinado";
-  const percEmb = usaEmbutido ? percLanceEmb : 0;
-  const lanceProprio = usaProprio ? lanceProprioR : 0;
-
-  // ── Cenário COM LANCE ──────────────────────────────────────────────────────
-  // A parcela é derivada do crédito ATUALIZADO pelo INCC (núcleo); o lance
-  // amortiza o saldo devedor e (no modo "credito") reduz o crédito líquido.
+  // ── Cenário COM lance (timeline completa) ────────────────────────────────
   const comLance = simularConsorcio({
-    credito: cartaCredito,
-    taxaAdm: taxaAdmTotal,
-    prazo,
-    inccAnual: taxaAtualizacaoAnual,
-    mesContemplacao: mesLance,
+    credito:           i.cartaCredito,
+    taxaAdm:           i.taxaAdmTotal,
+    prazo:             N,
+    inccAnual:         i.taxaAtualizacaoAnual,
+    mesContemplacao:   mLance,
     lanceEmbutidoPerc: percEmb,
-    lanceProprioR: lanceProprio,
-    abatimentoEmbutido: tipoAbatimentoLance,
-    amortizacao: "parcela",
+    lanceProprioR:     lanceProprio,
+    amortizacao:       "parcela",
   });
 
-  // ── Cenário SEM LANCE ──────────────────────────────────────────────────────
-  // Paga a parcela padrão (reajustada pelo INCC) por todo o prazo.
+  // ── Cenário SEM lance: contemplado no mês de referência (mesSemLance) ─────
   const semLance = simularConsorcio({
-    credito: cartaCredito,
-    taxaAdm: taxaAdmTotal,
-    prazo,
-    inccAnual: taxaAtualizacaoAnual,
-    mesContemplacao: prazo, // sem lance: contemplação não antecipa nada
+    credito:         i.cartaCredito,
+    taxaAdm:         i.taxaAdmTotal,
+    prazo:           N,
+    inccAnual:       i.taxaAtualizacaoAnual,
+    mesContemplacao: mSem, // contemplação tardia sem lance
   });
 
-  const cartaAtualizada = comLance.creditoAtualizadoContemplacao;
-  const parcelaPadrao = comLance.parcelaInicial;
-  const parcelaPosLance = comLance.parcelaPosLance;
-  const saldoDevedorPosLance = comLance.saldoDevedorPosLance;
+  // KPIs derivados da timeline (fonte única)
+  const parcelaPadrao       = comLance.parcelaNominal;
+  const parcelaPosLance     = comLance.parcelaReduzida;
+  const lanceEmbR           = comLance.lanceEmbutidoR;
+  const lanceTotalR         = lanceEmbR + lanceProprio;
+  const saldoDevedorPosLance = comLance.saldoDevedor;
+  const creditoLiquido      = comLance.poderDeCompra;
+  const cartaAtualizada     = comLance.cartaCorrigida;
 
-  const lanceEmbR = comLance.lanceEmbutidoR;
-  const lanceTotalR = lanceEmbR + lanceProprio;
-  const percLanceTotalSobreCarta = cartaAtualizada > 0 ? (lanceTotalR / cartaAtualizada) * 100 : 0;
-  const creditoLiquido = comLance.creditoLiquido;
+  const percLanceTotalSobreCarta = cartaAtualizada > 0
+    ? (lanceTotalR / cartaAtualizada) * 100 : 0;
 
-  const parcelasRestantes = prazo - mesLance;
-
-  // ── Totais (a partir das timelines reajustadas — fonte única) ──────────────
-  const totalSemLance = semLance.totalParcelas;
-  const totalComLance = comLance.desembolsoTotal;
+  // Totais: CUSTO GLOBAL (snapshot na contemplação) — gabarito do Validador.
+  // Sem lance: snapshot no mês de referência (mesContemplacao = N → saldo zera);
+  // por isso usamos custoGlobal de ambos os cenários (parcelas + lance + saldo).
+  const totalSemLance = semLance.custoGlobal;
+  const totalComLance = comLance.custoGlobal;
   const economia = totalSemLance - totalComLance;
 
-  // ── Timeline mês a mês ───────────────────────────────────────────────────
+  // ── Timeline mês a mês ─────────────────────────────────────────────────
+  const maxM = Math.max(semLance.timeline.length, comLance.timeline.length);
   const timeline: MesData[] = [];
   let acumSemLance = 0;
   let acumComLance = 0;
 
-  for (let m = 1; m <= prazo; m++) {
-    const semM = semLance.timeline[m - 1];
-    const comM = comLance.timeline[m - 1];
+  for (let idx = 0; idx < maxM; idx++) {
+    const semM = semLance.timeline[idx];
+    const comM = comLance.timeline[idx];
     acumSemLance += semM?.parcela ?? 0;
     acumComLance += comM?.desembolsoMes ?? 0;
 
     timeline.push({
-      mes: m,
+      mes: (semM ?? comM)!.mes,
       parcelaSemLance: semM?.parcela ?? 0,
       parcelaComLance: comM?.parcela ?? 0,
       desembolsoAcumSemLance: acumSemLance,
@@ -153,14 +127,13 @@ export function calcLance(i: LanceInputs): LanceResults {
     });
   }
 
-  // ── Break-even ───────────────────────────────────────────────────────────
-  // Primeiro mês em que o desembolso acumulado COM lance ≤ SEM lance.
+  // Break-even: mês em que o acumulado COM lance ≤ acumulado SEM lance
   let breakEvenMes: number | null = null;
   if (lanceProprio > 0) {
     const cruzamento = timeline.find(
-      (t) => t.mes > mesLance && t.desembolsoAcumComLance <= t.desembolsoAcumSemLance,
+      t => t.mes > mLance && t.desembolsoAcumComLance <= t.desembolsoAcumSemLance,
     );
-    breakEvenMes = cruzamento ? cruzamento.mes : null;
+    breakEvenMes = cruzamento?.mes ?? null;
   }
 
   return {
@@ -177,7 +150,7 @@ export function calcLance(i: LanceInputs): LanceResults {
     timeline,
     breakEvenMes,
     saldoDevedorPosLance,
-    parcelesPre: mesLance,
-    parcelesPos: parcelasRestantes,
+    parcelesPre: mLance,
+    parcelesPos: N - mLance,
   };
 }

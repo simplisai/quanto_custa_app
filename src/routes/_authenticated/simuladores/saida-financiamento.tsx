@@ -105,7 +105,7 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
         <Icon className={`h-4 w-4 ${iconColors[variant]}`} />
         <span className="text-[10px] font-extrabold uppercase tracking-widest opacity-70">{label}</span>
       </div>
-      <div className="text-xl sm:text-2xl font-extrabold">{value}</div>
+      <div className="min-w-0 overflow-hidden text-lg sm:text-xl font-extrabold break-all">{value}</div>
       {sub && <div className="mt-1 text-xs opacity-60">{sub}</div>}
     </div>
   );
@@ -116,7 +116,12 @@ function SaidaFinanciamentoPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFSaidaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("saida-evolucao")} /> : null,
+    () => results ? <PDFSaidaDoc
+      r={results} inputs={inputs}
+      clientName={clients.find((c) => c.id === selectedClientId)?.name}
+      chartImg={captureChart("saida-evolucao")}
+      chartCustos={captureChart("saida-custos")}
+    /> : null,
     "saida-financiamento.pdf",
   );
 
@@ -455,6 +460,38 @@ function SaidaFinanciamentoPage() {
             </div>
           </Section>
 
+          {/* ── Novo: Custo Total Banco vs Consórcio ─────────────── */}
+          <Section title="⚖️ Custo Total: Banco vs Consórcio">
+            <div className="h-44 sm:h-56" data-chart="saida-custos">
+              <Bar
+                data={{
+                  labels: ["Manter Financiamento", "Migrar para Consórcio"],
+                  datasets: [{
+                    label: "Custo Total (R$)",
+                    data: [results.totalRestanteFin, results.totalConsorcio],
+                    backgroundColor: ["rgba(220,38,38,0.85)", "rgba(26,42,108,0.85)"],
+                    borderRadius: 8,
+                    borderSkipped: false as const,
+                  }],
+                }}
+                options={{
+                  responsive: true, maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (c: { raw: unknown }) => fmtBRL(c.raw as number) } },
+                  },
+                  scales: {
+                    x: { grid: { display: false } },
+                    y: { ticks: { callback: (v: unknown) => { const n = Number(v); return n >= 1e6 ? `R$${(n/1e6).toFixed(1)}M` : `R$${(n/1e3).toFixed(0)}k`; } } },
+                  },
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-center gap-2 rounded-xl bg-success/10 p-3 text-sm font-extrabold text-success">
+              💰 Você economiza {fmtBRL(results.economiaTotalCusto)} migrando para o consórcio
+            </div>
+          </Section>
+
           {/* Gráfico patrimônio */}
           {chartData && (
             <Section title="Evolução Patrimonial">
@@ -497,7 +534,7 @@ function SaidaFinanciamentoPage() {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFSaidaDoc({ r, inputs, clientName, chartImg }: {
+function PDFSaidaDoc({ r, inputs, clientName, chartImg, chartCustos }: {
   r: SaidaFinanciamentoResults;
   inputs: {
     valorImovelAtual: number;
@@ -515,6 +552,7 @@ function PDFSaidaDoc({ r, inputs, clientName, chartImg }: {
   };
   clientName?: string;
   chartImg?: string | null;
+  chartCustos?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -557,7 +595,8 @@ function PDFSaidaDoc({ r, inputs, clientName, chartImg }: {
         ]} />
       </RpSection>
 
-      <RpChartImage src={chartImg} title="Evolucao Patrimonial" height={130} />
+      <RpChartImage src={chartCustos} title="Custo Total: Banco vs Consórcio" height={100} />
+      <RpChartImage src={chartImg} title="Evolucao Patrimonial" height={120} />
 
       <RpInsight
         emoji="🔄"
