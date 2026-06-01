@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useBrandSettings } from "@/hooks/useBrandSettings";
 import {
   calcMetaPatrimonial,
   defaultMetaInputs,
@@ -109,12 +110,16 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function MetaPatrimonialPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
+  const brand = useBrandSettings();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
     () => results ? <PDFMetaDoc
       r={results} inputs={inputs}
       clientName={clients.find((c) => c.id === selectedClientId)?.name}
       chartImg={captureChart("meta-cotas")}
       chartMeta={captureChart("meta-progresso")}
+    
+      brandLogoUrl={brand.isCustomLogo ? brand.logoUrl : undefined}
+      brandColor={brand.isCustomColor ? brand.color : undefined}
     /> : null,
     "meta-patrimonial.pdf",
   );
@@ -526,7 +531,7 @@ function ChartProgressoMeta({ r, inputs }: { r: MetaPatrimonialResults; inputs: 
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFMetaDoc({ r, inputs, clientName, chartImg, chartMeta }: {
+function PDFMetaDoc({ r, inputs, clientName, chartImg, chartMeta, brandLogoUrl, brandColor }: {
   r: MetaPatrimonialResults;
   inputs: {
     modo: ModoMeta;
@@ -543,6 +548,8 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg, chartMeta }: {
     [key: string]: unknown;
   };
   clientName?: string;
+  brandLogoUrl?: string;
+  brandColor?: string;
   chartImg?: string | null;
   chartMeta?: string | null;
 }) {
@@ -556,6 +563,8 @@ function PDFMetaDoc({ r, inputs, clientName, chartImg, chartMeta }: {
         subtitle="Plano de Aquisição de Patrimônio via Consórcio — Cálculo Reverso"
         clientName={clientName}
         date={hoje}
+        brandLogoUrl={brandLogoUrl}
+        brandColor={brandColor}
       />
       <RpPremises items={[
         ["Modo", inputs.modo === "patrimonio" ? "Patrimônio" : "Renda Passiva"],

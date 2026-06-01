@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useBrandSettings } from "@/hooks/useBrandSettings";
 import { calcLance, defaultLanceInputs, type LanceInputs, type LanceResults } from "@/lib/calc-lance";
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -110,6 +111,7 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function SimuladorLancePage() {
   const { user } = useAuth();
   const search = Route.useSearch();
+  const brand = useBrandSettings();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
     () => results ? <PDFLanceDoc
       r={results} inputs={inputs}
@@ -117,6 +119,9 @@ function SimuladorLancePage() {
       chartCusto={captureChart("lance-custo")}
       chartParcelas={captureChart("lance-parcelas")}
       chartDesembolso={captureChart("lance-desembolso")}
+    
+      brandLogoUrl={brand.isCustomLogo ? brand.logoUrl : undefined}
+      brandColor={brand.isCustomColor ? brand.color : undefined}
     /> : null,
     "Simulador_Lance_Consorcio.pdf",
   );
@@ -623,8 +628,10 @@ function ResultsLance({ r, inputs }: { r: LanceResults; inputs: LanceInputs }) {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFLanceDoc({ r, inputs, clientName, chartCusto, chartParcelas, chartDesembolso }: {
+function PDFLanceDoc({ r, inputs, clientName, chartCusto, chartParcelas, chartDesembolso, brandLogoUrl, brandColor }: {
   r: LanceResults; inputs: LanceInputs; clientName?: string;
+  brandLogoUrl?: string;
+  brandColor?: string;
   chartCusto?: string | null;
   chartParcelas?: string | null;
   chartDesembolso?: string | null;
@@ -651,6 +658,8 @@ function PDFLanceDoc({ r, inputs, clientName, chartCusto, chartParcelas, chartDe
         subtitle="Estratégia de Contemplação — Relatório Personalizado"
         clientName={clientName}
         date={hoje}
+        brandLogoUrl={brandLogoUrl}
+        brandColor={brandColor}
       />
       <RpPremises items={[
         ["Carta de crédito", fmtBRL(inputs.cartaCredito)],

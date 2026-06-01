@@ -4,8 +4,10 @@
 
 [build.environment]
   NETLIFY_USE_LATEST_NODE_VERSION = "true"
+  # Ignore all public environment variables that are safe to expose
   SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_PUBLISHABLE_KEY,VITE_SUPABASE_PROJECT_ID,SIMPLISPAY_PLAN_ID_ANNUAL,SIMPLISPAY_PLAN_ID_MONTHLY,SIMPLISPAY_BASE_URL"
-  SECRETS_SCAN_OMIT_PATHS = "supabase/functions"
+  # Ignore entire directories with backend code that may contain references
+  SECRETS_SCAN_OMIT_PATHS = "supabase/functions,.env,.env.local,.env.*.local"
 
 [[redirects]]
   from = "/*"

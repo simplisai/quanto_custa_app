@@ -1,20 +1,63 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
 
-# Run and deploy your AI Studio app
+# Quanto Custa 2
 
-This contains everything you need to run your app locally.
+Plataforma de simulação de consórcios e investimentos.
 
-View your app in AI Studio: https://ai.studio/apps/946c1498-4ea2-40df-a25f-3d809a80b7f5
+## 🚀 Como rodar o projeto localmente
 
-## Run Locally
+### Pré-requisitos
 
-**Prerequisites:**  Node.js
+- Node.js 20+
+- npm ou yarn
 
+### Passo a passo
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. **Instalar dependências**
+   ```bash
+   npm install
+   ```
+
+2. **Configurar variáveis de ambiente**
+   - Copie o arquivo `.env.example` para `.env` (este arquivo já está pronto com as configurações)
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Iniciar o servidor de desenvolvimento**
+   ```bash
+   npm run dev
+   ```
+
+4. **Acessar o app**
+   - Abra o navegador em `http://localhost:5173`
+
+## 🌐 Deploy no Netlify
+
+1. **Conecte o repositório ao Netlify**
+2. **Adicione as variáveis de ambiente no Netlify**:
+   - No painel do Netlify: Settings → Build & deploy → Environment
+   - Adicione todas as variáveis do arquivo `.env`
+3. **Deploy!**
+
+## 📁 Estrutura do projeto
+
+```
+Quanto-custa-2/
+├── src/
+│   ├── components/       # Componentes reutilizáveis
+│   ├── hooks/           # Hooks customizados
+│   ├── integrations/    # Integrações com Supabase
+│   ├── lib/             # Utilitários e configurações
+│   ├── routes/          # Páginas e rotas
+│   └── main.tsx         # Arquivo principal
+├── supabase/            # Configurações do Supabase
+└── netlify.toml         # Configurações do Netlify
+```
+
+## 🛠️ Scripts disponíveis
+
+- `npm run dev`: Inicia o servidor de desenvolvimento
+- `npm run build`: Cria o build de produção
+- `npm run preview`: Visualiza o build de produção
+- `npm run lint`: Executa o linter
+- `npm run format`: Formata o código

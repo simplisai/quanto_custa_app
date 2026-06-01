@@ -1,7 +1,10 @@
 /**
  * RpShell — React PDF shell components using @react-pdf/renderer primitives.
- * Drop-in replacement for PdfShell.tsx but renders to a real PDF without
- * html2canvas / DOM screenshots. Zero thread blocking.
+ * Renderiza um PDF real (sem html2canvas), com layout moderno e sofisticado.
+ *
+ * White-label: por padrão o header usa a logo oficial do Quanto Custa. Quando o
+ * corretor configura a marca, apenas o header muda (logo + cor de destaque) —
+ * o restante do documento mantém o mesmo padrão visual.
  */
 
 import React from "react";
@@ -9,18 +12,28 @@ import { Document, Page, View, Text, Image } from "@react-pdf/renderer";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 export const C = {
+  // Marca / acento padrão (financeiro, sóbrio)
   navy:    "#1a2a6c",
   navyLt:  "#2d4499",
+  // Semânticos
   red:     "#c0392b",
   green:   "#179a47",
   amber:   "#d47c00",
-  muted:   "#64748b",
-  faint:   "#f1f5f9",
-  border:  "#e2e8f0",
-  white:   "#ffffff",
+  // Neutros (escala slate refinada)
+  ink:     "#0f172a", // títulos
   text:    "#1e293b",
   textSub: "#475569",
+  muted:   "#64748b",
+  faint:   "#f8fafc", // fundo de card
+  soft:    "#f1f5f9",
+  border:  "#e2e8f0",
+  borderLt:"#eef2f6", // hairline
+  white:   "#ffffff",
 } as const;
+
+// Logo oficial (absoluta para o react-pdf conseguir buscar no browser)
+const QC_LOGO_DEFAULT =
+  typeof window !== "undefined" ? `${window.location.origin}/logo-dark.png` : "/logo-dark.png";
 
 // ─── Document wrapper ─────────────────────────────────────────────────────────
 export function RpDoc({ children, compact = false }: { children: React.ReactNode; compact?: boolean }) {
@@ -29,8 +42,8 @@ export function RpDoc({ children, compact = false }: { children: React.ReactNode
       <Page
         size="A4"
         style={{
-          paddingHorizontal: compact ? 4 : 36,
-          paddingVertical: compact ? 4 : 36,
+          paddingHorizontal: compact ? 4 : 38,
+          paddingVertical: compact ? 4 : 38,
           backgroundColor: C.white,
           fontFamily: "Helvetica",
           color: C.text,
@@ -42,16 +55,17 @@ export function RpDoc({ children, compact = false }: { children: React.ReactNode
   );
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────────
+// ─── Header (letterhead moderno) ────────────────────────────────────────────────
 export function RpHeader({
-  title,
+  title: _title,
   subtitle,
   clientName,
   date,
   brandLogoUrl,
   brandColor,
 }: {
-  title: string;
+  /** Mantido por compatibilidade de API — a identidade vem da logo. */
+  title?: string;
   subtitle: string;
   clientName?: string;
   date: string;
@@ -61,68 +75,53 @@ export function RpHeader({
   brandColor?: string;
 }) {
   const accent = brandColor || C.navy;
-  // react-pdf <Image> só renderiza raster — ignora SVG silenciosamente
-  const rasterLogo =
-    brandLogoUrl && /\.(png|jpe?g)(\?|$)/i.test(brandLogoUrl) ? brandLogoUrl : null;
+  // react-pdf <Image> só renderiza raster — ignora SVG e cai na logo oficial
+  const raster = brandLogoUrl && /\.(png|jpe?g)(\?|$)/i.test(brandLogoUrl) ? brandLogoUrl : null;
+  const logoSrc = raster || QC_LOGO_DEFAULT;
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        borderBottomWidth: 3,
-        borderBottomColor: accent,
-        paddingBottom: 12,
-        marginBottom: 18,
-      }}
-    >
-      {/* Left: branding */}
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        {rasterLogo ? (
-          <Image
-            src={rasterLogo}
-            style={{ width: 28, height: 28, marginRight: 8, objectFit: "contain" }}
-          />
-        ) : (
-          <View
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 6,
-              backgroundColor: accent,
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 8,
-            }}
-          >
-            <Text style={{ color: C.white, fontFamily: "Helvetica-Bold", fontSize: 14 }}>Q</Text>
+    <View style={{ marginBottom: 20 }}>
+      {/* Linha superior: logo + meta */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Image src={logoSrc} style={{ height: 26 }} />
+        <View style={{ alignItems: "flex-end" }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: accent, marginRight: 5 }} />
+            <Text style={{ fontSize: 7.5, letterSpacing: 1.2, color: accent, fontFamily: "Helvetica-Bold", textTransform: "uppercase" }}>
+              Relatório Exclusivo
+            </Text>
           </View>
-        )}
-        <View>
-          <Text style={{ fontSize: 15, color: accent, fontFamily: "Helvetica-Bold" }}>{title}</Text>
-          <Text style={{ fontSize: 8, color: C.muted, textTransform: "uppercase", marginTop: 1 }}>{subtitle}</Text>
+          <Text style={{ fontSize: 8.5, color: C.muted, marginTop: 3 }}>{date}</Text>
         </View>
       </View>
 
-      {/* Right: meta */}
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={{ fontFamily: "Helvetica-Bold", color: C.red, fontSize: 8, textTransform: "uppercase" }}>
-          Relatório Exclusivo
-        </Text>
-        <Text style={{ color: C.muted, fontSize: 9, marginTop: 3 }}>{date}</Text>
+      {/* Régua de destaque (cor da marca) */}
+      <View style={{ flexDirection: "row", marginTop: 12, height: 3 }}>
+        <View style={{ width: 48, backgroundColor: accent, borderRadius: 2 }} />
+        <View style={{ flex: 1, backgroundColor: C.borderLt, borderRadius: 2, marginLeft: 4 }} />
+      </View>
+
+      {/* Título do documento + cliente */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 12 }}>
+        <View style={{ flex: 1, paddingRight: 10 }}>
+          <Text style={{ fontSize: 17, color: C.ink, fontFamily: "Helvetica-Bold", letterSpacing: -0.4 }}>
+            {subtitle}
+          </Text>
+          <Text style={{ fontSize: 7.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8, marginTop: 3 }}>
+            Análise comparativa de crédito imobiliário
+          </Text>
+        </View>
         {clientName ? (
           <View
             style={{
-              marginTop: 5,
-              backgroundColor: C.navy,
-              paddingHorizontal: 10,
-              paddingVertical: 3,
+              backgroundColor: accent,
+              paddingHorizontal: 11,
+              paddingVertical: 4,
               borderRadius: 20,
             }}
           >
             <Text style={{ color: C.white, fontSize: 8, fontFamily: "Helvetica-Bold" }}>
-              Preparado para: {clientName}
+              Preparado para {clientName}
             </Text>
           </View>
         ) : null}
@@ -145,21 +144,17 @@ export function RpSection({
 }) {
   const accentColor = accent === "green" ? C.green : accent === "amber" ? C.amber : C.navy;
   return (
-    <View style={{ marginBottom: 14 }}>
-      <View
-        style={{
-          borderBottomWidth: 2,
-          borderBottomColor: accentColor,
-          paddingBottom: 4,
-          marginBottom: description ? 5 : 8,
-        }}
-      >
-        <Text style={{ fontSize: 8, color: accentColor, fontFamily: "Helvetica-Bold", textTransform: "uppercase" }}>
+    <View style={{ marginBottom: 15 }}>
+      {/* Cabeçalho da seção: marcador + label + hairline */}
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: description ? 5 : 8 }}>
+        <View style={{ width: 3, height: 11, borderRadius: 2, backgroundColor: accentColor, marginRight: 6 }} />
+        <Text style={{ fontSize: 8.5, color: C.ink, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 0.6 }}>
           {title}
         </Text>
+        <View style={{ flex: 1, height: 1, backgroundColor: C.borderLt, marginLeft: 8 }} />
       </View>
       {description ? (
-        <Text style={{ fontSize: 8.5, color: C.muted, marginBottom: 7, fontFamily: "Helvetica-Oblique" }}>
+        <Text style={{ fontSize: 8.5, color: C.muted, marginBottom: 8, fontFamily: "Helvetica-Oblique", lineHeight: 1.5 }}>
           {description}
         </Text>
       ) : null}
@@ -182,15 +177,25 @@ export function RpMetric({
 }) {
   const bg = color ?? C.navy;
   return (
-    <View style={{ flex: 1, backgroundColor: bg, borderRadius: 6, padding: 9 }}>
-      <Text style={{ fontSize: 7, color: C.white, textTransform: "uppercase", fontFamily: "Helvetica-Bold" }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: bg,
+        borderRadius: 8,
+        paddingVertical: 11,
+        paddingHorizontal: 11,
+      }}
+    >
+      <Text style={{ fontSize: 6.5, color: C.white, opacity: 0.8, textTransform: "uppercase", fontFamily: "Helvetica-Bold", letterSpacing: 0.5 }}>
         {label}
       </Text>
-      <Text style={{ fontSize: 14, color: C.white, fontFamily: "Helvetica-Bold", marginTop: 4 }}>
+      <Text style={{ fontSize: 15, color: C.white, fontFamily: "Helvetica-Bold", marginTop: 6, letterSpacing: -0.3 }}>
         {value}
       </Text>
       {description ? (
-        <Text style={{ fontSize: 7, color: C.white, marginTop: 4 }}>{description}</Text>
+        <Text style={{ fontSize: 6.5, color: C.white, opacity: 0.75, marginTop: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
+          {description}
+        </Text>
       ) : null}
     </View>
   );
@@ -199,7 +204,7 @@ export function RpMetric({
 // Row wrapper for metric cards
 export function RpMetricRow({ children }: { children: React.ReactNode }) {
   return (
-    <View style={{ flexDirection: "row", gap: 7, marginBottom: 10 }}>
+    <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
       {children}
     </View>
   );
@@ -207,9 +212,7 @@ export function RpMetricRow({ children }: { children: React.ReactNode }) {
 
 // ─── Insight box ──────────────────────────────────────────────────────────────
 export function RpInsight({
-  // `emoji` é mantido por compatibilidade de API, mas NÃO é renderizado: as
-  // fontes padrão do @react-pdf (Helvetica) não possuem glifos de emoji e
-  // produziam caracteres corrompidos no PDF (ex.: "<ÆPor que consórcio...").
+  // `emoji` mantido por compat — não renderizado (Helvetica não tem glifos emoji).
   emoji: _emoji,
   title,
   body,
@@ -232,8 +235,8 @@ export function RpInsight({
         backgroundColor: bg,
         borderLeftWidth: 3,
         borderLeftColor: border,
-        borderRadius: 6,
-        padding: 10,
+        borderRadius: 8,
+        padding: 11,
         marginBottom: 12,
       }}
     >
@@ -252,7 +255,7 @@ export function RpKVList({
   rows: { label: string; value: string; color?: string }[];
 }) {
   return (
-    <View>
+    <View style={{ borderWidth: 1, borderColor: C.borderLt, borderRadius: 8, overflow: "hidden" }}>
       {rows.map(({ label, value, color }, i) => (
         <View
           key={i}
@@ -260,13 +263,13 @@ export function RpKVList({
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
-            paddingVertical: 4,
-            borderBottomWidth: 1,
-            borderBottomColor: C.border,
+            paddingVertical: 5.5,
+            paddingHorizontal: 10,
+            backgroundColor: i % 2 === 0 ? C.white : C.faint,
           }}
         >
           <Text style={{ fontSize: 9, color: C.textSub, flex: 1 }}>{label}</Text>
-          <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: color ?? C.text }}>
+          <Text style={{ fontSize: 9.5, fontFamily: "Helvetica-Bold", color: color ?? C.ink }}>
             {value}
           </Text>
         </View>
@@ -289,41 +292,23 @@ export function RpTable({
   }[];
 }) {
   return (
-    <View>
+    <View style={{ borderWidth: 1, borderColor: C.borderLt, borderRadius: 8, overflow: "hidden" }}>
       {rows.map(({ label, left, right, highlight, leftColor, rightColor }, i) => (
         <View
           key={i}
           style={{
             flexDirection: "row",
-            paddingVertical: 4,
-            paddingHorizontal: highlight ? 5 : 0,
-            borderBottomWidth: 1,
-            borderBottomColor: C.border,
-            backgroundColor: highlight ? "#f0fdf4" : "transparent",
-            borderRadius: highlight ? 4 : 0,
+            alignItems: "center",
+            paddingVertical: 5.5,
+            paddingHorizontal: 10,
+            backgroundColor: highlight ? "#f0fdf4" : i % 2 === 0 ? C.white : C.faint,
           }}
         >
           <Text style={{ fontSize: 9, color: C.textSub, flex: 1 }}>{label}</Text>
-          <Text
-            style={{
-              fontSize: 9,
-              color: leftColor ?? C.red,
-              width: 90,
-              textAlign: "right",
-              fontFamily: "Helvetica-Bold",
-            }}
-          >
+          <Text style={{ fontSize: 9, color: leftColor ?? C.red, width: 90, textAlign: "right", fontFamily: "Helvetica-Bold" }}>
             {left}
           </Text>
-          <Text
-            style={{
-              fontSize: 9,
-              color: rightColor ?? C.green,
-              width: 90,
-              textAlign: "right",
-              fontFamily: highlight ? "Helvetica-Bold" : "Helvetica-Bold",
-            }}
-          >
+          <Text style={{ fontSize: 9, color: rightColor ?? C.green, width: 90, textAlign: "right", fontFamily: "Helvetica-Bold" }}>
             {right}
           </Text>
         </View>
@@ -334,36 +319,35 @@ export function RpTable({
 
 // ─── Premises chips ───────────────────────────────────────────────────────────
 export function RpPremises({ items }: { items: [string, string][] }) {
-  // Split into rows of 4 chips
   const rows: [string, string][][] = [];
   for (let i = 0; i < items.length; i += 4) {
     rows.push(items.slice(i, i + 4) as [string, string][]);
   }
   return (
-    <View style={{ marginBottom: 14 }}>
+    <View style={{ marginBottom: 16 }}>
       {rows.map((row, ri) => (
-        <View key={ri} style={{ flexDirection: "row", gap: 6, marginBottom: ri < rows.length - 1 ? 6 : 0 }}>
+        <View key={ri} style={{ flexDirection: "row", gap: 7, marginBottom: ri < rows.length - 1 ? 7 : 0 }}>
           {row.map(([label, value]) => (
             <View
               key={label}
               style={{
                 flex: 1,
                 backgroundColor: C.faint,
-                padding: 7,
-                borderRadius: 5,
-                borderLeftWidth: 3,
-                borderLeftColor: C.navy,
+                paddingVertical: 8,
+                paddingHorizontal: 9,
+                borderRadius: 7,
+                borderWidth: 1,
+                borderColor: C.borderLt,
               }}
             >
-              <Text style={{ fontSize: 7, color: C.muted, fontFamily: "Helvetica-Bold", textTransform: "uppercase" }}>
+              <Text style={{ fontSize: 6.5, color: C.muted, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 0.4 }}>
                 {label}
               </Text>
-              <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 2, color: C.text }}>
+              <Text style={{ fontSize: 10.5, fontFamily: "Helvetica-Bold", marginTop: 3, color: C.ink, letterSpacing: -0.2 }}>
                 {value}
               </Text>
             </View>
           ))}
-          {/* Pad the last row with empty flex boxes so chips align */}
           {Array.from({ length: 4 - row.length }).map((_, k) => (
             <View key={`pad-${k}`} style={{ flex: 1 }} />
           ))}
@@ -374,8 +358,6 @@ export function RpPremises({ items }: { items: [string, string][] }) {
 }
 
 // ─── Gráfico (imagem capturada do chart.js) ─────────────────────────────────
-// Recebe um data URL PNG (canvas.toDataURL) e o renderiza no PDF. Não renderiza
-// nada se `src` estiver vazio (ex.: exportado fora do navegador).
 export function RpChartImage({
   src,
   title,
@@ -387,11 +369,23 @@ export function RpChartImage({
 }) {
   if (!src) return null;
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View
+      style={{
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: C.borderLt,
+        borderRadius: 8,
+        padding: 10,
+        backgroundColor: C.white,
+      }}
+    >
       {title ? (
-        <Text style={{ fontSize: 8, color: C.muted, fontFamily: "Helvetica-Bold", textTransform: "uppercase", marginBottom: 4 }}>
-          {title}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+          <View style={{ width: 3, height: 9, borderRadius: 2, backgroundColor: C.navy, marginRight: 5 }} />
+          <Text style={{ fontSize: 7.5, color: C.muted, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            {title}
+          </Text>
+        </View>
       ) : null}
       <Image src={src} style={{ width: "100%", height, objectFit: "contain" }} />
     </View>
@@ -403,23 +397,26 @@ export function RpFooter({ note }: { note?: string }) {
   const defaultNote =
     "Simulação elaborada com base nos dados informados. Os resultados são estimativas e podem variar conforme as condições reais do mercado, políticas da administradora e índices vigentes. Consulte um especialista antes de tomar decisões financeiras.";
   return (
-    <View
-      style={{
-        marginTop: 14,
-        padding: 10,
-        backgroundColor: C.faint,
-        borderRadius: 5,
-        borderLeftWidth: 3,
-        borderLeftColor: C.navy,
-      }}
-    >
-      <Text style={{ fontSize: 7.5, color: C.muted, lineHeight: 1.5 }}>
-        <Text style={{ fontFamily: "Helvetica-Bold", color: C.navy }}>Nota técnica: </Text>
-        {note ?? defaultNote}
-      </Text>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 5 }}>
-        <Text style={{ fontSize: 7, color: C.muted }}>Gerado por Quanto Custa • Sistema de Inteligência Imobiliária</Text>
-        <Text style={{ fontSize: 7, color: C.muted }}>quantocusta.pro</Text>
+    <View style={{ marginTop: 16 }}>
+      <View
+        style={{
+          padding: 11,
+          backgroundColor: C.faint,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: C.borderLt,
+        }}
+      >
+        <Text style={{ fontSize: 7.5, color: C.muted, lineHeight: 1.55 }}>
+          <Text style={{ fontFamily: "Helvetica-Bold", color: C.ink }}>Nota técnica: </Text>
+          {note ?? defaultNote}
+        </Text>
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+        <Text style={{ fontSize: 7, color: C.muted }}>
+          Gerado por Quanto Custa • Sistema de Inteligência Imobiliária
+        </Text>
+        <Text style={{ fontSize: 7, color: C.muted, fontFamily: "Helvetica-Bold" }}>quantocusta.pro</Text>
       </View>
     </View>
   );

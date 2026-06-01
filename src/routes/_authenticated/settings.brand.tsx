@@ -283,19 +283,31 @@ function BrandSettingsPage() {
                 Header do PDF
               </span>
             </div>
-            <div className="flex items-center gap-3 p-4" style={{ borderBottom: `3px solid ${color}` }}>
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md"
-                style={{ backgroundColor: color }}
-              >
+            <div className="bg-white p-4">
+              {/* logo + eyebrow */}
+              <div className="flex items-center justify-between">
                 {uploading
-                  ? <Loader2 className="h-4 w-4 animate-spin text-white" />
-                  : <img src={previewLogo} alt="logo" className="h-full w-full object-contain" />}
+                  ? <Loader2 className="h-5 w-5 animate-spin" style={{ color }} />
+                  : <img src={previewLogo} alt="logo" className="h-6 object-contain" />}
+                <div className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color }}>
+                    Relatório Exclusivo
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-bold" style={{ color }}>Relatório Patrimonial</p>
-                <p className="text-[9px] uppercase text-muted-foreground">Inteligência Imobiliária</p>
+              {/* accent rule */}
+              <div className="mt-3 flex h-[3px] gap-1">
+                <div className="w-12 rounded-full" style={{ backgroundColor: color }} />
+                <div className="flex-1 rounded-full bg-slate-100" />
               </div>
+              {/* title */}
+              <p className="mt-3 text-[13px] font-extrabold tracking-tight text-slate-900">
+                Relatório de Inteligência Patrimonial
+              </p>
+              <p className="text-[8px] uppercase tracking-wide text-slate-400">
+                Análise comparativa de crédito imobiliário
+              </p>
             </div>
           </div>
 

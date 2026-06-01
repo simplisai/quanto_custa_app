@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useBrandSettings } from "@/hooks/useBrandSettings";
 import {
   calcConsorcioCNPJ,
   defaultCNPJInputs,
@@ -106,12 +107,16 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function ConsorcioCNPJPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
+  const brand = useBrandSettings();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
     () => results ? <PDFCnpjDoc
       r={results} inputs={inputs}
       clientName={clients.find((c) => c.id === selectedClientId)?.name}
       chartImg={captureChart("cnpj-parcelas")}
       chartEconomia={captureChart("cnpj-economia")}
+    
+      brandLogoUrl={brand.isCustomLogo ? brand.logoUrl : undefined}
+      brandColor={brand.isCustomColor ? brand.color : undefined}
     /> : null,
     "consorcio-cnpj.pdf",
   );
@@ -496,7 +501,7 @@ function ChartEconomiaCnpj({ r }: { r: ConsorcioCNPJResults }) {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFCnpjDoc({ r, inputs, clientName, chartImg, chartEconomia }: {
+function PDFCnpjDoc({ r, inputs, clientName, chartImg, chartEconomia, brandLogoUrl, brandColor }: {
   r: ConsorcioCNPJResults;
   inputs: {
     cartaCredito: number;
@@ -513,6 +518,8 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg, chartEconomia }: {
     [key: string]: unknown;
   };
   clientName?: string;
+  brandLogoUrl?: string;
+  brandColor?: string;
   chartImg?: string | null;
   chartEconomia?: string | null;
 }) {
@@ -528,6 +535,8 @@ function PDFCnpjDoc({ r, inputs, clientName, chartImg, chartEconomia }: {
         subtitle="Beneficio Fiscal PJ — Parcelas Dedutiveis como Despesa Operacional"
         clientName={clientName}
         date={hoje}
+        brandLogoUrl={brandLogoUrl}
+        brandColor={brandColor}
       />
       <RpPremises items={[
         ["Carta de crédito", fmtBRL(inputs.cartaCredito)],

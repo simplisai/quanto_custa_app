@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useBrandSettings } from "@/hooks/useBrandSettings";
 import {
   calcAluguelVsConsorcio,
   defaultAluguelInputs,
@@ -114,12 +115,16 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function AluguelVsConsorcioPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
+  const brand = useBrandSettings();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
     () => results ? <PDFAluguelDoc
       r={results} inputs={inputs}
       clientName={clients.find((c) => c.id === selectedClientId)?.name}
       chartEvolucao={captureChart("avc-evolucao")}
       chartComparativo={captureChart("avc-comparativo")}
+    
+      brandLogoUrl={brand.isCustomLogo ? brand.logoUrl : undefined}
+      brandColor={brand.isCustomColor ? brand.color : undefined}
     /> : null,
     "Aluguel_vs_Consorcio.pdf",
   );
@@ -551,8 +556,10 @@ function ResultsAluguel({ r, inputs }: { r: AluguelResults; inputs: AluguelInput
   );
 }
 
-function PDFAluguelDoc({ r, inputs, clientName, chartEvolucao, chartComparativo }: {
+function PDFAluguelDoc({ r, inputs, clientName, chartEvolucao, chartComparativo, brandLogoUrl, brandColor }: {
   r: AluguelResults; inputs: AluguelInputs; clientName?: string;
+  brandLogoUrl?: string;
+  brandColor?: string;
   chartEvolucao?: string | null;
   chartComparativo?: string | null;
 }) {
@@ -566,6 +573,8 @@ function PDFAluguelDoc({ r, inputs, clientName, chartEvolucao, chartComparativo 
         subtitle="Analise Patrimonial — O Custo Real de Continuar Alugando"
         clientName={clientName}
         date={hoje}
+        brandLogoUrl={brandLogoUrl}
+        brandColor={brandColor}
       />
       <RpPremises items={[
         ["Aluguel atual", fmtBRL(inputs.aluguelAtual)],

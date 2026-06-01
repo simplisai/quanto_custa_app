@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useBrandSettings } from "@/hooks/useBrandSettings";
 import {
   calcFlipCota,
   defaultFlipCotaInputs,
@@ -117,8 +118,12 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function FlipCotaPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
+  const brand = useBrandSettings();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFFlipDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("flip-rentab")} /> : null,
+    () => results ? <PDFFlipDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartImg={captureChart("flip-rentab")} 
+      brandLogoUrl={brand.isCustomLogo ? brand.logoUrl : undefined}
+      brandColor={brand.isCustomColor ? brand.color : undefined}
+    /> : null,
     "Flip_Cota_Consorcio.pdf",
   );
 
@@ -506,8 +511,10 @@ function ResultsFlip({ r, inputs }: { r: FlipCotaResults; inputs: FlipCotaInputs
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFFlipDoc({ r, inputs, clientName, chartImg }: {
-  r: FlipCotaResults; inputs: FlipCotaInputs; clientName?: string; chartImg?: string | null;
+function PDFFlipDoc({ r, inputs, clientName, chartImg, brandLogoUrl, brandColor }: {
+  r: FlipCotaResults; inputs: FlipCotaInputs; clientName?: string;
+  brandLogoUrl?: string;
+  brandColor?: string; chartImg?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -518,6 +525,8 @@ function PDFFlipDoc({ r, inputs, clientName, chartImg }: {
         subtitle="Estratégia de Compra e Venda de Cota — Relatório de Retorno"
         clientName={clientName}
         date={hoje}
+        brandLogoUrl={brandLogoUrl}
+        brandColor={brandColor}
       />
       <RpPremises items={[
         ["Carta de crédito", fmtBRL(inputs.cartaCredito)],

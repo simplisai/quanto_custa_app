@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useBrandSettings } from "@/hooks/useBrandSettings";
 import {
   calcRendaPassiva,
   defaultRendaPassivaInputs,
@@ -115,8 +116,12 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function RendaPassivaPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
+  const brand = useBrandSettings();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
-    () => results ? <PDFRendaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartPrincipal={captureChart("renda-principal")} chartPatrimonio={captureChart("renda-patrimonio")} /> : null,
+    () => results ? <PDFRendaDoc r={results} inputs={inputs} clientName={clients.find((c) => c.id === selectedClientId)?.name} chartPrincipal={captureChart("renda-principal")} chartPatrimonio={captureChart("renda-patrimonio")} 
+      brandLogoUrl={brand.isCustomLogo ? brand.logoUrl : undefined}
+      brandColor={brand.isCustomColor ? brand.color : undefined}
+    /> : null,
     "Renda_Passiva_Consorcio.pdf",
   );
 
@@ -528,8 +533,10 @@ function ResultsRenda({ r, inputs }: { r: RendaPassivaResults; inputs: RendaPass
   );
 }
 
-function PDFRendaDoc({ r, inputs, clientName, chartPrincipal, chartPatrimonio }: {
+function PDFRendaDoc({ r, inputs, clientName, chartPrincipal, chartPatrimonio, brandLogoUrl, brandColor }: {
   r: RendaPassivaResults; inputs: RendaPassivaInputs; clientName?: string;
+  brandLogoUrl?: string;
+  brandColor?: string;
   chartPrincipal?: string | null; chartPatrimonio?: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
@@ -555,6 +562,8 @@ function PDFRendaDoc({ r, inputs, clientName, chartPrincipal, chartPatrimonio }:
         subtitle="Consórcio como Investimento — Relatório de Viabilidade"
         clientName={clientName}
         date={hoje}
+        brandLogoUrl={brandLogoUrl}
+        brandColor={brandColor}
       />
       <RpPremises items={[
         ["Carta de crédito", fmtBRL(inputs.cartaCredito)],

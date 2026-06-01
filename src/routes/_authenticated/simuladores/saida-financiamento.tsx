@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useBrandSettings } from "@/hooks/useBrandSettings";
 import {
   calcSaidaFinanciamento,
   defaultSaidaInputs,
@@ -115,12 +116,16 @@ function KPI({ icon: Icon, label, value, sub, variant = "default" }: {
 function SaidaFinanciamentoPage() {
   const { user } = useAuth();
   const search = Route.useSearch();
+  const brand = useBrandSettings();
   const { exportPDF, shareWhatsApp, isExporting } = usePdfExport(
     () => results ? <PDFSaidaDoc
       r={results} inputs={inputs}
       clientName={clients.find((c) => c.id === selectedClientId)?.name}
       chartImg={captureChart("saida-evolucao")}
       chartCustos={captureChart("saida-custos")}
+    
+      brandLogoUrl={brand.isCustomLogo ? brand.logoUrl : undefined}
+      brandColor={brand.isCustomColor ? brand.color : undefined}
     /> : null,
     "saida-financiamento.pdf",
   );
@@ -534,7 +539,7 @@ function SaidaFinanciamentoPage() {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFSaidaDoc({ r, inputs, clientName, chartImg, chartCustos }: {
+function PDFSaidaDoc({ r, inputs, clientName, chartImg, chartCustos, brandLogoUrl, brandColor }: {
   r: SaidaFinanciamentoResults;
   inputs: {
     valorImovelAtual: number;
@@ -551,6 +556,8 @@ function PDFSaidaDoc({ r, inputs, clientName, chartImg, chartCustos }: {
     [key: string]: unknown;
   };
   clientName?: string;
+  brandLogoUrl?: string;
+  brandColor?: string;
   chartImg?: string | null;
   chartCustos?: string | null;
 }) {
@@ -563,6 +570,8 @@ function PDFSaidaDoc({ r, inputs, clientName, chartImg, chartCustos }: {
         subtitle="Migração do Financiamento Bancário para Consórcio — Análise de Viabilidade"
         clientName={clientName}
         date={hoje}
+        brandLogoUrl={brandLogoUrl}
+        brandColor={brandColor}
       />
       <RpPremises items={[
         ["Valor do imóvel", fmtBRL(inputs.valorImovelAtual)],
