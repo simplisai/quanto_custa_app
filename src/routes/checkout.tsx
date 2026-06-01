@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate, useLocation, Link } from "@tanstack/react
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { Logo } from "@/components/Logo";
 import { ReferralBanner } from "@/components/landing/ReferralBanner";
 import { useReferralStatus } from "@/hooks/useReferralStatus";
@@ -218,12 +217,16 @@ function CheckoutPage() {
         ? `${window.location.origin}/checkout?plan=${cycle}`
         : `/checkout?plan=${cycle}`;
 
-      const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: redirectUri });
-      if (result.error) {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUri,
+        },
+      });
+      if (error) {
         toast.error("Erro ao iniciar login com Google.");
         setOauthLoading(false);
       }
-      // If result.redirected === true, browser is redirecting — nothing to do
     } catch {
       toast.error("Erro ao iniciar login com Google.");
       setOauthLoading(false);

@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate, useLocation } from "@tanstack/react
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { Logo } from "@/components/Logo";
 import { ArrowRight } from "lucide-react";
 
@@ -46,11 +45,13 @@ function LoginPage() {
   };
 
   const google = async () => {
-    const r = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: emailRedirectTo,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: emailRedirectTo,
+      },
     });
-    if (r.error) toast.error(r.error.message);
-    else if (!r.redirected) goAfterAuth();
+    if (error) toast.error(error.message);
   };
 
   return (

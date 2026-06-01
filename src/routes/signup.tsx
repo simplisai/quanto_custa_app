@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate, useLocation } from "@tanstack/react
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { Logo } from "@/components/Logo";
 import { ArrowRight } from "lucide-react";
 import { readReferralCode } from "@/routes/$referralCode";
@@ -94,10 +93,16 @@ function SignupPage() {
   };
 
   const google = async () => {
-    const r = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: emailRedirectTo,
+    const referralCode = readReferralCode() ?? undefined;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: emailRedirectTo,
+        queryParams: referralCode ? { referral_code: referralCode } : undefined,
+        data: referralCode ? { referral_code: referralCode } : undefined,
+      },
     });
-    if (r.error) toast.error(r.error.message);
+    if (error) toast.error(error.message);
   };
 
   return (

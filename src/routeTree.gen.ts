@@ -9,24 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ReferralCodeRouteImport } from './routes/$referralCode'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as ReferralCodeRouteImport } from './routes/$referralCode'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FSlugRouteImport } from './routes/f.$slug'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedSuporteRouteImport } from './routes/_authenticated/suporte'
 import { Route as AuthenticatedSimuladoresRouteImport } from './routes/_authenticated/simuladores'
-import { Route as AuthenticatedSimuladoresLanceRouteImport } from './routes/_authenticated/simuladores/lance'
-import { Route as AuthenticatedSimuladoresAluguelVsConsorcioRouteImport } from './routes/_authenticated/simuladores/aluguel-vs-consorcio'
-import { Route as AuthenticatedSimuladoresRendaPassivaRouteImport } from './routes/_authenticated/simuladores/renda-passiva'
-import { Route as AuthenticatedSimuladoresFlipCotaRouteImport } from './routes/_authenticated/simuladores/flip-cota'
-import { Route as AuthenticatedSimuladoresEstrategiaSlugRouteImport } from './routes/_authenticated/simuladores/estrategia/$slug'
-import { Route as AuthenticatedSimuladoresSaidaFinanciamentoRouteImport } from './routes/_authenticated/simuladores/saida-financiamento'
-import { Route as AuthenticatedSimuladoresMetaPatrimonialRouteImport } from './routes/_authenticated/simuladores/meta-patrimonial'
-import { Route as AuthenticatedSimuladoresConsorcioCNPJRouteImport } from './routes/_authenticated/simuladores/consorcio-cnpj'
+import { Route as AuthenticatedIndicarRouteImport } from './routes/_authenticated/indicar'
 import { Route as AuthenticatedHistoricoRouteImport } from './routes/_authenticated/historico'
+import { Route as AuthenticatedFormulariosRouteImport } from './routes/_authenticated/formularios'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedAssinaturaRouteImport } from './routes/_authenticated/assinatura'
@@ -34,24 +29,25 @@ import { Route as AuthenticatedAssinarRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedSimuladoresSaidaFinanciamentoRouteImport } from './routes/_authenticated/simuladores/saida-financiamento'
+import { Route as AuthenticatedSimuladoresRendaPassivaRouteImport } from './routes/_authenticated/simuladores/renda-passiva'
+import { Route as AuthenticatedSimuladoresMetaPatrimonialRouteImport } from './routes/_authenticated/simuladores/meta-patrimonial'
+import { Route as AuthenticatedSimuladoresLanceRouteImport } from './routes/_authenticated/simuladores/lance'
+import { Route as AuthenticatedSimuladoresFlipCotaRouteImport } from './routes/_authenticated/simuladores/flip-cota'
+import { Route as AuthenticatedSimuladoresConsorcioCnpjRouteImport } from './routes/_authenticated/simuladores/consorcio-cnpj'
+import { Route as AuthenticatedSimuladoresAluguelVsConsorcioRouteImport } from './routes/_authenticated/simuladores/aluguel-vs-consorcio'
+import { Route as AuthenticatedSettingsBrandRouteImport } from './routes/_authenticated/settings.brand'
+import { Route as AuthenticatedFormulariosIdRouteImport } from './routes/_authenticated/formularios.$id'
 import { Route as AuthenticatedAdminWebhooksRouteImport } from './routes/_authenticated/admin.webhooks'
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin.usuarios'
 import { Route as AuthenticatedAdminSuporteRouteImport } from './routes/_authenticated/admin.suporte'
-import { Route as AuthenticatedAdminFinanceiroRouteImport } from './routes/_authenticated/admin.financeiro'
-import { Route as AuthenticatedAdminAssinaturasRouteImport } from './routes/_authenticated/admin.assinaturas'
 import { Route as AuthenticatedAdminSimuladoresRouteImport } from './routes/_authenticated/admin.simuladores'
-import { Route as AuthenticatedAdminSimuladoresSlugRouteImport } from './routes/_authenticated/admin.simuladores.$slug'
+import { Route as AuthenticatedAdminFinanceiroRouteImport } from './routes/_authenticated/admin.financeiro'
 import { Route as AuthenticatedAdminCamposRouteImport } from './routes/_authenticated/admin.campos'
-import { Route as AuthenticatedIndicarRouteImport } from './routes/_authenticated/indicar'
-import { Route as AuthenticatedFormulariosRouteImport } from './routes/_authenticated/formularios'
-import { Route as AuthenticatedFormulariosIdRouteImport } from './routes/_authenticated/formularios.$id'
-import { Route as FSlugRouteImport } from './routes/f.$slug'
+import { Route as AuthenticatedAdminAssinaturasRouteImport } from './routes/_authenticated/admin.assinaturas'
+import { Route as AuthenticatedSimuladoresEstrategiaSlugRouteImport } from './routes/_authenticated/simuladores/estrategia/$slug'
+import { Route as AuthenticatedAdminSimuladoresSlugRouteImport } from './routes/_authenticated/admin.simuladores.$slug'
 
-const ReferralCodeRoute = ReferralCodeRouteImport.update({
-  id: '/$referralCode',
-  path: '/$referralCode',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -71,9 +67,19 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReferralCodeRoute = ReferralCodeRouteImport.update({
+  id: '/$referralCode',
+  path: '/$referralCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FSlugRoute = FSlugRouteImport.update({
+  id: '/f/$slug',
+  path: '/f/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
@@ -92,59 +98,22 @@ const AuthenticatedSimuladoresRoute =
     path: '/simuladores',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedSimuladoresLanceRoute =
-  AuthenticatedSimuladoresLanceRouteImport.update({
-    id: '/simuladores/lance',
-    path: '/simuladores/lance',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSimuladoresAluguelVsConsorcioRoute =
-  AuthenticatedSimuladoresAluguelVsConsorcioRouteImport.update({
-    id: '/simuladores/aluguel-vs-consorcio',
-    path: '/simuladores/aluguel-vs-consorcio',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSimuladoresRendaPassivaRoute =
-  AuthenticatedSimuladoresRendaPassivaRouteImport.update({
-    id: '/simuladores/renda-passiva',
-    path: '/simuladores/renda-passiva',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSimuladoresFlipCotaRoute =
-  AuthenticatedSimuladoresFlipCotaRouteImport.update({
-    id: '/simuladores/flip-cota',
-    path: '/simuladores/flip-cota',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSimuladoresEstrategiaSlugRoute =
-  AuthenticatedSimuladoresEstrategiaSlugRouteImport.update({
-    id: '/simuladores/estrategia/$slug',
-    path: '/simuladores/estrategia/$slug',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSimuladoresSaidaFinanciamentoRoute =
-  AuthenticatedSimuladoresSaidaFinanciamentoRouteImport.update({
-    id: '/simuladores/saida-financiamento',
-    path: '/simuladores/saida-financiamento',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSimuladoresMetaPatrimonialRoute =
-  AuthenticatedSimuladoresMetaPatrimonialRouteImport.update({
-    id: '/simuladores/meta-patrimonial',
-    path: '/simuladores/meta-patrimonial',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSimuladoresConsorcioCNPJRoute =
-  AuthenticatedSimuladoresConsorcioCNPJRouteImport.update({
-    id: '/simuladores/consorcio-cnpj',
-    path: '/simuladores/consorcio-cnpj',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
+const AuthenticatedIndicarRoute = AuthenticatedIndicarRouteImport.update({
+  id: '/indicar',
+  path: '/indicar',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedHistoricoRoute = AuthenticatedHistoricoRouteImport.update({
   id: '/historico',
   path: '/historico',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFormulariosRoute =
+  AuthenticatedFormulariosRouteImport.update({
+    id: '/formularios',
+    path: '/formularios',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -180,6 +149,60 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedSimuladoresSaidaFinanciamentoRoute =
+  AuthenticatedSimuladoresSaidaFinanciamentoRouteImport.update({
+    id: '/saida-financiamento',
+    path: '/saida-financiamento',
+    getParentRoute: () => AuthenticatedSimuladoresRoute,
+  } as any)
+const AuthenticatedSimuladoresRendaPassivaRoute =
+  AuthenticatedSimuladoresRendaPassivaRouteImport.update({
+    id: '/renda-passiva',
+    path: '/renda-passiva',
+    getParentRoute: () => AuthenticatedSimuladoresRoute,
+  } as any)
+const AuthenticatedSimuladoresMetaPatrimonialRoute =
+  AuthenticatedSimuladoresMetaPatrimonialRouteImport.update({
+    id: '/meta-patrimonial',
+    path: '/meta-patrimonial',
+    getParentRoute: () => AuthenticatedSimuladoresRoute,
+  } as any)
+const AuthenticatedSimuladoresLanceRoute =
+  AuthenticatedSimuladoresLanceRouteImport.update({
+    id: '/lance',
+    path: '/lance',
+    getParentRoute: () => AuthenticatedSimuladoresRoute,
+  } as any)
+const AuthenticatedSimuladoresFlipCotaRoute =
+  AuthenticatedSimuladoresFlipCotaRouteImport.update({
+    id: '/flip-cota',
+    path: '/flip-cota',
+    getParentRoute: () => AuthenticatedSimuladoresRoute,
+  } as any)
+const AuthenticatedSimuladoresConsorcioCnpjRoute =
+  AuthenticatedSimuladoresConsorcioCnpjRouteImport.update({
+    id: '/consorcio-cnpj',
+    path: '/consorcio-cnpj',
+    getParentRoute: () => AuthenticatedSimuladoresRoute,
+  } as any)
+const AuthenticatedSimuladoresAluguelVsConsorcioRoute =
+  AuthenticatedSimuladoresAluguelVsConsorcioRouteImport.update({
+    id: '/aluguel-vs-consorcio',
+    path: '/aluguel-vs-consorcio',
+    getParentRoute: () => AuthenticatedSimuladoresRoute,
+  } as any)
+const AuthenticatedSettingsBrandRoute =
+  AuthenticatedSettingsBrandRouteImport.update({
+    id: '/settings/brand',
+    path: '/settings/brand',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedFormulariosIdRoute =
+  AuthenticatedFormulariosIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedFormulariosRoute,
+  } as any)
 const AuthenticatedAdminWebhooksRoute =
   AuthenticatedAdminWebhooksRouteImport.update({
     id: '/webhooks',
@@ -198,10 +221,22 @@ const AuthenticatedAdminSuporteRoute =
     path: '/suporte',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminSimuladoresRoute =
+  AuthenticatedAdminSimuladoresRouteImport.update({
+    id: '/simuladores',
+    path: '/simuladores',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminFinanceiroRoute =
   AuthenticatedAdminFinanceiroRouteImport.update({
     id: '/financeiro',
     path: '/financeiro',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminCamposRoute =
+  AuthenticatedAdminCamposRouteImport.update({
+    id: '/campos',
+    path: '/campos',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminAssinaturasRoute =
@@ -210,169 +245,145 @@ const AuthenticatedAdminAssinaturasRoute =
     path: '/assinaturas',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
-const AuthenticatedAdminSimuladoresRoute =
-  AuthenticatedAdminSimuladoresRouteImport.update({
-    id: '/_authenticated/admin/simuladores',
-    path: '/admin/simuladores',
-    getParentRoute: () => AuthenticatedRoute,
+const AuthenticatedSimuladoresEstrategiaSlugRoute =
+  AuthenticatedSimuladoresEstrategiaSlugRouteImport.update({
+    id: '/estrategia/$slug',
+    path: '/estrategia/$slug',
+    getParentRoute: () => AuthenticatedSimuladoresRoute,
   } as any)
-const AuthenticatedIndicarRoute = AuthenticatedIndicarRouteImport.update({
-  id: '/indicar',
-  path: '/indicar',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedFormulariosRoute = AuthenticatedFormulariosRouteImport.update({
-  id: '/formularios',
-  path: '/formularios',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedFormulariosIdRoute = AuthenticatedFormulariosIdRouteImport.update({
-  id: '/formularios/$id',
-  path: '/formularios/$id',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const FSlugRoute = FSlugRouteImport.update({
-  id: '/f/$slug',
-  path: '/f/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthenticatedAdminSimuladoresSlugRoute =
   AuthenticatedAdminSimuladoresSlugRouteImport.update({
-    id: '/_authenticated/admin/simuladores/$slug',
-    path: '/admin/simuladores/$slug',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedAdminCamposRoute =
-  AuthenticatedAdminCamposRouteImport.update({
-    id: '/_authenticated/admin/campos',
-    path: '/admin/campos',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/$slug',
+    path: '/$slug',
+    getParentRoute: () => AuthenticatedAdminSimuladoresRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$referralCode': typeof ReferralCodeRoute
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/$referralCode': typeof ReferralCodeRoute
-  '/f/$slug': typeof FSlugRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/app': typeof AuthenticatedAppRoute
   '/assinar': typeof AuthenticatedAssinarRoute
   '/assinatura': typeof AuthenticatedAssinaturaRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/formularios': typeof AuthenticatedFormulariosRoute
-  '/formularios/$id': typeof AuthenticatedFormulariosIdRoute
+  '/formularios': typeof AuthenticatedFormulariosRouteWithChildren
   '/historico': typeof AuthenticatedHistoricoRoute
   '/indicar': typeof AuthenticatedIndicarRoute
-  '/simuladores': typeof AuthenticatedSimuladoresRoute
-  '/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
-  '/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
-  '/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
-  '/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
-  '/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
-  '/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
-  '/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
-  '/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCNPJRoute
+  '/simuladores': typeof AuthenticatedSimuladoresRouteWithChildren
   '/suporte': typeof AuthenticatedSuporteRoute
   '/templates': typeof AuthenticatedTemplatesRoute
+  '/f/$slug': typeof FSlugRoute
   '/admin/assinaturas': typeof AuthenticatedAdminAssinaturasRoute
+  '/admin/campos': typeof AuthenticatedAdminCamposRoute
   '/admin/financeiro': typeof AuthenticatedAdminFinanceiroRoute
+  '/admin/simuladores': typeof AuthenticatedAdminSimuladoresRouteWithChildren
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/formularios/$id': typeof AuthenticatedFormulariosIdRoute
+  '/settings/brand': typeof AuthenticatedSettingsBrandRoute
+  '/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
+  '/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCnpjRoute
+  '/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
+  '/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
+  '/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
+  '/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
+  '/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
-  '/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
   '/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
-  '/admin/campos': typeof AuthenticatedAdminCamposRoute
+  '/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$referralCode': typeof ReferralCodeRoute
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/$referralCode': typeof ReferralCodeRoute
-  '/f/$slug': typeof FSlugRoute
   '/app': typeof AuthenticatedAppRoute
   '/assinar': typeof AuthenticatedAssinarRoute
   '/assinatura': typeof AuthenticatedAssinaturaRoute
   '/clientes': typeof AuthenticatedClientesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/formularios': typeof AuthenticatedFormulariosRoute
-  '/formularios/$id': typeof AuthenticatedFormulariosIdRoute
+  '/formularios': typeof AuthenticatedFormulariosRouteWithChildren
   '/historico': typeof AuthenticatedHistoricoRoute
   '/indicar': typeof AuthenticatedIndicarRoute
-  '/simuladores': typeof AuthenticatedSimuladoresRoute
-  '/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
-  '/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
-  '/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
-  '/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
-  '/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
-  '/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
-  '/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
-  '/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCNPJRoute
+  '/simuladores': typeof AuthenticatedSimuladoresRouteWithChildren
   '/suporte': typeof AuthenticatedSuporteRoute
   '/templates': typeof AuthenticatedTemplatesRoute
+  '/f/$slug': typeof FSlugRoute
   '/admin/assinaturas': typeof AuthenticatedAdminAssinaturasRoute
+  '/admin/campos': typeof AuthenticatedAdminCamposRoute
   '/admin/financeiro': typeof AuthenticatedAdminFinanceiroRoute
+  '/admin/simuladores': typeof AuthenticatedAdminSimuladoresRouteWithChildren
   '/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/formularios/$id': typeof AuthenticatedFormulariosIdRoute
+  '/settings/brand': typeof AuthenticatedSettingsBrandRoute
+  '/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
+  '/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCnpjRoute
+  '/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
+  '/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
+  '/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
+  '/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
+  '/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
-  '/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
   '/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
-  '/admin/campos': typeof AuthenticatedAdminCamposRoute
+  '/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$referralCode': typeof ReferralCodeRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/login': typeof LoginRoute
-  '/f/$slug': typeof FSlugRoute
-  '/_authenticated/formularios': typeof AuthenticatedFormulariosRoute
-  '/_authenticated/formularios/$id': typeof AuthenticatedFormulariosIdRoute
   '/signup': typeof SignupRoute
-  '/$referralCode': typeof ReferralCodeRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/assinar': typeof AuthenticatedAssinarRoute
   '/_authenticated/assinatura': typeof AuthenticatedAssinaturaRoute
   '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/formularios': typeof AuthenticatedFormulariosRouteWithChildren
   '/_authenticated/historico': typeof AuthenticatedHistoricoRoute
   '/_authenticated/indicar': typeof AuthenticatedIndicarRoute
-  '/_authenticated/simuladores': typeof AuthenticatedSimuladoresRoute
-  '/_authenticated/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
-  '/_authenticated/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
-  '/_authenticated/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
-  '/_authenticated/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
-  '/_authenticated/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
-  '/_authenticated/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
-  '/_authenticated/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
-  '/_authenticated/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCNPJRoute
+  '/_authenticated/simuladores': typeof AuthenticatedSimuladoresRouteWithChildren
   '/_authenticated/suporte': typeof AuthenticatedSuporteRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
+  '/f/$slug': typeof FSlugRoute
   '/_authenticated/admin/assinaturas': typeof AuthenticatedAdminAssinaturasRoute
+  '/_authenticated/admin/campos': typeof AuthenticatedAdminCamposRoute
   '/_authenticated/admin/financeiro': typeof AuthenticatedAdminFinanceiroRoute
+  '/_authenticated/admin/simuladores': typeof AuthenticatedAdminSimuladoresRouteWithChildren
   '/_authenticated/admin/suporte': typeof AuthenticatedAdminSuporteRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
   '/_authenticated/admin/webhooks': typeof AuthenticatedAdminWebhooksRoute
+  '/_authenticated/formularios/$id': typeof AuthenticatedFormulariosIdRoute
+  '/_authenticated/settings/brand': typeof AuthenticatedSettingsBrandRoute
+  '/_authenticated/simuladores/aluguel-vs-consorcio': typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
+  '/_authenticated/simuladores/consorcio-cnpj': typeof AuthenticatedSimuladoresConsorcioCnpjRoute
+  '/_authenticated/simuladores/flip-cota': typeof AuthenticatedSimuladoresFlipCotaRoute
+  '/_authenticated/simuladores/lance': typeof AuthenticatedSimuladoresLanceRoute
+  '/_authenticated/simuladores/meta-patrimonial': typeof AuthenticatedSimuladoresMetaPatrimonialRoute
+  '/_authenticated/simuladores/renda-passiva': typeof AuthenticatedSimuladoresRendaPassivaRoute
+  '/_authenticated/simuladores/saida-financiamento': typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
-  '/_authenticated/admin/simuladores': typeof AuthenticatedAdminSimuladoresRoute
   '/_authenticated/admin/simuladores/$slug': typeof AuthenticatedAdminSimuladoresSlugRoute
-  '/_authenticated/admin/campos': typeof AuthenticatedAdminCamposRoute
+  '/_authenticated/simuladores/estrategia/$slug': typeof AuthenticatedSimuladoresEstrategiaSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/$referralCode'
     | '/checkout'
     | '/login'
     | '/signup'
-    | '/$referralCode'
-    | '/f/$slug'
     | '/admin'
     | '/app'
     | '/assinar'
@@ -380,126 +391,123 @@ export interface FileRouteTypes {
     | '/clientes'
     | '/dashboard'
     | '/formularios'
-    | '/formularios/$id'
     | '/historico'
     | '/indicar'
     | '/simuladores'
-    | '/simuladores/lance'
-    | '/simuladores/aluguel-vs-consorcio'
-    | '/simuladores/renda-passiva'
-    | '/simuladores/flip-cota'
-    | '/simuladores/estrategia/$slug'
-    | '/simuladores/saida-financiamento'
-    | '/simuladores/meta-patrimonial'
-    | '/simuladores/consorcio-cnpj'
     | '/suporte'
     | '/templates'
+    | '/f/$slug'
     | '/admin/assinaturas'
+    | '/admin/campos'
     | '/admin/financeiro'
+    | '/admin/simuladores'
     | '/admin/suporte'
     | '/admin/usuarios'
     | '/admin/webhooks'
+    | '/formularios/$id'
+    | '/settings/brand'
+    | '/simuladores/aluguel-vs-consorcio'
+    | '/simuladores/consorcio-cnpj'
+    | '/simuladores/flip-cota'
+    | '/simuladores/lance'
+    | '/simuladores/meta-patrimonial'
+    | '/simuladores/renda-passiva'
+    | '/simuladores/saida-financiamento'
     | '/admin/'
-    | '/admin/simuladores'
     | '/admin/simuladores/$slug'
-    | '/admin/campos'
+    | '/simuladores/estrategia/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/$referralCode'
     | '/checkout'
     | '/login'
     | '/signup'
-    | '/$referralCode'
-    | '/f/$slug'
     | '/app'
     | '/assinar'
     | '/assinatura'
     | '/clientes'
     | '/dashboard'
     | '/formularios'
-    | '/formularios/$id'
     | '/historico'
     | '/indicar'
     | '/simuladores'
-    | '/simuladores/lance'
-    | '/simuladores/aluguel-vs-consorcio'
-    | '/simuladores/renda-passiva'
-    | '/simuladores/flip-cota'
-    | '/simuladores/estrategia/$slug'
-    | '/simuladores/saida-financiamento'
-    | '/simuladores/meta-patrimonial'
-    | '/simuladores/consorcio-cnpj'
     | '/suporte'
     | '/templates'
+    | '/f/$slug'
     | '/admin/assinaturas'
+    | '/admin/campos'
     | '/admin/financeiro'
+    | '/admin/simuladores'
     | '/admin/suporte'
     | '/admin/usuarios'
     | '/admin/webhooks'
+    | '/formularios/$id'
+    | '/settings/brand'
+    | '/simuladores/aluguel-vs-consorcio'
+    | '/simuladores/consorcio-cnpj'
+    | '/simuladores/flip-cota'
+    | '/simuladores/lance'
+    | '/simuladores/meta-patrimonial'
+    | '/simuladores/renda-passiva'
+    | '/simuladores/saida-financiamento'
     | '/admin'
-    | '/admin/simuladores'
     | '/admin/simuladores/$slug'
-    | '/admin/campos'
+    | '/simuladores/estrategia/$slug'
   id:
     | '__root__'
     | '/'
+    | '/$referralCode'
     | '/_authenticated'
     | '/checkout'
     | '/login'
     | '/signup'
-    | '/$referralCode'
-    | '/f/$slug'
-    | '/_authenticated/formularios'
-    | '/_authenticated/formularios/$id'
     | '/_authenticated/admin'
     | '/_authenticated/app'
     | '/_authenticated/assinar'
     | '/_authenticated/assinatura'
     | '/_authenticated/clientes'
     | '/_authenticated/dashboard'
+    | '/_authenticated/formularios'
     | '/_authenticated/historico'
     | '/_authenticated/indicar'
     | '/_authenticated/simuladores'
-    | '/_authenticated/simuladores/lance'
-    | '/_authenticated/simuladores/aluguel-vs-consorcio'
-    | '/_authenticated/simuladores/renda-passiva'
-    | '/_authenticated/simuladores/flip-cota'
-    | '/_authenticated/simuladores/estrategia/$slug'
-    | '/_authenticated/simuladores/saida-financiamento'
-    | '/_authenticated/simuladores/meta-patrimonial'
-    | '/_authenticated/simuladores/consorcio-cnpj'
     | '/_authenticated/suporte'
     | '/_authenticated/templates'
+    | '/f/$slug'
     | '/_authenticated/admin/assinaturas'
+    | '/_authenticated/admin/campos'
     | '/_authenticated/admin/financeiro'
+    | '/_authenticated/admin/simuladores'
     | '/_authenticated/admin/suporte'
     | '/_authenticated/admin/usuarios'
     | '/_authenticated/admin/webhooks'
+    | '/_authenticated/formularios/$id'
+    | '/_authenticated/settings/brand'
+    | '/_authenticated/simuladores/aluguel-vs-consorcio'
+    | '/_authenticated/simuladores/consorcio-cnpj'
+    | '/_authenticated/simuladores/flip-cota'
+    | '/_authenticated/simuladores/lance'
+    | '/_authenticated/simuladores/meta-patrimonial'
+    | '/_authenticated/simuladores/renda-passiva'
+    | '/_authenticated/simuladores/saida-financiamento'
     | '/_authenticated/admin/'
-    | '/_authenticated/admin/simuladores'
     | '/_authenticated/admin/simuladores/$slug'
-    | '/_authenticated/admin/campos'
+    | '/_authenticated/simuladores/estrategia/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ReferralCodeRoute: typeof ReferralCodeRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
-  ReferralCodeRoute: typeof ReferralCodeRoute
   FSlugRoute: typeof FSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/$referralCode': {
-      id: '/$referralCode'
-      path: '/$referralCode'
-      fullPath: '/$referralCode'
-      preLoaderRoute: typeof ReferralCodeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -528,11 +536,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$referralCode': {
+      id: '/$referralCode'
+      path: '/$referralCode'
+      fullPath: '/$referralCode'
+      preLoaderRoute: typeof ReferralCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/f/$slug': {
+      id: '/f/$slug'
+      path: '/f/$slug'
+      fullPath: '/f/$slug'
+      preLoaderRoute: typeof FSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/templates': {
@@ -556,60 +578,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSimuladoresRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/simuladores/lance': {
-      id: '/_authenticated/simuladores/lance'
-      path: '/simuladores/lance'
-      fullPath: '/simuladores/lance'
-      preLoaderRoute: typeof AuthenticatedSimuladoresLanceRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/simuladores/aluguel-vs-consorcio': {
-      id: '/_authenticated/simuladores/aluguel-vs-consorcio'
-      path: '/simuladores/aluguel-vs-consorcio'
-      fullPath: '/simuladores/aluguel-vs-consorcio'
-      preLoaderRoute: typeof AuthenticatedSimuladoresAluguelVsConsorcioRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/simuladores/renda-passiva': {
-      id: '/_authenticated/simuladores/renda-passiva'
-      path: '/simuladores/renda-passiva'
-      fullPath: '/simuladores/renda-passiva'
-      preLoaderRoute: typeof AuthenticatedSimuladoresRendaPassivaRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/simuladores/flip-cota': {
-      id: '/_authenticated/simuladores/flip-cota'
-      path: '/simuladores/flip-cota'
-      fullPath: '/simuladores/flip-cota'
-      preLoaderRoute: typeof AuthenticatedSimuladoresFlipCotaRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/simuladores/estrategia/$slug': {
-      id: '/_authenticated/simuladores/estrategia/$slug'
-      path: '/simuladores/estrategia/$slug'
-      fullPath: '/simuladores/estrategia/$slug'
-      preLoaderRoute: typeof AuthenticatedSimuladoresEstrategiaSlugRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/simuladores/saida-financiamento': {
-      id: '/_authenticated/simuladores/saida-financiamento'
-      path: '/simuladores/saida-financiamento'
-      fullPath: '/simuladores/saida-financiamento'
-      preLoaderRoute: typeof AuthenticatedSimuladoresSaidaFinanciamentoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/simuladores/meta-patrimonial': {
-      id: '/_authenticated/simuladores/meta-patrimonial'
-      path: '/simuladores/meta-patrimonial'
-      fullPath: '/simuladores/meta-patrimonial'
-      preLoaderRoute: typeof AuthenticatedSimuladoresMetaPatrimonialRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/simuladores/consorcio-cnpj': {
-      id: '/_authenticated/simuladores/consorcio-cnpj'
-      path: '/simuladores/consorcio-cnpj'
-      fullPath: '/simuladores/consorcio-cnpj'
-      preLoaderRoute: typeof AuthenticatedSimuladoresConsorcioCNPJRouteImport
+    '/_authenticated/indicar': {
+      id: '/_authenticated/indicar'
+      path: '/indicar'
+      fullPath: '/indicar'
+      preLoaderRoute: typeof AuthenticatedIndicarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/historico': {
@@ -617,6 +590,13 @@ declare module '@tanstack/react-router' {
       path: '/historico'
       fullPath: '/historico'
       preLoaderRoute: typeof AuthenticatedHistoricoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/formularios': {
+      id: '/_authenticated/formularios'
+      path: '/formularios'
+      fullPath: '/formularios'
+      preLoaderRoute: typeof AuthenticatedFormulariosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -639,34 +619,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/assinatura'
       preLoaderRoute: typeof AuthenticatedAssinaturaRouteImport
       parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/indicar': {
-      id: '/_authenticated/indicar'
-      path: '/indicar'
-      fullPath: '/indicar'
-      preLoaderRoute: typeof AuthenticatedIndicarRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/formularios': {
-      id: '/_authenticated/formularios'
-      path: '/formularios'
-      fullPath: '/formularios'
-      preLoaderRoute: typeof AuthenticatedFormulariosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/formularios/$id': {
-      id: '/_authenticated/formularios/$id'
-      path: '/formularios/$id'
-      fullPath: '/formularios/$id'
-      preLoaderRoute: typeof AuthenticatedFormulariosIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/f/$slug': {
-      id: '/f/$slug'
-      path: '/f/$slug'
-      fullPath: '/f/$slug'
-      preLoaderRoute: typeof FSlugRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/assinar': {
       id: '/_authenticated/assinar'
@@ -696,6 +648,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/simuladores/saida-financiamento': {
+      id: '/_authenticated/simuladores/saida-financiamento'
+      path: '/saida-financiamento'
+      fullPath: '/simuladores/saida-financiamento'
+      preLoaderRoute: typeof AuthenticatedSimuladoresSaidaFinanciamentoRouteImport
+      parentRoute: typeof AuthenticatedSimuladoresRoute
+    }
+    '/_authenticated/simuladores/renda-passiva': {
+      id: '/_authenticated/simuladores/renda-passiva'
+      path: '/renda-passiva'
+      fullPath: '/simuladores/renda-passiva'
+      preLoaderRoute: typeof AuthenticatedSimuladoresRendaPassivaRouteImport
+      parentRoute: typeof AuthenticatedSimuladoresRoute
+    }
+    '/_authenticated/simuladores/meta-patrimonial': {
+      id: '/_authenticated/simuladores/meta-patrimonial'
+      path: '/meta-patrimonial'
+      fullPath: '/simuladores/meta-patrimonial'
+      preLoaderRoute: typeof AuthenticatedSimuladoresMetaPatrimonialRouteImport
+      parentRoute: typeof AuthenticatedSimuladoresRoute
+    }
+    '/_authenticated/simuladores/lance': {
+      id: '/_authenticated/simuladores/lance'
+      path: '/lance'
+      fullPath: '/simuladores/lance'
+      preLoaderRoute: typeof AuthenticatedSimuladoresLanceRouteImport
+      parentRoute: typeof AuthenticatedSimuladoresRoute
+    }
+    '/_authenticated/simuladores/flip-cota': {
+      id: '/_authenticated/simuladores/flip-cota'
+      path: '/flip-cota'
+      fullPath: '/simuladores/flip-cota'
+      preLoaderRoute: typeof AuthenticatedSimuladoresFlipCotaRouteImport
+      parentRoute: typeof AuthenticatedSimuladoresRoute
+    }
+    '/_authenticated/simuladores/consorcio-cnpj': {
+      id: '/_authenticated/simuladores/consorcio-cnpj'
+      path: '/consorcio-cnpj'
+      fullPath: '/simuladores/consorcio-cnpj'
+      preLoaderRoute: typeof AuthenticatedSimuladoresConsorcioCnpjRouteImport
+      parentRoute: typeof AuthenticatedSimuladoresRoute
+    }
+    '/_authenticated/simuladores/aluguel-vs-consorcio': {
+      id: '/_authenticated/simuladores/aluguel-vs-consorcio'
+      path: '/aluguel-vs-consorcio'
+      fullPath: '/simuladores/aluguel-vs-consorcio'
+      preLoaderRoute: typeof AuthenticatedSimuladoresAluguelVsConsorcioRouteImport
+      parentRoute: typeof AuthenticatedSimuladoresRoute
+    }
+    '/_authenticated/settings/brand': {
+      id: '/_authenticated/settings/brand'
+      path: '/settings/brand'
+      fullPath: '/settings/brand'
+      preLoaderRoute: typeof AuthenticatedSettingsBrandRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/formularios/$id': {
+      id: '/_authenticated/formularios/$id'
+      path: '/$id'
+      fullPath: '/formularios/$id'
+      preLoaderRoute: typeof AuthenticatedFormulariosIdRouteImport
+      parentRoute: typeof AuthenticatedFormulariosRoute
+    }
     '/_authenticated/admin/webhooks': {
       id: '/_authenticated/admin/webhooks'
       path: '/webhooks'
@@ -717,11 +732,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminSuporteRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/simuladores': {
+      id: '/_authenticated/admin/simuladores'
+      path: '/simuladores'
+      fullPath: '/admin/simuladores'
+      preLoaderRoute: typeof AuthenticatedAdminSimuladoresRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/financeiro': {
       id: '/_authenticated/admin/financeiro'
       path: '/financeiro'
       fullPath: '/admin/financeiro'
       preLoaderRoute: typeof AuthenticatedAdminFinanceiroRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/campos': {
+      id: '/_authenticated/admin/campos'
+      path: '/campos'
+      fullPath: '/admin/campos'
+      preLoaderRoute: typeof AuthenticatedAdminCamposRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/assinaturas': {
@@ -731,33 +760,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAssinaturasRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
-    '/_authenticated/admin/simuladores': {
-      id: '/_authenticated/admin/simuladores'
-      path: '/admin/simuladores'
-      fullPath: '/admin/simuladores'
-      preLoaderRoute: typeof AuthenticatedAdminSimuladoresRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/_authenticated/simuladores/estrategia/$slug': {
+      id: '/_authenticated/simuladores/estrategia/$slug'
+      path: '/estrategia/$slug'
+      fullPath: '/simuladores/estrategia/$slug'
+      preLoaderRoute: typeof AuthenticatedSimuladoresEstrategiaSlugRouteImport
+      parentRoute: typeof AuthenticatedSimuladoresRoute
     }
     '/_authenticated/admin/simuladores/$slug': {
       id: '/_authenticated/admin/simuladores/$slug'
-      path: '/admin/simuladores/$slug'
+      path: '/$slug'
       fullPath: '/admin/simuladores/$slug'
       preLoaderRoute: typeof AuthenticatedAdminSimuladoresSlugRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/admin/campos': {
-      id: '/_authenticated/admin/campos'
-      path: '/admin/campos'
-      fullPath: '/admin/campos'
-      preLoaderRoute: typeof AuthenticatedAdminCamposRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedAdminSimuladoresRoute
     }
   }
 }
 
+interface AuthenticatedAdminSimuladoresRouteChildren {
+  AuthenticatedAdminSimuladoresSlugRoute: typeof AuthenticatedAdminSimuladoresSlugRoute
+}
+
+const AuthenticatedAdminSimuladoresRouteChildren: AuthenticatedAdminSimuladoresRouteChildren =
+  {
+    AuthenticatedAdminSimuladoresSlugRoute:
+      AuthenticatedAdminSimuladoresSlugRoute,
+  }
+
+const AuthenticatedAdminSimuladoresRouteWithChildren =
+  AuthenticatedAdminSimuladoresRoute._addFileChildren(
+    AuthenticatedAdminSimuladoresRouteChildren,
+  )
+
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAssinaturasRoute: typeof AuthenticatedAdminAssinaturasRoute
+  AuthenticatedAdminCamposRoute: typeof AuthenticatedAdminCamposRoute
   AuthenticatedAdminFinanceiroRoute: typeof AuthenticatedAdminFinanceiroRoute
+  AuthenticatedAdminSimuladoresRoute: typeof AuthenticatedAdminSimuladoresRouteWithChildren
   AuthenticatedAdminSuporteRoute: typeof AuthenticatedAdminSuporteRoute
   AuthenticatedAdminUsuariosRoute: typeof AuthenticatedAdminUsuariosRoute
   AuthenticatedAdminWebhooksRoute: typeof AuthenticatedAdminWebhooksRoute
@@ -766,7 +805,10 @@ interface AuthenticatedAdminRouteChildren {
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAssinaturasRoute: AuthenticatedAdminAssinaturasRoute,
+  AuthenticatedAdminCamposRoute: AuthenticatedAdminCamposRoute,
   AuthenticatedAdminFinanceiroRoute: AuthenticatedAdminFinanceiroRoute,
+  AuthenticatedAdminSimuladoresRoute:
+    AuthenticatedAdminSimuladoresRouteWithChildren,
   AuthenticatedAdminSuporteRoute: AuthenticatedAdminSuporteRoute,
   AuthenticatedAdminUsuariosRoute: AuthenticatedAdminUsuariosRoute,
   AuthenticatedAdminWebhooksRoute: AuthenticatedAdminWebhooksRoute,
@@ -776,6 +818,55 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
 const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
+interface AuthenticatedFormulariosRouteChildren {
+  AuthenticatedFormulariosIdRoute: typeof AuthenticatedFormulariosIdRoute
+}
+
+const AuthenticatedFormulariosRouteChildren: AuthenticatedFormulariosRouteChildren =
+  {
+    AuthenticatedFormulariosIdRoute: AuthenticatedFormulariosIdRoute,
+  }
+
+const AuthenticatedFormulariosRouteWithChildren =
+  AuthenticatedFormulariosRoute._addFileChildren(
+    AuthenticatedFormulariosRouteChildren,
+  )
+
+interface AuthenticatedSimuladoresRouteChildren {
+  AuthenticatedSimuladoresAluguelVsConsorcioRoute: typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
+  AuthenticatedSimuladoresConsorcioCnpjRoute: typeof AuthenticatedSimuladoresConsorcioCnpjRoute
+  AuthenticatedSimuladoresFlipCotaRoute: typeof AuthenticatedSimuladoresFlipCotaRoute
+  AuthenticatedSimuladoresLanceRoute: typeof AuthenticatedSimuladoresLanceRoute
+  AuthenticatedSimuladoresMetaPatrimonialRoute: typeof AuthenticatedSimuladoresMetaPatrimonialRoute
+  AuthenticatedSimuladoresRendaPassivaRoute: typeof AuthenticatedSimuladoresRendaPassivaRoute
+  AuthenticatedSimuladoresSaidaFinanciamentoRoute: typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
+  AuthenticatedSimuladoresEstrategiaSlugRoute: typeof AuthenticatedSimuladoresEstrategiaSlugRoute
+}
+
+const AuthenticatedSimuladoresRouteChildren: AuthenticatedSimuladoresRouteChildren =
+  {
+    AuthenticatedSimuladoresAluguelVsConsorcioRoute:
+      AuthenticatedSimuladoresAluguelVsConsorcioRoute,
+    AuthenticatedSimuladoresConsorcioCnpjRoute:
+      AuthenticatedSimuladoresConsorcioCnpjRoute,
+    AuthenticatedSimuladoresFlipCotaRoute:
+      AuthenticatedSimuladoresFlipCotaRoute,
+    AuthenticatedSimuladoresLanceRoute: AuthenticatedSimuladoresLanceRoute,
+    AuthenticatedSimuladoresMetaPatrimonialRoute:
+      AuthenticatedSimuladoresMetaPatrimonialRoute,
+    AuthenticatedSimuladoresRendaPassivaRoute:
+      AuthenticatedSimuladoresRendaPassivaRoute,
+    AuthenticatedSimuladoresSaidaFinanciamentoRoute:
+      AuthenticatedSimuladoresSaidaFinanciamentoRoute,
+    AuthenticatedSimuladoresEstrategiaSlugRoute:
+      AuthenticatedSimuladoresEstrategiaSlugRoute,
+  }
+
+const AuthenticatedSimuladoresRouteWithChildren =
+  AuthenticatedSimuladoresRoute._addFileChildren(
+    AuthenticatedSimuladoresRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
@@ -783,24 +874,13 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAssinaturaRoute: typeof AuthenticatedAssinaturaRoute
   AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedFormulariosRoute: typeof AuthenticatedFormulariosRoute
-  AuthenticatedFormulariosIdRoute: typeof AuthenticatedFormulariosIdRoute
+  AuthenticatedFormulariosRoute: typeof AuthenticatedFormulariosRouteWithChildren
   AuthenticatedHistoricoRoute: typeof AuthenticatedHistoricoRoute
   AuthenticatedIndicarRoute: typeof AuthenticatedIndicarRoute
-  AuthenticatedSimuladoresRoute: typeof AuthenticatedSimuladoresRoute
-  AuthenticatedSimuladoresLanceRoute: typeof AuthenticatedSimuladoresLanceRoute
-  AuthenticatedSimuladoresAluguelVsConsorcioRoute: typeof AuthenticatedSimuladoresAluguelVsConsorcioRoute
-  AuthenticatedSimuladoresRendaPassivaRoute: typeof AuthenticatedSimuladoresRendaPassivaRoute
-  AuthenticatedSimuladoresFlipCotaRoute: typeof AuthenticatedSimuladoresFlipCotaRoute
-  AuthenticatedSimuladoresEstrategiaSlugRoute: typeof AuthenticatedSimuladoresEstrategiaSlugRoute
-  AuthenticatedSimuladoresSaidaFinanciamentoRoute: typeof AuthenticatedSimuladoresSaidaFinanciamentoRoute
-  AuthenticatedSimuladoresMetaPatrimonialRoute: typeof AuthenticatedSimuladoresMetaPatrimonialRoute
-  AuthenticatedSimuladoresConsorcioCNPJRoute: typeof AuthenticatedSimuladoresConsorcioCNPJRoute
+  AuthenticatedSimuladoresRoute: typeof AuthenticatedSimuladoresRouteWithChildren
   AuthenticatedSuporteRoute: typeof AuthenticatedSuporteRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
-  AuthenticatedAdminSimuladoresRoute: typeof AuthenticatedAdminSimuladoresRoute
-  AuthenticatedAdminSimuladoresSlugRoute: typeof AuthenticatedAdminSimuladoresSlugRoute
-  AuthenticatedAdminCamposRoute: typeof AuthenticatedAdminCamposRoute
+  AuthenticatedSettingsBrandRoute: typeof AuthenticatedSettingsBrandRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -810,24 +890,13 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAssinaturaRoute: AuthenticatedAssinaturaRoute,
   AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedFormulariosRoute: AuthenticatedFormulariosRoute,
-  AuthenticatedFormulariosIdRoute: AuthenticatedFormulariosIdRoute,
+  AuthenticatedFormulariosRoute: AuthenticatedFormulariosRouteWithChildren,
   AuthenticatedHistoricoRoute: AuthenticatedHistoricoRoute,
   AuthenticatedIndicarRoute: AuthenticatedIndicarRoute,
-  AuthenticatedSimuladoresRoute: AuthenticatedSimuladoresRoute,
-  AuthenticatedSimuladoresLanceRoute: AuthenticatedSimuladoresLanceRoute,
-  AuthenticatedSimuladoresAluguelVsConsorcioRoute: AuthenticatedSimuladoresAluguelVsConsorcioRoute,
-  AuthenticatedSimuladoresRendaPassivaRoute: AuthenticatedSimuladoresRendaPassivaRoute,
-  AuthenticatedSimuladoresFlipCotaRoute: AuthenticatedSimuladoresFlipCotaRoute,
-  AuthenticatedSimuladoresEstrategiaSlugRoute: AuthenticatedSimuladoresEstrategiaSlugRoute,
-  AuthenticatedSimuladoresSaidaFinanciamentoRoute: AuthenticatedSimuladoresSaidaFinanciamentoRoute,
-  AuthenticatedSimuladoresMetaPatrimonialRoute: AuthenticatedSimuladoresMetaPatrimonialRoute,
-  AuthenticatedSimuladoresConsorcioCNPJRoute: AuthenticatedSimuladoresConsorcioCNPJRoute,
+  AuthenticatedSimuladoresRoute: AuthenticatedSimuladoresRouteWithChildren,
   AuthenticatedSuporteRoute: AuthenticatedSuporteRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
-  AuthenticatedAdminSimuladoresRoute: AuthenticatedAdminSimuladoresRoute,
-  AuthenticatedAdminSimuladoresSlugRoute: AuthenticatedAdminSimuladoresSlugRoute,
-  AuthenticatedAdminCamposRoute: AuthenticatedAdminCamposRoute,
+  AuthenticatedSettingsBrandRoute: AuthenticatedSettingsBrandRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -836,23 +905,13 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ReferralCodeRoute: ReferralCodeRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
-  ReferralCodeRoute: ReferralCodeRoute,
   FSlugRoute: FSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
