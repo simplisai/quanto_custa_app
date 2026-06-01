@@ -2338,7 +2338,7 @@ function MobileCTA() {
 /* ─── Page ────────────────────────────────────────────────── */
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-[100svh] bg-background text-foreground">
       {/* Banner VIP — renderiza acima de tudo quando há indicação válida */}
       <ReferralBanner />
       <Header />

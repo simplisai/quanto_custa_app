@@ -206,7 +206,10 @@ export function calcular(i: CalcInputs): CalcResults {
   const imovelNoFuturo = valor * Math.pow(1 + valAnualImovel / 12, maxMeses);
   let patrimonioConsTotal = cdiCons;
   if (usoCredito === "patrimonio") patrimonioConsTotal += valorCreditoRentabilizado;
-  const valorEmbVisual = i.baseLance === "plano" ? credito * (1 + tA) * pEmb : credito * pEmb;
+  // Usar o crédito já corrigido pelo INCC para que o valor visual corresponda ao desconto real no saldo
+  const valorEmbVisual = i.baseLance === "plano"
+    ? creditoAtualizadoContemplacao * (1 + tA) * pEmb
+    : creditoAtualizadoContemplacao * pEmb;
 
   return {
     tSAC,

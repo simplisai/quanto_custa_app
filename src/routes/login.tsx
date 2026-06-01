@@ -55,7 +55,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+    <div className="flex min-h-[100svh] items-center justify-center bg-background px-4 py-8">
       <div className="w-full max-w-md space-y-5">
 
         {/* Plan context banner */}

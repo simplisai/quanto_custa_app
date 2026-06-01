@@ -204,61 +204,68 @@ function AdminSimuladorEditorPage() {
   ];
 
   return (
-    <div className="space-y-5 pb-20">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link
-          to="/admin/simuladores"
-          className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <Link
-          to="/admin/campos"
-          className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <BookOpen className="h-3.5 w-3.5" />
-          Campos Canônicos
-        </Link>
-        <div className="flex-1 min-w-0">
+    <div className="space-y-5 pb-20 min-w-0">
+      {/* Header — duas linhas em mobile, uma no desktop */}
+      <div className="flex flex-wrap items-start gap-2">
+        {/* Navegação */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            to="/admin/simuladores"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-accent shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <Link
+            to="/admin/campos"
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-muted-foreground hover:bg-accent hover:text-foreground whitespace-nowrap"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Campos Canônicos</span>
+          </Link>
+        </div>
+
+        {/* Título — cresce mas não empurra toolbar */}
+        <div className="flex-1 min-w-0 min-w-[140px]">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xl">{operation?.icon ?? "⚙️"}</span>
-            <h1 className="text-xl font-extrabold tracking-tight">
+            <span className="text-xl leading-none">{operation?.icon ?? "⚙️"}</span>
+            <h1 className="text-lg font-extrabold tracking-tight truncate max-w-[260px] sm:max-w-none">
               {operation?.name ?? slug}
             </h1>
             {publishedVersion && (
-              <span className="rounded-full bg-green-500 px-2 py-0.5 text-[11px] font-extrabold text-white">
+              <span className="rounded-full bg-green-500 px-2 py-0.5 text-[11px] font-extrabold text-white whitespace-nowrap">
                 v{publishedVersion.version_number} em produção
               </span>
             )}
             {!publishedVersion && (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-                Apenas TypeScript (sem config publicada)
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground whitespace-nowrap">
+                Sem config publicada
               </span>
             )}
           </div>
-          <p className="mt-0.5 font-mono text-xs text-muted-foreground">{slug}</p>
+          <p className="mt-0.5 font-mono text-xs text-muted-foreground truncate">{slug}</p>
         </div>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Toolbar — vai para nova linha em mobile se não couber */}
+        <div className="flex items-center gap-2 shrink-0 ml-auto">
           {versions.length === 0 && seedCfg && (
             <button
               onClick={seedFromTS}
               disabled={seeding}
-              className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-accent disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-accent disabled:opacity-50 whitespace-nowrap"
             >
               <Sparkles className="h-3.5 w-3.5 text-primary" />
-              {seeding ? "Criando…" : "Seed v1 do TypeScript"}
+              <span className="hidden sm:inline">{seeding ? "Criando…" : "Seed v1"}</span>
+              <span className="sm:hidden">{seeding ? "…" : "Seed"}</span>
             </button>
           )}
           <button
             onClick={saveDraft}
             disabled={saving || versions.length === 0}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-extrabold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-extrabold text-primary-foreground hover:opacity-90 disabled:opacity-50 whitespace-nowrap"
           >
             <Save className="h-3.5 w-3.5" />
-            {saving ? "Salvando…" : "Salvar rascunho"}
+            <span className="hidden sm:inline">{saving ? "Salvando…" : "Salvar rascunho"}</span>
+            <span className="sm:hidden">{saving ? "…" : "Salvar"}</span>
           </button>
         </div>
       </div>

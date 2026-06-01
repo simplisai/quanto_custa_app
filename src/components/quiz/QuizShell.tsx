@@ -13,7 +13,7 @@ export function QuizShell({ step, total, children, themeColor = '#6366f1', brand
   const progress = total > 0 ? ((step + 1) / total) * 100 : 0
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100svh] bg-background flex flex-col">
       {/* Progress bar */}
       {total > 0 && (
         <div className="fixed top-0 left-0 right-0 z-50">

@@ -166,36 +166,42 @@ export function FormulaEditorV2({ config, onChange }: FormulaEditorV2Props) {
     <div className="space-y-3">
       {/* ── Status bar ── */}
       <div className={[
-        "flex items-center gap-3 rounded-xl px-4 py-2.5 text-xs font-bold",
+        "flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold min-w-0",
         allOk
           ? "bg-green-50 text-green-700 border border-green-200 dark:bg-green-950 dark:text-green-300"
           : errorCount > 0
             ? "bg-red-50 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-300"
             : "bg-muted border border-border text-muted-foreground",
       ].join(" ")}>
-        {allOk
-          ? <><CheckCircle2 className="h-3.5 w-3.5" /> Todas as {config.intermediates.length + config.outputs.length} fórmulas computadas sem erros</>
-          : errorCount > 0
-            ? <><AlertCircle className="h-3.5 w-3.5" /> {errorCount} fórmula{errorCount > 1 ? "s com erro" : " com erro"} — verifique abaixo</>
-            : <><Eye className="h-3.5 w-3.5" /> Adicione variáveis e fórmulas para começar</>
-        }
-        <span className="ml-auto opacity-60">Valores ao vivo com os inputs de teste →</span>
+        <span className="shrink-0">
+          {allOk ? <CheckCircle2 className="h-3.5 w-3.5" /> : errorCount > 0 ? <AlertCircle className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+        </span>
+        <span className="truncate">
+          {allOk
+            ? `Todas as ${config.intermediates.length + config.outputs.length} fórmulas computadas sem erros`
+            : errorCount > 0
+              ? `${errorCount} fórmula${errorCount > 1 ? "s com erro" : " com erro"} — verifique abaixo`
+              : "Adicione variáveis e fórmulas para começar"
+          }
+        </span>
+        <span className="ml-auto shrink-0 opacity-60 hidden md:block">Valores ao vivo →</span>
       </div>
 
       {/* ── Three-panel layout ── */}
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr_260px]">
+      {/* xl: 3 colunas fixas — só ativa em telas ≥1280px onde há espaço suficiente com a sidebar */}
+      <div className="grid gap-4 xl:grid-cols-[260px_1fr_240px]">
 
         {/* ────────────────────────────────────────────────────────── */}
         {/* PAINEL ① — VARIÁVEIS DE ENTRADA                          */}
         {/* ────────────────────────────────────────────────────────── */}
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           <PanelHeader
             number="①"
             title="Variáveis de Entrada"
             description="Defina os inputs do simulador. Cada campo vira uma variável nas fórmulas."
           />
 
-          <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto overflow-x-hidden pr-1">
             {config.inputs.length === 0 && (
               <EmptyState icon="🔢" text="Nenhuma variável definida" sub="Clique abaixo para adicionar" />
             )}
@@ -223,7 +229,7 @@ export function FormulaEditorV2({ config, onChange }: FormulaEditorV2Props) {
         {/* ────────────────────────────────────────────────────────── */}
         {/* PAINEL ② — PIPELINE DE FÓRMULAS                          */}
         {/* ────────────────────────────────────────────────────────── */}
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           <PanelHeader
             number="②"
             title="Pipeline de Cálculo"
@@ -231,7 +237,7 @@ export function FormulaEditorV2({ config, onChange }: FormulaEditorV2Props) {
             badge={config.intermediates.length > 0 ? `${config.intermediates.length} passos` : undefined}
           />
 
-          <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto overflow-x-hidden pr-1">
             {config.intermediates.length === 0 && (
               <EmptyState
                 icon="⚗️"
@@ -270,14 +276,14 @@ export function FormulaEditorV2({ config, onChange }: FormulaEditorV2Props) {
         {/* ────────────────────────────────────────────────────────── */}
         {/* PAINEL ③ — RESULTADOS (KPIs + TIMELINE)                  */}
         {/* ────────────────────────────────────────────────────────── */}
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           <PanelHeader
             number="③"
             title="Resultados"
             description="KPIs exibidos ao usuário + timeline mensal (opcional)."
           />
 
-          <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto overflow-x-hidden pr-1">
             {/* KPI Outputs */}
             <div className="rounded-xl border border-border bg-card p-3 space-y-2">
               <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
@@ -356,7 +362,7 @@ function InputVarRow({
       {/* Collapsed header */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-2.5 hover:bg-accent/50 text-left"
+        className="flex w-full items-center gap-2 px-3 py-2.5 hover:bg-accent/50 text-left min-w-0"
       >
         <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
         <span className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${varColor(field.type)}`}>
@@ -366,7 +372,7 @@ function InputVarRow({
           <p className="font-mono text-xs font-bold text-foreground truncate">{field.key || "(sem key)"}</p>
           {!open && <p className="text-[10px] text-muted-foreground truncate">{field.label}</p>}
         </div>
-        <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
+        <span className="shrink-0 max-w-[80px] truncate rounded bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary">
           {displayVal || "0"}
         </span>
         {open ? <ChevronUp className="h-3 w-3 text-muted-foreground shrink-0" /> : <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />}
@@ -464,7 +470,7 @@ function PipelineStepRow({
       {/* Collapsed header — the KEY row that shows value */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-2.5 hover:bg-accent/40 text-left bg-card"
+        className="flex w-full items-center gap-2 px-3 py-2.5 hover:bg-accent/40 text-left bg-card min-w-0"
       >
         <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-extrabold text-primary w-6 text-center">
           {index + 1}
@@ -474,14 +480,14 @@ function PipelineStepRow({
           <p className="font-mono text-xs font-bold text-foreground truncate">{step.key || "(sem nome)"}</p>
           <p className="font-mono text-[10px] text-muted-foreground truncate">{step.formula || "…"}</p>
         </div>
-        {/* Live value badge — the magic */}
-        <div className="shrink-0 text-right">
+        {/* Live value badge — max-w para não empurrar o layout */}
+        <div className="shrink-0 text-right max-w-[90px]">
           {hasError ? (
             <span className="flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950 dark:text-red-400">
               <AlertCircle className="h-2.5 w-2.5" /> erro
             </span>
           ) : hasValue && step.formula ? (
-            <span className="rounded bg-green-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-green-700 dark:bg-green-950 dark:text-green-300">
+            <span className="block truncate rounded bg-green-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-green-700 dark:bg-green-950 dark:text-green-300">
               = {fmtScope(scopeValue!, step.type)}
             </span>
           ) : (
@@ -613,7 +619,8 @@ function OutputRow({
               <input value={output.label} onChange={(e) => up("label", e.target.value)} className={miniInput} />
             </MiniField>
           </div>
-          <div className="grid gap-1.5 grid-cols-3">
+          {/* Tipo + Cor KPI em linha, Ordem separada — evita 3 cols em panel estreito */}
+          <div className="grid gap-1.5 grid-cols-2">
             <MiniField label="Tipo">
               <select value={output.type ?? "money"} onChange={(e) => up("type", e.target.value as OutputField["type"])} className={miniInput}>
                 {RESULT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -624,10 +631,10 @@ function OutputRow({
                 {KPI_VARIANTS.map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
             </MiniField>
-            <MiniField label="Ordem">
-              <input type="number" value={output.displayOrder} onChange={(e) => up("displayOrder", Number(e.target.value))} className={miniInput} />
-            </MiniField>
           </div>
+          <MiniField label="Ordem de exibição">
+            <input type="number" value={output.displayOrder} onChange={(e) => up("displayOrder", Number(e.target.value))} className={miniInput} />
+          </MiniField>
           <MiniField label="Fórmula">
             <FormulaInput
               value={output.formula}
@@ -733,9 +740,19 @@ function TimelineSection({
                   <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Acumuladores</p>
                   {(tl.accumulators ?? []).map((acc, idx) => (
                     <div key={idx} className="rounded-lg border border-border bg-background p-2 space-y-1.5">
-                      <div className="grid gap-1.5 grid-cols-3">
-                        <input value={acc.key} onChange={(e) => upTimeline({ accumulators: (tl.accumulators ?? []).map((x, i) => i === idx ? { ...x, key: e.target.value } : x) })} placeholder="key" className={`${miniInput} font-mono`} />
-                        <input value={acc.initialValue} onChange={(e) => upTimeline({ accumulators: (tl.accumulators ?? []).map((x, i) => i === idx ? { ...x, initialValue: e.target.value } : x) })} placeholder="0" className={`${miniInput} font-mono`} />
+                      {/* key + valor inicial em linha, fórmula abaixo — evita 3 cols em panel estreito */}
+                      <div className="grid gap-1.5 grid-cols-2">
+                        <div>
+                          <p className="text-[9px] font-semibold text-muted-foreground mb-0.5">Key</p>
+                          <input value={acc.key} onChange={(e) => upTimeline({ accumulators: (tl.accumulators ?? []).map((x, i) => i === idx ? { ...x, key: e.target.value } : x) })} placeholder="key" className={`${miniInput} font-mono`} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-semibold text-muted-foreground mb-0.5">Valor inicial</p>
+                          <input value={acc.initialValue} onChange={(e) => upTimeline({ accumulators: (tl.accumulators ?? []).map((x, i) => i === idx ? { ...x, initialValue: e.target.value } : x) })} placeholder="0" className={`${miniInput} font-mono`} />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-semibold text-muted-foreground mb-0.5">Fórmula de atualização</p>
                         <input value={acc.formula} onChange={(e) => upTimeline({ accumulators: (tl.accumulators ?? []).map((x, i) => i === idx ? { ...x, formula: e.target.value } : x) })} placeholder="acc + campo" className={`${miniInput} font-mono`} />
                       </div>
                       <button onClick={() => upTimeline({ accumulators: (tl.accumulators ?? []).filter((_, i) => i !== idx) })} className="flex items-center gap-1 text-[10px] text-destructive hover:underline">

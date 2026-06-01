@@ -334,51 +334,113 @@ export const SEED_CONFIGS: Array<{
   // ─── 8. Calculadora Patrimonial (SAC/PRICE vs Consórcio) ───────────────────
   {
     slug: "calculadora-patrimonial",
-    version_label: "v1 — Configuração inicial (espelho TypeScript)",
-    notes: "Configuração base extraída de calculator.ts. Este simulador tem lógica comparativa SAC vs PRICE vs Consórcio — a versão DB cobre os KPIs principais.",
+    version_label: "v2 — Configuração completa: todos os campos e fórmulas editáveis",
+    notes: "Espelho completo de calculator.ts. Cobre todos os campos do bloco 'Cenário Consórcio Estratégico' e o comparativo SAC/PRICE. Inclui timeline com loop mensal do consórcio para saldo devedor e CDI precisos.",
     config: {
       schemaVersion: 1,
       inputs: [
-        { key: "valorImovel",          label: "Valor do imóvel (R$)",             type: "money",   defaultValue: "500.000,00" },
-        { key: "entrada",              label: "Entrada (R$)",                      type: "money",   defaultValue: "100.000,00" },
-        { key: "taxaJurosMensalFin",   label: "Taxa de juros mensal fin. (%)",    type: "percent", defaultValue: "0,85" },
-        { key: "prazoFinanciamento",   label: "Prazo financiamento (meses)",      type: "int",     defaultValue: "360" },
-        { key: "taxaAdmConsorcio",     label: "Taxa de adm. consórcio (%)",       type: "percent", defaultValue: "18,00" },
-        { key: "prazoConsorcio",       label: "Prazo consórcio (meses)",          type: "int",     defaultValue: "120" },
-        { key: "percLance",            label: "Lance ofertado (% da carta)",      type: "int",     defaultValue: "20" },
-        { key: "mesContemplacao",      label: "Mês de contemplação",              type: "int",     defaultValue: "24" },
-        { key: "valorizacaoAnual",     label: "Valorização anual do imóvel (%)", type: "percent", defaultValue: "6,00" },
+        // Imóvel e entrada
+        { key: "valorImovel",            label: "Valor do imóvel (R$)",                  type: "money",   defaultValue: "500.000,00" },
+        { key: "entrada",                label: "Entrada própria (R$)",                  type: "money",   defaultValue: "100.000,00" },
+        // Financiamento
+        { key: "jFinAnual",              label: "Taxa de juros anual fin. (%)",          type: "percent", defaultValue: "10,20",  hint: "Taxa anual — o editor converte para mensal internamente" },
+        { key: "trAnual",                label: "TR / ajuste anual (%)",                 type: "percent", defaultValue: "0,00",   hint: "Reajuste anual do saldo devedor bancário (TR)" },
+        { key: "prazoFinanciamento",     label: "Prazo financiamento (meses)",           type: "int",     defaultValue: "360" },
+        // Consórcio
+        { key: "creditoCons",            label: "Carta de crédito consórcio (R$)",       type: "money",   defaultValue: "500.000,00" },
+        { key: "taxaAdmConsorcio",       label: "Taxa de adm. consórcio (%)",            type: "percent", defaultValue: "18,00" },
+        { key: "prazoConsorcio",         label: "Prazo do plano (meses)",                type: "int",     defaultValue: "120" },
+        { key: "percLanceEmb",           label: "Lance embutido (% da carta)",           type: "int",     defaultValue: "20",    hint: "% do crédito corrigido pelo INCC usado como lance embutido" },
+        { key: "lanceProprio",           label: "Lance recurso próprio (R$)",            type: "money",   defaultValue: "0,00" },
+        { key: "mesContemplacao",        label: "Mês de contemplação",                   type: "int",     defaultValue: "24" },
+        { key: "inccAnual",              label: "INCC anual estimado (%)",               type: "percent", defaultValue: "4,00",   hint: "Reajusta a carta de crédito e o saldo do plano anualmente" },
+        { key: "percReducao",            label: "Redução parcela pré-contemplação (%)",  type: "int",     defaultValue: "0",     hint: "Alguns grupos permitem pagar parcela reduzida antes da contemplação" },
+        // Custo de oportunidade e despesas
+        { key: "aluguel",                label: "Aluguel mensal durante espera (R$)",    type: "money",   defaultValue: "0,00" },
+        { key: "taxaOportunidadeMensal", label: "Taxa de oportunidade mensal (%)",       type: "percent", defaultValue: "0,80",   hint: "Rendimento mensal da entrada aplicada (CDI, poupança, etc.)" },
+        { key: "valorizacaoAnual",       label: "Valorização anual do imóvel (%)",       type: "percent", defaultValue: "6,00" },
+        { key: "percItbi",               label: "ITBI / Cartório (%)",                   type: "percent", defaultValue: "2,00" },
       ],
       intermediates: [
-        { key: "valorFinanciado",      label: "Valor financiado (R$)",            formula: "valorImovel - entrada", type: "money" },
-        { key: "taxaJurosFrac",        label: "Taxa juros (fração)",              formula: "taxaJurosMensalFin / 100" },
-        { key: "taxaAdmFrac",          label: "Taxa adm. (fração)",              formula: "taxaAdmConsorcio / 100" },
-        { key: "cartaConsorcio",       label: "Carta de crédito (R$)",           formula: "valorImovel", type: "money" },
-        { key: "lanceR",               label: "Lance em R$",                     formula: "cartaConsorcio * (percLance / 100)", type: "money" },
-        { key: "saldoPosLance",        label: "Saldo pós-lance (R$)",            formula: "max(cartaConsorcio - lanceR, 0)", type: "money" },
-        { key: "parcelaCons",          label: "Parcela consórcio (R$)",          formula: "cartaConsorcio * (1 + taxaAdmFrac) / prazoConsorcio", type: "money" },
-        { key: "parcelaPosLance",      label: "Parcela consórcio pós-lance (R$)",formula: "saldoPosLance * (1 + taxaAdmFrac) / prazoConsorcio", type: "money" },
-        // PRICE
-        { key: "coefPrice",            label: "Coef. Price",                     formula: "taxaJurosFrac > 0 ? (taxaJurosFrac * pow(1 + taxaJurosFrac, prazoFinanciamento)) / (pow(1 + taxaJurosFrac, prazoFinanciamento) - 1) : 1 / prazoFinanciamento" },
-        { key: "parcelaPrice",         label: "Parcela PRICE (R$)",              formula: "valorFinanciado * coefPrice", type: "money" },
-        { key: "totalPrice",           label: "Total pago PRICE (R$)",           formula: "parcelaPrice * prazoFinanciamento", type: "money" },
-        { key: "jurosPrice",           label: "Juros totais PRICE (R$)",         formula: "totalPrice - valorFinanciado", type: "money" },
-        // SAC
-        { key: "amortizacaoSAC",       label: "Amortização mensal SAC (R$)",     formula: "valorFinanciado / prazoFinanciamento", type: "money" },
-        { key: "primeiraParcelaSAC",   label: "1ª parcela SAC (R$)",             formula: "amortizacaoSAC + valorFinanciado * taxaJurosFrac", type: "money" },
-        { key: "totalSAC",             label: "Total pago SAC (R$)",             formula: "amortizacaoSAC * prazoFinanciamento + (valorFinanciado * taxaJurosFrac * (prazoFinanciamento + 1)) / 2", type: "money" },
-        { key: "jurosSAC",             label: "Juros totais SAC (R$)",           formula: "totalSAC - valorFinanciado", type: "money" },
-        // Consórcio
-        { key: "totalConsorcio",       label: "Total pago consórcio (R$)",       formula: "parcelaCons * mesContemplacao + lanceR + parcelaPosLance * (prazoConsorcio - mesContemplacao)", type: "money" },
-        { key: "economiaCons",         label: "Economia consórcio vs. PRICE (R$)",formula: "totalPrice - totalConsorcio", type: "money" },
+        // ── Financiamento ────────────────────────────────────────────────────
+        { key: "valorFinanciado",        label: "Valor financiado (R$)",                 formula: "valorImovel - entrada",                                                                                                                   type: "money",   description: "Saldo a financiar após subtrair a entrada" },
+        { key: "taxaJurosMensalFin",     label: "Taxa de juros mensal fin. (fração)",    formula: "jFinAnual / 100 / 12",                                                                                                                                     description: "Converte taxa anual → mensal: jAnual / 100 / 12" },
+        { key: "coefPrice",              label: "Coeficiente Price",                     formula: "taxaJurosMensalFin > 0 ? (taxaJurosMensalFin * pow(1 + taxaJurosMensalFin, prazoFinanciamento)) / (pow(1 + taxaJurosMensalFin, prazoFinanciamento) - 1) : 1 / prazoFinanciamento", description: "Fator multiplicador da tabela Price" },
+        { key: "parcelaPrice",           label: "Parcela PRICE (R$)",                    formula: "valorFinanciado * coefPrice",                                                                                                             type: "money" },
+        { key: "totalPrice",             label: "Total pago PRICE (R$)",                 formula: "parcelaPrice * prazoFinanciamento",                                                                                                        type: "money" },
+        { key: "jurosPrice",             label: "Juros totais PRICE (R$)",               formula: "totalPrice - valorFinanciado",                                                                                                             type: "money" },
+        { key: "amortizacaoSAC",         label: "Amortização mensal SAC (R$)",           formula: "valorFinanciado / prazoFinanciamento",                                                                                                     type: "money" },
+        { key: "primeiraParcelaSAC",     label: "1ª parcela SAC (R$)",                   formula: "amortizacaoSAC + valorFinanciado * taxaJurosMensalFin",                                                                                   type: "money" },
+        { key: "totalSAC",               label: "Total pago SAC (R$)",                   formula: "amortizacaoSAC * prazoFinanciamento + (valorFinanciado * taxaJurosMensalFin * (prazoFinanciamento + 1)) / 2",                             type: "money",   description: "Soma de todas as parcelas SAC (amortização + juros decrescentes)" },
+        { key: "jurosSAC",               label: "Juros totais SAC (R$)",                 formula: "totalSAC - valorFinanciado",                                                                                                              type: "money" },
+        // ── Consórcio — base ─────────────────────────────────────────────────
+        { key: "tAdmFrac",               label: "Taxa adm. (fração decimal)",            formula: "taxaAdmConsorcio / 100",                                                                                                                                   description: "Ex: 18% → 0.18" },
+        { key: "montanteComTaxa",        label: "Montante do plano c/ taxa adm. (R$)",   formula: "creditoCons * (1 + tAdmFrac)",                                                                                                            type: "money",   description: "Saldo inicial do grupo = carta × (1 + taxa_adm)" },
+        { key: "parcelaBaseConsorcio",   label: "Parcela base consórcio (R$)",           formula: "montanteComTaxa / prazoConsorcio",                                                                                                         type: "money",   description: "Parcela padrão pré-contemplação (sem redução)" },
+        { key: "custoITBIConsorcio",     label: "Custo ITBI/Cartório — consórcio (R$)",  formula: "valorImovel * (percItbi / 100)",                                                                                                           type: "money" },
+        { key: "custoAluguel",           label: "Custo aluguel na espera (R$)",          formula: "aluguel * mesContemplacao",                                                                                                                type: "money",   description: "Total pago de aluguel enquanto aguarda contemplação" },
+        // ── INCC e contemplação ───────────────────────────────────────────────
+        { key: "anosContemplacao",       label: "Anos até contemplação",                 formula: "floor((mesContemplacao - 1) / 12)",                                                                                                                        description: "Quantos aniversários do plano ocorrem antes da contemplação" },
+        { key: "multINCC",               label: "Multiplicador INCC acumulado",          formula: "pow(1 + inccAnual / 100, anosContemplacao)",                                                                                                               description: "Fator de correção pelo INCC até a contemplação" },
+        { key: "creditoAtualizado",      label: "Crédito atualizado pelo INCC (R$)",     formula: "creditoCons * multINCC",                                                                                                                   type: "money",   description: "Valor real da carta na data da contemplação após reajuste INCC" },
+        { key: "montanteReajustado",     label: "Montante do plano reajustado (R$)",     formula: "montanteComTaxa * multINCC",                                                                                                               type: "money",   description: "Saldo total do plano corrigido pelo INCC (base=plano)" },
+        // ── Lance embutido (base=crédito, caso padrão) ───────────────────────
+        { key: "lanceEmbR",              label: "Lance embutido em R$ (INCC-ajustado)",  formula: "creditoAtualizado * (percLanceEmb / 100)",                                                                                                 type: "money",   description: "Lance embutido calculado sobre o crédito já corrigido pelo INCC. Para base=plano, substitua creditoAtualizado por montanteReajustado." },
+        { key: "lanceTotalR",            label: "Lance total (embutido + próprio) (R$)", formula: "lanceEmbR + lanceProprio",                                                                                                                 type: "money" },
+        { key: "poderCompraLiq",         label: "Poder de compra líquido (R$)",          formula: "max(creditoAtualizado - lanceEmbR, 0)",                                                                                                    type: "money",   description: "Crédito disponível após descontar o lance embutido" },
+        // ── Saldo devedor pós-lance (aproximação sem INCC loop) ─────────────
+        { key: "saldoDevedorPreLance",   label: "Saldo devedor antes do lance (R$)",     formula: "max(montanteComTaxa - parcelaBaseConsorcio * mesContemplacao, 0)",                                                                        type: "money",   description: "Saldo restante após pagar parcelas até a contemplação (sem INCC intra-anual)" },
+        { key: "saldoDevedorPosLance",   label: "Saldo devedor pós-lance (R$)",          formula: "max(saldoDevedorPreLance - lanceTotalR, 0)",                                                                                               type: "money",   description: "Saldo devedor após aplicar o lance total na contemplação" },
+        // ── Imóvel e patrimônio ───────────────────────────────────────────────
+        { key: "imovelCorrigido",        label: "Valor do imóvel corrigido (R$)",        formula: "valorImovel * pow(1 + valorizacaoAnual / 100, prazoConsorcio / 12)",                                                                      type: "money",   description: "Valor projetado do imóvel ao final do prazo do consórcio" },
+        { key: "patrimonioFinalCDI",     label: "Patrimônio final CDI (R$)",             formula: "max(entrada * pow(1 + taxaOportunidadeMensal / 100, prazoConsorcio) - lanceProprio, 0)",                                                  type: "money",   description: "Entrada aplicada rendendo à taxa de oportunidade pelo prazo do consórcio, menos o lance próprio" },
+        // ── Comparativo totais ────────────────────────────────────────────────
+        { key: "totalConsorcioEst",      label: "Total estimado pago consórcio (R$)",    formula: "parcelaBaseConsorcio * prazoConsorcio + lanceProprio",                                                                                     type: "money",   description: "Estimativa do desembolso total no consórcio (parcelas + lance próprio)" },
+        { key: "economiaCons",           label: "Economia consórcio vs. PRICE (R$)",     formula: "totalPrice - totalConsorcioEst",                                                                                                           type: "money" },
       ],
       outputs: [
-        { key: "parcelaPriceOut",      label: "Parcela PRICE (R$)",              formula: "parcelaPrice",   type: "money",   displayOrder: 1, kpiVariant: "danger"   },
-        { key: "totalPriceOut",        label: "Total pago PRICE (R$)",           formula: "totalPrice",     type: "money",   displayOrder: 2, kpiVariant: "danger"   },
-        { key: "parcelaConsOut",       label: "Parcela consórcio (R$)",          formula: "parcelaCons",    type: "money",   displayOrder: 3, kpiVariant: "success"  },
-        { key: "totalConsorcioOut",    label: "Total pago consórcio (R$)",       formula: "totalConsorcio", type: "money",   displayOrder: 4, kpiVariant: "success"  },
-        { key: "economiaConsOut",      label: "Economia vs. PRICE (R$)",         formula: "economiaCons",   type: "money",   displayOrder: 5, kpiVariant: "primary"  },
+        // ── Cenário Consórcio Estratégico (espelha app.tsx linhas 477-488) ───
+        { key: "creditoNominalOut",      label: "Crédito da Carta Nominal (R$)",         formula: "creditoCons",           type: "money",   displayOrder: 1,  kpiVariant: "default"  },
+        { key: "creditoAtualizadoOut",   label: "Crédito Atualizado (INCC) (R$)",        formula: "creditoAtualizado",     type: "money",   displayOrder: 2,  kpiVariant: "primary"  },
+        { key: "lanceEmbOut",            label: "Lance Embutido Utilizado (R$)",         formula: "lanceEmbR",             type: "money",   displayOrder: 3,  kpiVariant: "default"  },
+        { key: "poderCompraOut",         label: "Poder de Compra Líquido (R$)",          formula: "poderCompraLiq",        type: "money",   displayOrder: 4,  kpiVariant: "success"  },
+        { key: "saldoDevedorOut",        label: "Saldo Devedor Pós-Lance (R$)",          formula: "saldoDevedorPosLance",  type: "money",   displayOrder: 5,  kpiVariant: "primary"  },
+        { key: "custoAluguelOut",        label: "Custo C/ Aluguel (Espera) (R$)",        formula: "custoAluguel",          type: "money",   displayOrder: 6,  kpiVariant: "danger"   },
+        { key: "imovelCorrigidoOut",     label: "Valor do Imóvel (Corrigido) (R$)",      formula: "imovelCorrigido",       type: "money",   displayOrder: 7,  kpiVariant: "success"  },
+        { key: "patrimonioFinalOut",     label: "Patrimônio Líquido Final (CDI) (R$)",   formula: "patrimonioFinalCDI",    type: "money",   displayOrder: 8,  kpiVariant: "success"  },
+        // ── Comparativo SAC / PRICE / Consórcio ──────────────────────────────
+        { key: "parcelaPriceOut",        label: "Parcela PRICE (R$)",                    formula: "parcelaPrice",          type: "money",   displayOrder: 9,  kpiVariant: "danger"   },
+        { key: "totalPriceOut",          label: "Total pago PRICE (R$)",                 formula: "totalPrice",            type: "money",   displayOrder: 10, kpiVariant: "danger"   },
+        { key: "parcelaConsOut",         label: "Parcela base consórcio (R$)",           formula: "parcelaBaseConsorcio",  type: "money",   displayOrder: 11, kpiVariant: "success"  },
+        { key: "totalConsorcioOut",      label: "Total estimado consórcio (R$)",         formula: "totalConsorcioEst",     type: "money",   displayOrder: 12, kpiVariant: "success"  },
+        { key: "economiaConsOut",        label: "Economia vs. PRICE (R$)",               formula: "economiaCons",          type: "money",   displayOrder: 13, kpiVariant: "primary"  },
       ],
+      // ── Timeline: loop mensal do consórcio ──────────────────────────────────
+      // Calcula saldo devedor e CDI mês a mês para valores precisos no editor.
+      // saldoConsAcum → reflete o saldo real pós-lance na contemplação.
+      // cdiConsAcum   → entrada rendendo à taxa de oportunidade, descontando o lance próprio na contemplação.
+      timeline: {
+        loopVariable: "mes",
+        lengthFormula: "prazoConsorcio",
+        fields: [
+          { key: "parcelaConsMes",  label: "Parcela consórcio (R$)",   formula: "mes <= mesContemplacao ? parcelaBaseConsorcio * (1 - percReducao/100) : parcelaBaseConsorcio", type: "money" },
+          { key: "cdiEntrada",      label: "Entrada com CDI (R$)",     formula: "entrada * pow(1 + taxaOportunidadeMensal/100, mes)",                                          type: "money" },
+        ],
+        accumulators: [
+          {
+            key: "saldoConsAcum",
+            label: "Saldo devedor consórcio acumulado (R$)",
+            initialValue: "montanteComTaxa",
+            formula: "mes == mesContemplacao ? max(saldoConsAcum - parcelaConsMes - lanceTotalR, 0) : max(saldoConsAcum - parcelaConsMes, 0)",
+          },
+          {
+            key: "cdiConsAcum",
+            label: "CDI acumulado sobre a entrada (R$)",
+            initialValue: "entrada",
+            formula: "mes == mesContemplacao ? max(cdiConsAcum * (1 + taxaOportunidadeMensal/100) - lanceProprio, 0) : cdiConsAcum * (1 + taxaOportunidadeMensal/100)",
+          },
+        ],
+      },
     },
   },
 ];

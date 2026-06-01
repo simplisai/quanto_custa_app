@@ -43,7 +43,7 @@ export function WhatsAppShareButton({ onShare, prefilledPhone, disabled, isLoadi
 
   if (open) {
     return (
-      <div className="flex items-center gap-1.5 rounded-xl border-2 border-[#25D366]/60 bg-[#25D366]/5 px-2 py-1">
+      <div className="flex w-full min-w-0 items-center gap-1.5 rounded-xl border-2 border-[#25D366]/60 bg-[#25D366]/5 px-2 py-1 sm:w-auto">
         <MessageCircle className="h-4 w-4 shrink-0 text-[#25D366]" />
         <input
           autoFocus
@@ -52,22 +52,24 @@ export function WhatsAppShareButton({ onShare, prefilledPhone, disabled, isLoadi
           onKeyDown={handleKey}
           placeholder="(11) 9 8765-4321"
           type="tel"
-          className="w-36 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground/60"
+          className="w-full min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground/60 sm:w-36 sm:flex-none"
         />
         <button
           onClick={handleSend}
           disabled={!phone.trim() || isLoading}
-          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#25D366] text-white transition hover:bg-[#1ebe5d] disabled:opacity-40"
+          aria-label="Enviar"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#25D366] text-white transition hover:bg-[#1ebe5d] active:scale-95 disabled:opacity-40"
           title="Enviar"
         >
-          <Send className="h-3.5 w-3.5" />
+          <Send className="h-4 w-4" />
         </button>
         <button
           onClick={() => setOpen(false)}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted"
+          aria-label="Cancelar"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted active:scale-95"
           title="Cancelar"
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-4 w-4" />
         </button>
       </div>
     );
@@ -78,7 +80,7 @@ export function WhatsAppShareButton({ onShare, prefilledPhone, disabled, isLoadi
       onClick={handleOpen}
       disabled={disabled || isLoading}
       title="Enviar via WhatsApp"
-      className="flex items-center gap-2 rounded-xl border-2 border-[#25D366]/40 bg-[#25D366]/10 px-3 py-2 text-sm font-bold text-[#25D366] transition hover:bg-[#25D366]/20 disabled:opacity-40"
+      className="flex min-h-[44px] items-center gap-2 rounded-xl border-2 border-[#25D366]/40 bg-[#25D366]/10 px-3 py-2 text-sm font-bold text-[#25D366] transition hover:bg-[#25D366]/20 active:scale-[0.98] disabled:opacity-40"
     >
       <MessageCircle className="h-4 w-4" />
       <span className="hidden sm:inline">WhatsApp</span>

@@ -13,11 +13,11 @@ export default defineConfig({
     },
   },
   server: {
-    port: 39487,
-    strictPort: true,
+    port: 5173,
+    strictPort: false,
   },
   preview: {
-    port: 39487,
-    strictPort: true,
+    port: 4173,
+    strictPort: false,
   },
 });

@@ -138,7 +138,7 @@ function PublicQuizPage() {
   // ── Loading ───────────────────────────────────────────────────────────────
   if (loadState === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-[100svh] flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
           <p className="text-sm text-muted-foreground">Carregando...</p>
@@ -150,7 +150,7 @@ function PublicQuizPage() {
   // ── Not found ─────────────────────────────────────────────────────────────
   if (loadState === 'not_found') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-5">
+      <div className="min-h-[100svh] flex items-center justify-center bg-background px-5">
         <div className="text-center max-w-sm">
           <div className="text-5xl mb-4">🔍</div>
           <h1 className="text-xl font-bold">Formulário não encontrado</h1>
@@ -165,7 +165,7 @@ function PublicQuizPage() {
   // ── Inactive ──────────────────────────────────────────────────────────────
   if (loadState === 'inactive') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-5">
+      <div className="min-h-[100svh] flex items-center justify-center bg-background px-5">
         <div className="text-center max-w-sm">
           <div className="text-5xl mb-4">🔒</div>
           <h1 className="text-xl font-bold">Formulário inativo</h1>
@@ -183,7 +183,7 @@ function PublicQuizPage() {
   if (quizState === 'intro') {
     return (
       <div
-        className="min-h-screen flex flex-col bg-background"
+        className="min-h-[100svh] flex flex-col bg-background"
         style={{ '--quiz-color': form.theme_color } as React.CSSProperties}
       >
         <QuizBrandHeader brand={brand} title={form.title} />
@@ -232,7 +232,7 @@ function PublicQuizPage() {
   // ── Quiz completo ─────────────────────────────────────────────────────────
   if (quizState === 'complete') {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
+      <div className="min-h-[100svh] flex flex-col bg-background">
         <QuizBrandHeader brand={brand} title={form.title} />
         <div className="flex flex-1 items-center justify-center px-5">
           <QuizComplete formTitle={form.title} />

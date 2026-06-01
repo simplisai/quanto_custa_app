@@ -128,7 +128,7 @@ function AdminSuporte() {
   const byStatus = (s: string) => tickets.filter((t) => t.status === s).length
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-[100svh] bg-background p-4 sm:p-6">
       <div className="mx-auto max-w-6xl space-y-6">
         <header>
           <h1 className="text-3xl font-semibold tracking-tight">Suporte</h1>
