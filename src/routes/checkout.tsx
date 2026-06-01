@@ -4,11 +4,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { Logo } from "@/components/Logo";
-import {
-  readReferralCode,
-  saveReferralCode,
-  clearReferralCode,
-} from "@/routes/\$referralCode";
+import { ReferralBanner } from "@/components/landing/ReferralBanner";
+import { useReferralStatus } from "@/hooks/useReferralStatus";
+import { saveReferralCode } from "@/routes/\$referralCode";
 
 export const Route = createFileRoute("/checkout")({ component: CheckoutPage });
 
@@ -106,6 +104,9 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 function CheckoutPage() {
   const nav      = useNavigate();
   const location = useLocation();
+
+  // Status de indicação — determina se há trial VIP ou assinatura direta
+  const { isReferral, referralCode, clear: clearReferral } = useReferralStatus();
 
   // Determine plan from URL (?plan=monthly|annual)
   // Also try localStorage (set before Google OAuth redirect)
@@ -263,6 +264,8 @@ function CheckoutPage() {
             body: JSON.stringify({
               idempotencyKey: idempotencyKey.current,
               billingCycle: cycle,
+              hasTrial: isReferral,
+              referralCode: referralCode ?? undefined,
               customer: {
                 name: name.trim(),
                 email: email.trim(),
@@ -291,7 +294,10 @@ function CheckoutPage() {
         const body2 = await res.json() as { error?: string; subscriptionId?: string };
         if (!res.ok) { toast.error(body2.error ?? "Erro ao processar pagamento"); return; }
 
-        toast.success("Trial iniciado! 14 dias grátis.");
+        clearReferral();
+        toast.success(isReferral
+          ? "Trial VIP iniciado! 14 dias grátis. Bem-vindo!"
+          : "Assinatura ativa! Bem-vindo ao Quanto Custa!");
         nav({ to: "/assinatura" });
 
       } else {
@@ -307,7 +313,8 @@ function CheckoutPage() {
             body: JSON.stringify({
               idempotencyKey: idempotencyKey.current,
               billingCycle: cycle,
-              referralCode: readReferralCode() ?? undefined,
+              hasTrial: isReferral,
+              referralCode: referralCode ?? undefined,
               customer: {
                 name: name.trim(),
                 email: email.trim(),
@@ -365,8 +372,10 @@ function CheckoutPage() {
         }
 
         // Limpa o código de indicação após uso bem-sucedido
-        clearReferralCode();
-        toast.success("Trial iniciado! 14 dias grátis. Bem-vindo ao Quanto Custa!");
+        clearReferral();
+        toast.success(isReferral
+          ? "Trial VIP iniciado! 14 dias grátis. Bem-vindo ao Quanto Custa!"
+          : "Assinatura ativa! Bem-vindo ao Quanto Custa!");
         nav({ to: "/assinatura" });
       }
     } catch (err) {
@@ -393,6 +402,8 @@ function CheckoutPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
+      {/* Banner VIP — aparece se veio via link de indicação */}
+      <ReferralBanner />
       {/* Minimal header */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
@@ -417,7 +428,9 @@ function CheckoutPage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Checkout</p>
           <h1 className="text-3xl font-extrabold tracking-tight">Assinar o Quanto Custa</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            14 dias grátis · sem compromisso · cancele quando quiser
+            {isReferral
+              ? "Trial VIP · 14 dias grátis · sem compromisso · cancele quando quiser"
+              : "Assinatura imediata · Cancele quando quiser"}
           </p>
         </header>
 
@@ -451,9 +464,11 @@ function CheckoutPage() {
               <div className="text-xs text-muted-foreground">por mês · R$ 799/ano</div>
             </button>
           </div>
-          <div className="rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/40 px-4 py-2.5 text-sm font-semibold text-green-700 dark:text-green-400">
-            14 dias grátis — sem cobrança até {trialEndDate}
-          </div>
+          {isReferral && (
+            <div className="rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800/40 px-4 py-2.5 text-sm font-semibold text-green-700 dark:text-green-400">
+              🎁 Trial VIP — sem cobrança até {trialEndDate}
+            </div>
+          )}
         </section>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -678,13 +693,14 @@ function CheckoutPage() {
             >
               {submitting
                 ? "Processando…"
-                : `Iniciar trial gratuito de 14 dias — ${cycle === "monthly" ? MONTHLY_PRICE : ANNUAL_PRICE} após`}
+                : isReferral
+                  ? `Iniciar Trial VIP (14 dias grátis)`
+                  : `Assinar agora por ${cycle === "monthly" ? "R$ 99,00" : "R$ 799,00"}`}
             </button>
             <p className="text-center text-xs text-muted-foreground">
-              Após o trial, {cycle === "monthly"
-                ? MONTHLY_PRICE
-                : `${ANNUAL_MONTHLY} (cobrado como ${ANNUAL_PRICE})`}.
-              Cancele a qualquer momento antes do fim do trial sem nenhuma cobrança.
+              {isReferral
+                ? `Após o trial, ${cycle === "monthly" ? MONTHLY_PRICE : `${ANNUAL_MONTHLY} (cobrado como ${ANNUAL_PRICE})`}. Cancele antes sem nenhuma cobrança.`
+                : "Assinatura imediata. Cancele quando quiser."}
             </p>
           </div>
         </form>

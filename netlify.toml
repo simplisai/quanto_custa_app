@@ -4,3 +4,8 @@
 
 [build.environment]
   NETLIFY_USE_LATEST_NODE_VERSION = "true"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

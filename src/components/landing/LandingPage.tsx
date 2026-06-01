@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, animate } from "framer-motion";
+import { useReferralStatus } from "@/hooks/useReferralStatus";
+import { ReferralBanner } from "@/components/landing/ReferralBanner";
 import {
   AreaChart,
   Area,
@@ -602,6 +604,7 @@ const heroStagger = {
 
 function Hero() {
   const { isAuthenticated } = useAuth();
+  const { isReferral } = useReferralStatus();
 
   return (
     <section
@@ -715,7 +718,7 @@ function Hero() {
               to={isAuthenticated ? "/app" : "/checkout"}
               className="group inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-7 text-[14px] font-semibold tracking-[-0.01em] text-zinc-950 transition-all hover:scale-[1.02] hover:bg-white/90 active:scale-[0.98] sm:h-auto sm:py-3.5"
             >
-              Quero dominar minhas reuniões
+              {isReferral ? "Iniciar Meus 14 Dias Grátis" : "Quero dominar minhas reuniões"}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <a
@@ -2138,6 +2141,7 @@ function FAQ() {
 /* ─── Final CTA ───────────────────────────────────────────── */
 function FinalCTA() {
   const { isAuthenticated } = useAuth();
+  const { isReferral } = useReferralStatus();
   return (
     <SectionShell>
       <FadeIn>
@@ -2181,7 +2185,7 @@ function FinalCTA() {
                 to={isAuthenticated ? "/app" : "/checkout"}
                 className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-background px-6 text-[14px] font-medium tracking-[-0.01em] text-foreground transition-all hover:gap-3 sm:h-auto sm:w-auto sm:py-3.5"
               >
-                {isAuthenticated ? "Abrir Plataforma" : "Quero dominar minhas reuniões"}
+                {isAuthenticated ? "Abrir Plataforma" : isReferral ? "Iniciar Meus 14 Dias Grátis" : "Quero dominar minhas reuniões"}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </div>
@@ -2244,7 +2248,7 @@ function Footer() {
           <div className="space-y-6">
             <h4 className="font-mono text-[11px] font-bold uppercase tracking-[0.15em] text-white/25">Suporte</h4>
             <div className="space-y-4">
-              <p className="text-[14px] text-white/50">suporte@quantocusta.com</p>
+              <p className="text-[14px] text-white/50">contato@quantocusta.app</p>
               <a href="#" className="inline-flex items-center gap-2 rounded-full bg-green-500/10 px-4 py-2 text-[12px] font-medium text-green-400 border border-green-500/20">
                 <Zap className="h-3 w-3" />
                 Central de Ajuda
@@ -2275,6 +2279,7 @@ function Footer() {
 function MobileCTA() {
   const [show, setShow] = useState(false);
   const { isAuthenticated } = useAuth();
+  const { isReferral } = useReferralStatus();
   useEffect(() => {
     const onScroll = () => setShow(window.scrollY > 400);
     onScroll();
@@ -2293,7 +2298,7 @@ function MobileCTA() {
           to={isAuthenticated ? "/app" : "/checkout"}
           className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-6 text-[14px] font-medium tracking-[-0.01em] text-primary-foreground"
         >
-          {isAuthenticated ? "Abrir App" : "Dominar minhas reuniões"}
+          {isAuthenticated ? "Abrir App" : isReferral ? "Iniciar 14 Dias Grátis" : "Dominar minhas reuniões"}
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
@@ -2305,6 +2310,8 @@ function MobileCTA() {
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Banner VIP — renderiza acima de tudo quando há indicação válida */}
+      <ReferralBanner />
       <Header />
       <main>
         <Hero />
