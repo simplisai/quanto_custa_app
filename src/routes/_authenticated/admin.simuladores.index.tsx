@@ -9,7 +9,7 @@ import {
   Calculator, ChevronRight, CheckCircle2, Code2, Sparkles, RefreshCw, BookOpen,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/admin/simuladores")({
+export const Route = createFileRoute("/_authenticated/admin/simuladores/")({
   component: AdminSimuladoresPage,
 });
 

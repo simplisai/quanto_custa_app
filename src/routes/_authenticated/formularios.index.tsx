@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { copyToClipboard } from '@/lib/utils'
 
-export const Route = createFileRoute('/_authenticated/formularios')({
+export const Route = createFileRoute('/_authenticated/formularios/')({
   component: FormulariosPage,
 })
 
