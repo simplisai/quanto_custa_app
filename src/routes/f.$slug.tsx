@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client'
 import { QuizShell } from '@/components/quiz/QuizShell'
 import { QuizStep } from '@/components/quiz/QuizStep'
 import { QuizComplete } from '@/components/quiz/QuizComplete'
+import { QuizBrandHeader } from '@/components/quiz/QuizBrandHeader'
+import { useBrandSettings } from '@/hooks/useBrandSettings'
 import type { FormFieldDef } from '@/lib/form-fields-catalog'
 
 export const Route = createFileRoute('/f/$slug')({
@@ -12,10 +14,11 @@ export const Route = createFileRoute('/f/$slug')({
 
 const SUPABASE_FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL
   ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
-  : 'https://gkudaozyixdtywgucddv.supabase.co/functions/v1'
+  : 'https://seu-projeto.supabase.co/functions/v1'; // fallback genérico para tipagem
 
 interface FormTemplate {
   id: string
+  user_id: string
   title: string
   description: string | null
   slug: string
@@ -33,6 +36,7 @@ function PublicQuizPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | undefined>()
   const [submitting, setSubmitting] = useState(false)
+  const brand = useBrandSettings(form?.user_id)
 
   useEffect(() => {
     loadForm()
@@ -46,7 +50,7 @@ function PublicQuizPage() {
 
     const { data, error } = await supabase
       .from('form_templates')
-      .select('id, title, description, slug, fields, theme_color, is_active')
+      .select('id, user_id, title, description, slug, fields, theme_color, is_active')
       .eq('slug', slug)
       .maybeSingle()
 
@@ -179,16 +183,24 @@ function PublicQuizPage() {
   if (quizState === 'intro') {
     return (
       <div
-        className="min-h-screen flex flex-col items-center justify-center px-5 bg-background"
+        className="min-h-screen flex flex-col bg-background"
         style={{ '--quiz-color': form.theme_color } as React.CSSProperties}
       >
+        <QuizBrandHeader brand={brand} title={form.title} />
+        <div className="flex flex-1 flex-col items-center justify-center px-5">
         <div className="w-full max-w-lg text-center flex flex-col gap-6 animate-in fade-in duration-500">
-          <div
-            className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl text-3xl shadow-lg"
-            style={{ backgroundColor: form.theme_color + '20', color: form.theme_color }}
-          >
-            📋
-          </div>
+          {brand.isCustomLogo ? (
+            <div className="mx-auto flex h-16 items-center justify-center">
+              <img src={brand.logoUrl} alt={form.title} className="h-14 max-w-[200px] object-contain" />
+            </div>
+          ) : (
+            <div
+              className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl text-3xl shadow-lg"
+              style={{ backgroundColor: form.theme_color + '20', color: form.theme_color }}
+            >
+              📋
+            </div>
+          )}
           <div>
             <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
               {form.title}
@@ -212,6 +224,7 @@ function PublicQuizPage() {
             </p>
           </div>
         </div>
+        </div>
       </div>
     )
   }
@@ -219,8 +232,11 @@ function PublicQuizPage() {
   // ── Quiz completo ─────────────────────────────────────────────────────────
   if (quizState === 'complete') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-5">
-        <QuizComplete formTitle={form.title} />
+      <div className="min-h-screen flex flex-col bg-background">
+        <QuizBrandHeader brand={brand} title={form.title} />
+        <div className="flex flex-1 items-center justify-center px-5">
+          <QuizComplete formTitle={form.title} />
+        </div>
       </div>
     )
   }
@@ -230,7 +246,7 @@ function PublicQuizPage() {
   if (!current) return null
 
   return (
-    <QuizShell step={step} total={form.fields.length} themeColor={form.theme_color}>
+    <QuizShell step={step} total={form.fields.length} themeColor={form.theme_color} brandHeader={<QuizBrandHeader brand={brand} title={form.title} />}>
       <QuizStep
         field={current}
         value={answers[current.key] ?? ''}

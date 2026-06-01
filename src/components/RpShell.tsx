@@ -48,12 +48,23 @@ export function RpHeader({
   subtitle,
   clientName,
   date,
+  brandLogoUrl,
+  brandColor,
 }: {
   title: string;
   subtitle: string;
   clientName?: string;
   date: string;
+  /** Logo white-label do corretor (raster: png/jpg). SVG é ignorado — react-pdf não suporta. */
+  brandLogoUrl?: string;
+  /** Cor white-label do corretor. Default: navy. */
+  brandColor?: string;
 }) {
+  const accent = brandColor || C.navy;
+  // react-pdf <Image> só renderiza raster — ignora SVG silenciosamente
+  const rasterLogo =
+    brandLogoUrl && /\.(png|jpe?g)(\?|$)/i.test(brandLogoUrl) ? brandLogoUrl : null;
+
   return (
     <View
       style={{
@@ -61,28 +72,35 @@ export function RpHeader({
         justifyContent: "space-between",
         alignItems: "flex-start",
         borderBottomWidth: 3,
-        borderBottomColor: C.navy,
+        borderBottomColor: accent,
         paddingBottom: 12,
         marginBottom: 18,
       }}
     >
       {/* Left: branding */}
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <View
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
-            backgroundColor: C.navy,
-            alignItems: "center",
-            justifyContent: "center",
-            marginRight: 8,
-          }}
-        >
-          <Text style={{ color: C.white, fontFamily: "Helvetica-Bold", fontSize: 14 }}>Q</Text>
-        </View>
+        {rasterLogo ? (
+          <Image
+            src={rasterLogo}
+            style={{ width: 28, height: 28, marginRight: 8, objectFit: "contain" }}
+          />
+        ) : (
+          <View
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              backgroundColor: accent,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 8,
+            }}
+          >
+            <Text style={{ color: C.white, fontFamily: "Helvetica-Bold", fontSize: 14 }}>Q</Text>
+          </View>
+        )}
         <View>
-          <Text style={{ fontSize: 15, color: C.navy, fontFamily: "Helvetica-Bold" }}>{title}</Text>
+          <Text style={{ fontSize: 15, color: accent, fontFamily: "Helvetica-Bold" }}>{title}</Text>
           <Text style={{ fontSize: 8, color: C.muted, textTransform: "uppercase", marginTop: 1 }}>{subtitle}</Text>
         </View>
       </View>

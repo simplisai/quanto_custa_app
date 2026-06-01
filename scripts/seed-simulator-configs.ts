@@ -3,10 +3,15 @@
 import { createClient } from "@supabase/supabase-js";
 import { SEED_CONFIGS } from "../src/lib/simulator-seed-configs";
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://gkudaozyixdtywgucddv.supabase.co";
-const SERVICE_ROLE = process.env.VITE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('Missing required environment variables.');
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 async function run() {
   console.log("🚀 Iniciando seed de simulator_configs...\n");

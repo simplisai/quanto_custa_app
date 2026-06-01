@@ -5,7 +5,7 @@ import {
   Home, Calculator, History, Users, BookCopy, CreditCard,
   LifeBuoy, Radio, LogOut, ChevronRight, ArrowLeft, Menu, X,
   ShieldAlert, Wallet, PanelLeftClose, PanelLeftOpen,
-  LayoutDashboard, Gift, ClipboardList,
+  LayoutDashboard, Gift, ClipboardList, Palette,
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +25,7 @@ const USER_NAV = [
   { to: "/templates",   label: "Templates",       icon: BookCopy    },
   { to: "/indicar",     label: "Indicar & Ganhar", icon: Gift            },
   { to: "/formularios", label: "Formulários",     icon: ClipboardList  },
+  { to: "/settings/brand", label: "Minha Marca",  icon: Palette         },
   { to: "/assinatura",  label: "Assinatura",      icon: CreditCard      },
   { to: "/suporte",     label: "Suporte",         icon: LifeBuoy    },
 ] as const;

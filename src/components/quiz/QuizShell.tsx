@@ -5,9 +5,11 @@ interface QuizShellProps {
   total: number
   children: ReactNode
   themeColor?: string
+  /** Faixa de marca (logo + cor) renderizada no topo. */
+  brandHeader?: ReactNode
 }
 
-export function QuizShell({ step, total, children, themeColor = '#6366f1' }: QuizShellProps) {
+export function QuizShell({ step, total, children, themeColor = '#6366f1', brandHeader }: QuizShellProps) {
   const progress = total > 0 ? ((step + 1) / total) * 100 : 0
 
   return (
@@ -23,6 +25,9 @@ export function QuizShell({ step, total, children, themeColor = '#6366f1' }: Qui
           </div>
         </div>
       )}
+
+      {/* Brand header */}
+      {brandHeader}
 
       {/* Step counter */}
       {total > 0 && (

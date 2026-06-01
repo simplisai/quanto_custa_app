@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePdfExport } from "@/hooks/usePdfExport";
+import { useBrandSettings } from "@/hooks/useBrandSettings";
 import { calcular, defaultInputs, type CalcInputs, type CalcResults } from "@/lib/calculator";
 import { fmtBRL, maskMoney, maskPercent, unmask } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,6 +105,7 @@ function NumInput({ field, raw, setRaw }: { field: Field; raw: string; setRaw: (
 
 function CalculatorPage() {
   const { user } = useAuth();
+  const brand = useBrandSettings();
   const search = Route.useSearch();
   const [raws, setRaws] = useState<Record<string, string>>({});
   const [baseLance, setBaseLance] = useState<"credito" | "plano">("credito");
@@ -119,6 +121,8 @@ function CalculatorPage() {
       chartTermometro={captureChart("app-termometro")}
       chartParcelas={captureChart("app-parcelas")}
       chartPatrimonio={captureChart("app-patrimonio")}
+      brandLogoUrl={brand.isCustomLogo ? brand.logoUrl : undefined}
+      brandColor={brand.isCustomColor ? brand.color : undefined}
     /> : null,
     "Relatorio_Inteligencia_Imobiliaria.pdf",
   );
@@ -650,7 +654,7 @@ function ChartAlavancagem({ r }: { r: CalcResults }) {
 }
 
 // ─── PDF Document (react-pdf) ─────────────────────────────────────────────────
-function PDFReportDoc({ r, usoCredito, inputs, clientName, chartTermometro, chartParcelas, chartPatrimonio }: {
+function PDFReportDoc({ r, usoCredito, inputs, clientName, chartTermometro, chartParcelas, chartPatrimonio, brandLogoUrl, brandColor }: {
   r: CalcResults;
   usoCredito: "comprar" | "patrimonio";
   inputs: CalcInputs;
@@ -658,6 +662,8 @@ function PDFReportDoc({ r, usoCredito, inputs, clientName, chartTermometro, char
   chartTermometro?: string | null;
   chartParcelas?: string | null;
   chartPatrimonio?: string | null;
+  brandLogoUrl?: string;
+  brandColor?: string;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
@@ -668,6 +674,8 @@ function PDFReportDoc({ r, usoCredito, inputs, clientName, chartTermometro, char
         subtitle="Relatório de Inteligência Patrimonial"
         clientName={clientName}
         date={hoje}
+        brandLogoUrl={brandLogoUrl}
+        brandColor={brandColor}
       />
 
       <RpPremises items={[

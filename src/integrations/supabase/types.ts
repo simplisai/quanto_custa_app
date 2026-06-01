@@ -50,6 +50,8 @@ export type Database = {
           id: string;
           updated_at: string;
           referral_code: string | null;
+          brand_logo_url: string | null;
+          brand_color: string | null;
         };
         Insert: {
           created_at?: string;
@@ -58,6 +60,8 @@ export type Database = {
           id: string;
           updated_at?: string;
           referral_code?: string | null;
+          brand_logo_url?: string | null;
+          brand_color?: string | null;
         };
         Update: {
           created_at?: string;
@@ -66,6 +70,8 @@ export type Database = {
           id?: string;
           updated_at?: string;
           referral_code?: string | null;
+          brand_logo_url?: string | null;
+          brand_color?: string | null;
         };
         Relationships: [];
       };

@@ -5,14 +5,14 @@ ALTER TABLE public.plans
 
 -- Update Mensal plan: Simplispay id=25709, R$99,00
 UPDATE public.plans SET
-  simplispay_plan_id     = 25709,
+  simplispay_plan_id     = SIMPLISPAY_PLAN_ID_MONTHLY_PLACEHOLDER,
   simplispay_internal_id = 'e21a17d7-80ee-47e4-8bef-4e1bac8f34a5',
   amount_cents           = 9900
 WHERE billing_cycle = 'monthly' AND name = 'Mensal';
 
 -- Update Anual plan: Simplispay id=25710, R$799,00
 UPDATE public.plans SET
-  simplispay_plan_id     = 25710,
+  simplispay_plan_id     = SIMPLISPAY_PLAN_ID_ANNUAL_PLACEHOLDER,
   simplispay_internal_id = 'd04bd73e-b825-48a5-8678-eca4279263e1',
   amount_cents           = 79900
 WHERE billing_cycle = 'annual' AND name = 'Anual';
@@ -42,8 +42,8 @@ SELECT cron.schedule(
   'simplispay-refresh-token',
   '0 */2 * * *',
   $$
-  SELECT net.http_post(
-    url     := 'https://gkudaozyixdtywgucddv.supabase.co/functions/v1/simplispay-refresh-token',
+  SELECT perform net.http_post(
+    url := 'YOUR_SUPABASE_URL_PLACEHOLDER/functions/v1/simplispay-refresh-token',
     headers := '{"Content-Type": "application/json"}'::jsonb,
     body    := '{}'::jsonb
   ) AS request_id;
