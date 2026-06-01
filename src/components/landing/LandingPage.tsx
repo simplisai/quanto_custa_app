@@ -1621,108 +1621,117 @@ function SetteChaves() {
   const ActiveChart = tabCharts[tabs[active].chart];
 
   return (
-    <div ref={containerRef} className="relative h-[600vh]" id="arsenal">
-      <div className="sticky top-0 h-screen overflow-hidden flex flex-col justify-center">
-        <SectionShell tone="muted" className="h-full border-none flex items-center">
-          <div className="w-full">
-            <FadeIn>
-              <div className="mb-4 flex items-center gap-3">
-                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                <Eyebrow>As 7 Estratégias de Fechamento</Eyebrow>
-              </div>
-              <h2 className="font-sans-display max-w-[22ch] text-[clamp(1.875rem,5.5vw,3.75rem)] font-medium leading-[1.02] tracking-[-0.04em] text-foreground">
-                Sete armas que tornam sua proposta{" "}
-                <span className="font-display italic tracking-[-0.02em]">à prova de objeções.</span>
-              </h2>
-            </FadeIn>
+    <div ref={containerRef} className="relative h-[750vh]" id="arsenal">
+      <div className="sticky top-0 flex h-screen w-full flex-col items-center justify-center overflow-hidden bg-[#0a0a0a]">
+        {/* Decorative background element */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.03),transparent_70%)]" />
+        
+        <div className="relative mx-auto w-full max-w-[1280px] px-5 sm:px-10 py-12 lg:py-0">
+          <FadeIn>
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              <Eyebrow>As 7 Estratégias de Fechamento</Eyebrow>
+            </div>
+            <h2 className="font-sans-display max-w-[22ch] text-[clamp(1.5rem,4.5vw,2.75rem)] font-medium leading-[1.1] tracking-[-0.04em] text-foreground">
+              Sete armas que tornam sua proposta{" "}
+              <span className="font-display italic tracking-[-0.02em]">à prova de objeções.</span>
+            </h2>
+          </FadeIn>
 
-            <FadeIn delay={0.1}>
-              <div className="mt-14 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6">
-                {/* Tabs */}
-                <div className="mb-4 flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory lg:mb-0 lg:flex-col lg:overflow-visible lg:pb-0 lg:snap-none">
-                  {tabs.map((t, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        if (containerRef.current) {
-                          const totalHeight = containerRef.current.scrollHeight;
-                          const targetScroll = (i / tabs.length) * totalHeight;
-                          window.scrollTo({
-                            top: containerRef.current.offsetTop + targetScroll,
-                            behavior: "smooth"
-                          });
-                        }
-                      }}
-                      className={`group relative flex shrink-0 snap-start flex-col gap-1 rounded-xl px-4 py-3 text-left transition-all lg:flex-row lg:items-center lg:gap-3 ${
-                        active === i
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-background/60 text-muted-foreground hover:bg-background hover:text-foreground border border-border/50"
+          <FadeIn delay={0.1}>
+            <div className="mt-10 lg:mt-14 lg:grid lg:grid-cols-[280px_1fr] lg:gap-12 lg:items-start">
+              {/* Tabs Sidebar */}
+              <div className="mb-8 flex gap-2 overflow-x-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory lg:mb-0 lg:flex-col lg:overflow-visible lg:pb-0 lg:snap-none">
+                {tabs.map((t, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (containerRef.current) {
+                        const totalHeight = containerRef.current.scrollHeight;
+                        const sectionHeight = totalHeight / tabs.length;
+                        window.scrollTo({
+                          top: containerRef.current.offsetTop + (i * sectionHeight) + 10,
+                          behavior: "smooth"
+                        });
+                      }
+                    }}
+                    className={`group relative flex shrink-0 snap-start flex-col gap-1 rounded-2xl px-5 py-4 text-left transition-all duration-300 lg:flex-row lg:items-center lg:gap-4 ${
+                      active === i
+                        ? "bg-primary text-primary-foreground shadow-[0_20px_40px_rgba(0,0,0,0.3)] scale-[1.02]"
+                        : "bg-white/[0.03] text-muted-foreground hover:bg-white/[0.08] hover:text-foreground border border-white/[0.05]"
+                    }`}
+                  >
+                    <span
+                      className={`font-mono text-[10px] tabular-nums lg:w-6 ${
+                        active === i ? "text-primary-foreground/60" : "text-muted-foreground/40"
                       }`}
                     >
-                      <span
-                        className={`font-mono text-[10px] tabular-nums lg:w-6 ${
-                          active === i ? "text-primary-foreground/50" : "text-muted-foreground/60"
-                        }`}
-                      >
-                        {t.n}
-                      </span>
-                      <span className="font-sans-display text-[13px] font-medium leading-tight tracking-[-0.02em]">
-                        {t.title}
-                      </span>
-                      {active === i && (
-                        <motion.div
-                          layoutId="activeTabIndicator"
-                          className="absolute right-3 top-1/2 hidden h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary-foreground/60 lg:block"
-                        />
-                      )}
-                    </button>
-                  ))}
-                </div>
+                      {t.n}
+                    </span>
+                    <span className="font-sans-display text-[13px] font-semibold leading-tight tracking-[-0.01em]">
+                      {t.title}
+                    </span>
+                    {active === i && (
+                      <motion.div
+                        layoutId="activeTabIndicator"
+                        className="absolute right-4 top-1/2 hidden h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary-foreground lg:block"
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
 
-                {/* Content */}
-                <div className="rounded-2xl border border-border/60 bg-background p-6 sm:p-8 min-h-[400px] flex items-center">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={active}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -12 }}
-                      transition={{ duration: 0.25, ease: [0.21, 0.47, 0.32, 0.98] }}
-                      className="grid gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-start w-full"
-                    >
-                      {/* copy */}
-                      <div>
-                        <div className="mb-2 flex items-center gap-2">
-                          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                            {tabs[active].n} — {tabs[active].kicker}
-                          </span>
-                        </div>
-                        <h3 className="font-sans-display text-[22px] font-medium leading-[1.1] tracking-[-0.035em] text-foreground sm:text-[26px]">
-                          {tabs[active].title}
-                        </h3>
-                        <p className="mt-5 text-[15px] leading-[1.65] tracking-[-0.01em] text-muted-foreground">
-                          {tabs[active].copy}
-                        </p>
+              {/* Dynamic Content Card */}
+              <div className="relative min-h-[480px] lg:min-h-[520px] rounded-[32px] border border-white/10 bg-white/[0.02] backdrop-blur-md p-8 sm:p-12 shadow-2xl overflow-hidden flex items-center">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={active}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
+                    className="grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:items-center w-full"
+                  >
+                    {/* Strategy Text */}
+                    <div className="order-2 lg:order-1 space-y-6">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
+                          ESTRATÉGIA {tabs[active].n}
+                        </span>
+                        <div className="h-px w-8 bg-accent/30" />
+                      </div>
+                      <h3 className="font-sans-display text-[28px] font-medium leading-[1.1] tracking-[-0.03em] text-foreground sm:text-[38px]">
+                        {tabs[active].title}
+                      </h3>
+                      <p className="text-[16px] leading-[1.6] text-muted-foreground sm:text-[18px]">
+                        {tabs[active].copy}
+                      </p>
+                      <div className="pt-4">
                         <a
                           href="#planos"
-                          className="group mt-6 inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground underline decoration-foreground/20 underline-offset-4 hover:decoration-foreground/60"
+                          className="group inline-flex items-center gap-3 text-[14px] font-bold text-foreground"
                         >
-                          Quero essa estratégia
-                          <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                          <span className="relative">
+                            Ativar no meu arsenal
+                            <span className="absolute -bottom-2 left-0 h-px w-full bg-foreground/20 transition-all group-hover:bg-foreground group-hover:h-0.5" />
+                          </span>
+                          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
                         </a>
                       </div>
+                    </div>
 
-                      {/* chart */}
-                      <div>
+                    {/* Strategy Visual/Chart */}
+                    <div className="order-1 lg:order-2 flex justify-center lg:justify-end">
+                      <div className="w-full max-w-[480px] lg:max-w-none transform transition-all duration-700 hover:scale-[1.03]">
                         <ActiveChart />
                       </div>
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
               </div>
-            </FadeIn>
-          </div>
-        </SectionShell>
+            </div>
+          </FadeIn>
+        </div>
       </div>
     </div>
   );
