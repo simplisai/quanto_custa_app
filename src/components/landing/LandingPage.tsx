@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, animate, useScroll, useTransform, useMotionValueEvent } from "framer-motion";
+import { motion, AnimatePresence, animate, useScroll, useMotionValueEvent, useSpring } from "framer-motion";
 import { useReferralStatus } from "@/hooks/useReferralStatus";
 import { ReferralBanner } from "@/components/landing/ReferralBanner";
 import {
@@ -186,17 +186,15 @@ function SectionShell({
   id,
   tone = "default",
   children,
-  className = "",
 }: {
   id?: string;
   tone?: "default" | "muted";
   children: React.ReactNode;
-  className?: string;
 }) {
   return (
     <section
       id={id}
-      className={`border-b border-border/60 ${tone === "muted" ? "bg-secondary/40" : "bg-background"} ${className}`}
+      className={`border-b border-border/60 ${tone === "muted" ? "bg-secondary/40" : "bg-background"}`}
     >
       <div className="mx-auto max-w-[1280px] px-5 py-20 sm:px-10 sm:py-28 lg:py-36">{children}</div>
     </section>
@@ -1598,133 +1596,120 @@ const tabCharts: Record<string, React.FC> = {
   pj: TabChartPJ,
 };
 
-/* ─── 7 Estratégias (Parallax Scroll) ─────────────────────────── */
 function SetteChaves() {
-  const [active, setActive] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  
+  const containerRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
-    offset: ["start start", "end end"]
+    offset: ["start start", "end end"],
   });
 
+  const [active, setActive] = useState(0);
+
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
-    const index = Math.min(
-      Math.floor(latest * tabs.length),
-      tabs.length - 1
-    );
-    if (index !== active) {
-      setActive(index);
-    }
+    const numItems = tabs.length;
+    let index = Math.floor(latest * numItems);
+    if (index >= numItems) index = numItems - 1;
+    if (index < 0) index = 0;
+    if (index !== active) setActive(index);
   });
+
+  const progressSpring = useSpring(scrollYProgress, { stiffness: 300, damping: 30 });
 
   const ActiveChart = tabCharts[tabs[active].chart];
 
   return (
-    <div ref={containerRef} className="relative h-[750vh]" id="arsenal">
-      <div className="sticky top-0 flex h-screen w-full flex-col items-center justify-center overflow-hidden bg-[#0a0a0a]">
-        {/* Decorative background element */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(34,197,94,0.03),transparent_70%)]" />
-        
-        <div className="relative mx-auto w-full max-w-[1280px] px-5 sm:px-10 py-12 lg:py-0">
+    <section ref={containerRef} id="arsenal" className="relative h-[700vh] w-full border-b border-border/60 bg-secondary/40">
+      <div className="sticky top-0 flex h-[100dvh] w-full flex-col justify-start pt-16 sm:justify-center sm:pt-0 overflow-hidden">
+        <div className="mx-auto w-full max-w-[1280px] px-5 sm:px-10">
           <FadeIn>
-            <div className="mb-4 flex items-center gap-3">
+            <div className="mb-2 flex items-center gap-2 sm:mb-4 sm:gap-3">
               <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               <Eyebrow>As 7 Estratégias de Fechamento</Eyebrow>
             </div>
-            <h2 className="font-sans-display max-w-[22ch] text-[clamp(1.5rem,4.5vw,2.75rem)] font-medium leading-[1.1] tracking-[-0.04em] text-foreground">
+            <h2 className="font-sans-display max-w-[22ch] text-[clamp(1.5rem,5vw,3.75rem)] font-medium leading-[1.02] tracking-[-0.04em] text-foreground">
               Sete armas que tornam sua proposta{" "}
               <span className="font-display italic tracking-[-0.02em]">à prova de objeções.</span>
             </h2>
+            
+            {/* Scroll Progress Bar */}
+            <div className="mt-4 h-1 w-full max-w-sm overflow-hidden rounded-full bg-border/40 sm:mt-8 lg:max-w-md">
+              <motion.div 
+                className="h-full bg-primary"
+                style={{ scaleX: progressSpring, transformOrigin: "left", transform: "translateZ(0)" }}
+              />
+            </div>
           </FadeIn>
 
           <FadeIn delay={0.1}>
-            <div className="mt-10 lg:mt-14 lg:grid lg:grid-cols-[280px_1fr] lg:gap-12 lg:items-start">
-              {/* Tabs Sidebar */}
-              <div className="mb-8 flex gap-2 overflow-x-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory lg:mb-0 lg:flex-col lg:overflow-visible lg:pb-0 lg:snap-none">
+            <div className="mt-6 lg:mt-10 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6">
+              {/* Tabs / Progress Indicator */}
+              <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory sm:mb-4 sm:pb-2 lg:mb-0 lg:flex-col lg:overflow-visible lg:pb-0 lg:snap-none">
                 {tabs.map((t, i) => (
-                  <button
+                  <div
                     key={i}
-                    onClick={() => {
-                      if (containerRef.current) {
-                        const totalHeight = containerRef.current.scrollHeight;
-                        const sectionHeight = totalHeight / tabs.length;
-                        window.scrollTo({
-                          top: containerRef.current.offsetTop + (i * sectionHeight) + 10,
-                          behavior: "smooth"
-                        });
-                      }
-                    }}
-                    className={`group relative flex shrink-0 snap-start flex-col gap-1 rounded-2xl px-5 py-4 text-left transition-all duration-300 lg:flex-row lg:items-center lg:gap-4 ${
+                    className={`group relative flex shrink-0 snap-start flex-col gap-1 rounded-xl px-3 py-2 text-left transition-all sm:px-4 sm:py-3 lg:flex-row lg:items-center lg:gap-3 ${
                       active === i
-                        ? "bg-primary text-primary-foreground shadow-[0_20px_40px_rgba(0,0,0,0.3)] scale-[1.02]"
-                        : "bg-white/[0.03] text-muted-foreground hover:bg-white/[0.08] hover:text-foreground border border-white/[0.05]"
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "bg-background/60 text-muted-foreground border border-border/50"
                     }`}
                   >
                     <span
                       className={`font-mono text-[10px] tabular-nums lg:w-6 ${
-                        active === i ? "text-primary-foreground/60" : "text-muted-foreground/40"
+                        active === i ? "text-primary-foreground/50" : "text-muted-foreground/60"
                       }`}
                     >
                       {t.n}
                     </span>
-                    <span className="font-sans-display text-[13px] font-semibold leading-tight tracking-[-0.01em]">
+                    <span className="font-sans-display text-[12px] font-medium leading-tight tracking-[-0.02em] sm:text-[13px]">
                       {t.title}
                     </span>
                     {active === i && (
                       <motion.div
                         layoutId="activeTabIndicator"
-                        className="absolute right-4 top-1/2 hidden h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary-foreground lg:block"
+                        className="absolute right-3 top-1/2 hidden h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-primary-foreground/60 lg:block"
                       />
                     )}
-                  </button>
+                  </div>
                 ))}
               </div>
 
-              {/* Dynamic Content Card */}
-              <div className="relative min-h-[480px] lg:min-h-[520px] rounded-[32px] border border-white/10 bg-white/[0.02] backdrop-blur-md p-8 sm:p-12 shadow-2xl overflow-hidden flex items-center">
+              {/* Content */}
+              <div className="rounded-2xl border border-border/60 bg-background p-4 sm:p-8">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={active}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-                    className="grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:items-center w-full"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -16 }}
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="grid gap-4 sm:gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-start will-change-transform will-change-opacity"
+                    style={{ transform: "translateZ(0)" }}
                   >
-                    {/* Strategy Text */}
-                    <div className="order-2 lg:order-1 space-y-6">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
-                          ESTRATÉGIA {tabs[active].n}
+                    {/* copy */}
+                    <div>
+                      <div className="mb-1 flex items-center gap-2 sm:mb-2">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                          {tabs[active].n} — {tabs[active].kicker}
                         </span>
-                        <div className="h-px w-8 bg-accent/30" />
                       </div>
-                      <h3 className="font-sans-display text-[28px] font-medium leading-[1.1] tracking-[-0.03em] text-foreground sm:text-[38px]">
+                      <h3 className="font-sans-display text-[18px] font-medium leading-[1.1] tracking-[-0.035em] text-foreground sm:text-[26px]">
                         {tabs[active].title}
                       </h3>
-                      <p className="text-[16px] leading-[1.6] text-muted-foreground sm:text-[18px]">
+                      <p className="mt-2 text-[14px] leading-[1.5] tracking-[-0.01em] text-muted-foreground sm:mt-5 sm:text-[15px] sm:leading-[1.65]">
                         {tabs[active].copy}
                       </p>
-                      <div className="pt-4">
-                        <a
-                          href="#planos"
-                          className="group inline-flex items-center gap-3 text-[14px] font-bold text-foreground"
-                        >
-                          <span className="relative">
-                            Ativar no meu arsenal
-                            <span className="absolute -bottom-2 left-0 h-px w-full bg-foreground/20 transition-all group-hover:bg-foreground group-hover:h-0.5" />
-                          </span>
-                          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" />
-                        </a>
-                      </div>
+                      <a
+                        href="#planos"
+                        className="group mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground underline decoration-foreground/20 underline-offset-4 hover:decoration-foreground/60 sm:mt-6"
+                      >
+                        Quero essa estratégia
+                        <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                      </a>
                     </div>
 
-                    {/* Strategy Visual/Chart */}
-                    <div className="order-1 lg:order-2 flex justify-center lg:justify-end">
-                      <div className="w-full max-w-[480px] lg:max-w-none transform transition-all duration-700 hover:scale-[1.03]">
-                        <ActiveChart />
-                      </div>
+                    {/* chart */}
+                    <div>
+                      <ActiveChart />
                     </div>
                   </motion.div>
                 </AnimatePresence>
@@ -1733,7 +1718,7 @@ function SetteChaves() {
           </FadeIn>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
