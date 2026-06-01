@@ -2,11 +2,10 @@
  * simplispay-webhook
  * Receives POST events from Simplispay and keeps subscriptions/invoices in sync.
  * No JWT required — Simplispay calls this endpoint directly.
- * URL configured at Simplispay: https://gkudaozyixdtywgucddv.supabase.co/functions/v1/simplispay-webhook
  *
  * Referral logic:
- *  - invoice.paid when sub was 'trialing' → mark referral as converted → grant credit to referrer (every 2)
- *  - invoice.paid when referrer has months_credit → postpone next billing via SimplisPay API
+ *   - invoice.paid when sub was 'trialing' → mark referral as converted → grant credit to referrer (every 2)
+ *   - invoice.paid when referrer has months_credit → postpone next billing via SimplisPay API
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
