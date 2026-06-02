@@ -10,7 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as ReferralCodeRouteImport } from './routes/$referralCode'
@@ -54,9 +56,19 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutRoute = CheckoutRouteImport.update({
@@ -269,7 +281,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$referralCode': typeof ReferralCodeRoute
   '/checkout': typeof CheckoutRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/app': typeof AuthenticatedAppRoute
@@ -309,7 +323,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$referralCode': typeof ReferralCodeRoute
   '/checkout': typeof CheckoutRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/app': typeof AuthenticatedAppRoute
   '/assinar': typeof AuthenticatedAssinarRoute
@@ -349,7 +365,9 @@ export interface FileRoutesById {
   '/$referralCode': typeof ReferralCodeRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/checkout': typeof CheckoutRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/app': typeof AuthenticatedAppRoute
@@ -391,7 +409,9 @@ export interface FileRouteTypes {
     | '/'
     | '/$referralCode'
     | '/checkout'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/admin'
     | '/app'
@@ -431,7 +451,9 @@ export interface FileRouteTypes {
     | '/'
     | '/$referralCode'
     | '/checkout'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/app'
     | '/assinar'
@@ -470,7 +492,9 @@ export interface FileRouteTypes {
     | '/$referralCode'
     | '/_authenticated'
     | '/checkout'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/signup'
     | '/_authenticated/admin'
     | '/_authenticated/app'
@@ -512,7 +536,9 @@ export interface RootRouteChildren {
   ReferralCodeRoute: typeof ReferralCodeRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   FSlugRoute: typeof FSlugRoute
 }
@@ -526,11 +552,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout': {
@@ -904,7 +944,9 @@ const rootRouteChildren: RootRouteChildren = {
   ReferralCodeRoute: ReferralCodeRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   FSlugRoute: FSlugRoute,
 }

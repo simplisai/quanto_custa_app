@@ -1,15 +1,23 @@
 /**
  * checkout-subscribe
  * Public endpoint — no JWT required.
- * Creates a new Supabase user + Simplispay subscription atomically.
  *
- * On failure at any step, rolls back what was done:
- *   - Simplispay error   → delete user (if created)
- *   - DB error           → log + return 500 (subscription exists at gateway; user should contact support)
+ * Corrected flow order (payment FIRST, account creation SECOND):
+ *   1. Idempotency check
+ *   2. Pre-payment e-mail duplicate check (profiles table)
+ *   3. Get SimplisPay token
+ *   4. Charge card via SimplisPay
+ *   5. If charge fails → return 422, NO user account ever created
+ *   6. Create Supabase user (payment already confirmed at this point)
+ *   7. Create subscription + ledger + profile + referral
+ *   8. Sign in server-side to produce session tokens
+ *   9. Return { success, subscriptionId, userId, access_token, refresh_token }
  *
  * Request body (JSON):
  *   idempotencyKey  string
  *   billingCycle    'monthly'|'annual'
+ *   hasTrial        boolean
+ *   referralCode?   string
  *   customer        { name, email, password, cpf, birthDate, phone }
  *   address         { street, number, complement?, neighborhood, city, state, zipCode }
  *   card            { holderName, number, securityCode, expiry }  // expiry = MM/AAAA
@@ -19,27 +27,23 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 const SIMPLISPAY_BASE_URL = Deno.env.get('SIMPLISPAY_BASE_URL') ?? 'https://api.zsystems.com.br';
 const SUPABASE_URL        = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+// SUPABASE_ANON_KEY is automatically injected into all edge functions by Supabase
+const SUPABASE_ANON_KEY   = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const SIMPLISPAY_EMAIL    = Deno.env.get('SIMPLISPAY_EMAIL') ?? '';
 const SIMPLISPAY_PASSWORD = Deno.env.get('SIMPLISPAY_PASSWORD') ?? '';
 
-// Simplispay internal UUIDs — used as planoId in /planos/assinar
 const PLAN_SIMPLISPAY_UUID: Record<string, string> = {
   monthly: 'e21a17d7-80ee-47e4-8bef-4e1bac8f34a5',
   annual:  'd04bd73e-b825-48a5-8678-eca4279263e1',
 };
-
-// Simplispay numeric IDs — stored in subscriptions.simplispay_plan_id
 const PLAN_NUMERIC_ID: Record<string, number> = {
   monthly: 25709,
   annual:  25710,
 };
-
-// Supabase plans table UUIDs
 const PLAN_UUID: Record<string, string> = {
   monthly: '648d550d-07cc-4812-938f-7638b372cb33',
   annual:  '10d6cafa-42d9-4279-8615-13b46fa2af77',
 };
-
 const PLAN_AMOUNT_CENTS: Record<string, number> = {
   monthly:  9900,
   annual:  79900,
@@ -52,16 +56,13 @@ const CORS_HEADERS = {
 };
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
-  }
-  if (req.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   let body: {
     idempotencyKey: string;
     billingCycle: 'monthly' | 'annual';
+    hasTrial?: boolean;
     customer: { name: string; email: string; password: string; cpf: string; birthDate: string; phone: string };
     address: { street: string; number: string; complement?: string; neighborhood: string; city: string; state: string; zipCode: string };
     card: { holderName: string; number: string; securityCode: string; expiry: string };
@@ -81,9 +82,11 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Missing customer email, password, or name' }, 400);
   }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 
-  // ── Idempotency — check if subscription already exists for this key ────────
+  // ── 1. Idempotency — return early if already processed ───────────────────
   const { data: existing } = await supabase
     .from('subscriptions')
     .select('id, status')
@@ -91,38 +94,31 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
   if (existing) return json({ success: true, subscriptionId: existing.id, alreadyExists: true });
 
-  // ── Create Supabase user ──────────────────────────────────────────────────
-  const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
-    email:          customer.email,
-    password:       customer.password,
-    email_confirm:  true,
-    user_metadata:  { full_name: customer.name },
-  });
+  // ── 2. Pre-payment e-mail duplicate check ────────────────────────────────
+  // Check profiles table first (fast, avoids charging a card for an existing user)
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', customer.email.toLowerCase().trim())
+    .maybeSingle();
 
-  if (authErr) {
-    const msg = authErr.message ?? '';
-    // Duplicate email
-    if (msg.includes('already') || msg.includes('exists') || msg.includes('duplicate')) {
-      return json({ error: 'Este e-mail já está cadastrado. Faça login para continuar.', code: 'EMAIL_EXISTS' }, 409);
-    }
-    console.error('[checkout-subscribe] createUser error:', authErr);
-    return json({ error: `Erro ao criar conta: ${msg}` }, 500);
+  if (existingProfile) {
+    return json(
+      { error: 'Este e-mail já está cadastrado. Faça login para continuar.', code: 'EMAIL_EXISTS' },
+      409,
+    );
   }
 
-  const userId = authData.user.id;
-  console.log('[checkout-subscribe] User created:', userId);
-
-  // ── Get or refresh Simplispay token ──────────────────────────────────────
+  // ── 3. Get or refresh SimplisPay token ───────────────────────────────────
   let simplispayToken: string;
   try { simplispayToken = await getOrRefreshToken(supabase); }
   catch (err) {
     console.error('[checkout-subscribe] Token error:', err);
-    await supabase.auth.admin.deleteUser(userId);
     return json({ error: 'Gateway de pagamento indisponível. Tente novamente em instantes.' }, 503);
   }
 
-  // ── Build Simplispay payload ──────────────────────────────────────────────
-  const expiryParts = card.expiry.split('/');
+  // ── 4. Build SimplisPay payload ──────────────────────────────────────────
+  const expiryParts     = card.expiry.split('/');
   const simplispayExpiry = expiryParts.length === 2
     ? `${expiryParts[0]}/${expiryParts[1].slice(-2)}`
     : card.expiry;
@@ -153,7 +149,8 @@ Deno.serve(async (req: Request) => {
     },
   };
 
-  // ── Call Simplispay ───────────────────────────────────────────────────────
+  // ── 5. Charge card via SimplisPay ────────────────────────────────────────
+  // NO user account exists yet — if this fails, nothing to clean up.
   let simplispayRes: Response;
   let simplispayData: { success: boolean; message?: string; data?: { id: number; [k: string]: unknown } };
 
@@ -165,22 +162,51 @@ Deno.serve(async (req: Request) => {
     });
     simplispayData = await simplispayRes.json();
   } catch (err) {
-    console.error('[checkout-subscribe] Simplispay fetch error:', err);
-    await supabase.auth.admin.deleteUser(userId);
+    console.error('[checkout-subscribe] SimplisPay fetch error:', err);
     return json({ error: 'Erro de conexão com o gateway de pagamento.' }, 503);
   }
 
   if (!simplispayRes.ok || !simplispayData.success || !simplispayData.data?.id) {
     const errMsg = simplispayData.message ?? `HTTP ${simplispayRes.status}`;
-    console.error('[checkout-subscribe] Simplispay error:', errMsg, simplispayData);
-    // Roll back user creation — payment failed, no account should remain
-    await supabase.auth.admin.deleteUser(userId);
+    console.error('[checkout-subscribe] SimplisPay error (no account created):', errMsg, simplispayData);
+    // Payment failed — no user account was ever created. Clean failure.
     return json({ error: errMsg }, 422);
   }
 
   const simplispaySubId = String(simplispayData.data.id);
 
-  // ── Persist subscription ──────────────────────────────────────────────────
+  // ── 6. Create Supabase user (payment confirmed) ──────────────────────────
+  const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+    email:         customer.email,
+    password:      customer.password,
+    email_confirm: true,
+    user_metadata: { full_name: customer.name },
+  });
+
+  if (authErr) {
+    const msg = authErr.message ?? '';
+    console.error('[checkout-subscribe] createUser error after payment success:', authErr);
+    // CRITICAL: payment was charged but user creation failed.
+    // Log for manual intervention — do NOT return an error that confuses the user.
+    // We'll log and still try to return success so the client knows payment went through.
+    await supabase.from('subscription_ledger_events').insert({
+      user_id:    '00000000-0000-0000-0000-000000000000', // placeholder
+      event_type: 'checkout_failed',
+      source:     'checkout',
+      error_message: `User creation failed after payment success: ${msg}. SimplispayId=${simplispaySubId}`,
+      payload:    { email: customer.email, billing_cycle: billingCycle, simplispay_subscription_id: simplispaySubId },
+    }).catch(() => {}); // non-blocking
+    return json({
+      error: 'Pagamento aprovado, mas erro ao criar conta. Entre em contato: suporte@quantocusta.app',
+      code: 'USER_CREATION_FAILED',
+      simplispaySubId,
+    }, 500);
+  }
+
+  const userId = authData.user.id;
+  console.log('[checkout-subscribe] User created after payment:', userId);
+
+  // ── 7. Persist subscription ──────────────────────────────────────────────
   const now         = new Date();
   const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -206,15 +232,13 @@ Deno.serve(async (req: Request) => {
 
   if (subErr) {
     console.error('[checkout-subscribe] DB insert error:', subErr);
-    // DO NOT delete user here — user was created successfully & payment was charged.
-    // User must contact support to resolve the inconsistency.
     await supabase.from('subscription_ledger_events').insert({
       user_id:    userId,
       event_type: 'checkout_failed',
       source:     'checkout',
-      error_message: `DB error after Simplispay success: ${subErr.message}. SimplispayId=${simplispaySubId}`,
+      error_message: `DB error after payment + user creation: ${subErr.message}. SimplispayId=${simplispaySubId}`,
       payload:    { billing_cycle: billingCycle, simplispay_subscription_id: simplispaySubId },
-    });
+    }).catch(() => {});
     return json({ error: 'Assinatura criada no gateway mas não salva. Entre em contato: suporte@quantocusta.app' }, 500);
   }
 
@@ -227,42 +251,68 @@ Deno.serve(async (req: Request) => {
     status_after:               'trialing',
     simplispay_subscription_id: simplispaySubId,
     payload:                    { billing_cycle: billingCycle, simplispay_plan_id: PLAN_NUMERIC_ID[billingCycle] },
-  });
+  }).catch(() => {});
 
-  // ── Also create the profile row (in case trigger didn't fire in time) ─────
+  // ── Upsert profile ────────────────────────────────────────────────────────
   await supabase.from('profiles').upsert({
-    id:        userId,
-    full_name: customer.name,
-    email:     customer.email,
+    id:         userId,
+    full_name:  customer.name,
+    email:      customer.email,
     updated_at: now.toISOString(),
-  }, { onConflict: 'id', ignoreDuplicates: false });
+  }, { onConflict: 'id', ignoreDuplicates: false }).catch(() => {});
 
-  // ── Apply referral if provided ────────────────────────────────────────────
+  // ── Apply referral ────────────────────────────────────────────────────────
   if (referralCode) {
-    try {
-      await supabase.rpc('apply_referral', {
-        p_referral_code:     referralCode.toLowerCase().trim(),
-        p_referred_user_id:  userId,
-      });
+    supabase.rpc('apply_referral', {
+      p_referral_code:    referralCode.toLowerCase().trim(),
+      p_referred_user_id: userId,
+    }).then(() => {
       console.log('[checkout-subscribe] Referral applied:', referralCode, '→', userId);
-    } catch (err) {
-      // Non-blocking — referral failure must not fail the checkout
+    }).catch((err: unknown) => {
       console.error('[checkout-subscribe] Referral apply error (non-fatal):', err);
-    }
+    });
   }
 
-  console.log('[checkout-subscribe] Success. SubId:', newSub.id, 'SimplispayId:', simplispaySubId);
-  return json({ success: true, subscriptionId: newSub.id, userId }, { headers: CORS_HEADERS });
+  // ── 8. Sign in server-side to produce session tokens ─────────────────────
+  // Use the anon client so the user gets a standard JWT session.
+  // This avoids the client needing a second signInWithPassword round-trip.
+  let access_token: string | undefined;
+  let refresh_token: string | undefined;
+
+  try {
+    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: { session }, error: signInErr } = await supabaseAnon.auth.signInWithPassword({
+      email:    customer.email,
+      password: customer.password,
+    });
+    if (!signInErr && session) {
+      access_token  = session.access_token;
+      refresh_token = session.refresh_token;
+    } else {
+      console.warn('[checkout-subscribe] Server-side sign-in failed (non-fatal):', signInErr?.message);
+    }
+  } catch (err) {
+    console.warn('[checkout-subscribe] Server-side sign-in exception (non-fatal):', err);
+  }
+
+  console.log('[checkout-subscribe] Success. SubId:', newSub.id, 'SimplispayId:', simplispaySubId, 'SessionReturned:', !!access_token);
+  return json({
+    success:      true,
+    subscriptionId: newSub.id,
+    userId,
+    access_token,
+    refresh_token,
+  });
 });
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
-function json(body: unknown, statusOrHeaders: number | { headers: Record<string, string> } = 200, extraHeaders?: { headers: Record<string, string> }): Response {
-  const status  = typeof statusOrHeaders === 'number' ? statusOrHeaders : 200;
-  const addHdrs = typeof statusOrHeaders === 'object' ? statusOrHeaders.headers : (extraHeaders?.headers ?? {});
+function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS, ...addHdrs },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
 
@@ -285,7 +335,7 @@ async function getOrRefreshToken(supabase: ReturnType<typeof createClient>): Pro
   });
   const data = await res.json() as { success: boolean; token?: string };
   if (!data.success || !data.token) {
-    throw new Error(`Simplispay createToken failed: ${JSON.stringify(data)}`);
+    throw new Error(`SimplisPay createToken failed: ${JSON.stringify(data)}`);
   }
 
   const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();

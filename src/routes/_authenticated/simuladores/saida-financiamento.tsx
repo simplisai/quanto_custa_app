@@ -18,7 +18,7 @@ import {
   CategoryScale, LinearScale, BarElement, PointElement, LineElement,
   Title, Tooltip, Legend, Filler,
 } from "chart.js";
-import { Line } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import {
   ArrowLeft, TrendingUp, TrendingDown, Home, Wallet, ArrowRight,
   BookOpen,

@@ -115,7 +115,15 @@ function LoginPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold">Senha</label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-semibold">Senha</label>
+                <Link
+                  to="/forgot-password"
+                  className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                >
+                  Esqueceu sua senha?
+                </Link>
+              </div>
               <input
                 className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none"
                 type="password"

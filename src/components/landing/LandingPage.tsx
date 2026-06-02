@@ -19,11 +19,13 @@ import {
 } from "recharts";
 import {
   ArrowRight, ArrowUpRight, Check, Minus, Plus, Menu, X,
-  Scan, TrendingUp, BarChart2, Crown, Shield, Zap,
+  Scan, TrendingUp, BarChart2, Crown, Shield, Zap, Lock, Users, Loader2,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 /* ─── Chart color palette ──────────────────────────────────── */
 const G = "#22c55e";
@@ -662,17 +664,23 @@ function Hero() {
           animate="show"
           className="flex flex-col justify-center space-y-7 lg:col-span-7 lg:pt-8"
         >
-          {/* Eyebrow badge (styled like reference) */}
+          {/* Eyebrow badge — conditional on referral status */}
           <motion.div variants={heroStagger.item}>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/6 px-3.5 py-1.5 backdrop-blur-md transition-colors hover:bg-white/10">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-              </span>
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-white/65">
-                Para estrategistas, corretores e consultores de elite.
-              </span>
-            </div>
+            {isReferral ? (
+              <div className="inline-flex items-center gap-2 rounded-full border border-green-500/35 bg-green-500/12 px-3.5 py-1.5 backdrop-blur-md">
+                <span className="text-green-400 text-[11px]">✦</span>
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-green-400">
+                  Acesso Liberado por Indicação
+                </span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-full border border-red-500/35 bg-red-500/10 px-3.5 py-1.5 backdrop-blur-md">
+                <Lock className="h-3 w-3 text-red-400" />
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-red-400">
+                  Acesso Restrito
+                </span>
+              </div>
+            )}
           </motion.div>
 
           {/* H1 — gradient word treatment */}
@@ -709,18 +717,28 @@ function Hero() {
             <span className="font-medium text-white/90">vantagem competitiva desleal.</span>
           </motion.p>
 
-          {/* CTAs — styled like reference (white primary) */}
+          {/* CTAs */}
           <motion.div
             variants={heroStagger.item}
             className="flex flex-col gap-4 sm:flex-row"
           >
-            <Link
-              to={isAuthenticated ? "/app" : "/checkout"}
-              className="group inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-7 text-[14px] font-semibold tracking-[-0.01em] text-zinc-950 transition-all hover:scale-[1.02] hover:bg-white/90 active:scale-[0.98] sm:h-auto sm:py-3.5"
-            >
-              {isReferral ? "Iniciar Meus 14 Dias Grátis" : "Quero dominar minhas reuniões"}
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+            {isReferral ? (
+              <Link
+                to={isAuthenticated ? "/app" : "/checkout"}
+                className="group inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-7 text-[14px] font-semibold tracking-[-0.01em] text-zinc-950 transition-all hover:scale-[1.02] hover:bg-white/90 active:scale-[0.98] sm:h-auto sm:py-3.5"
+              >
+                {isAuthenticated ? "Abrir Plataforma" : "Iniciar Meus 14 Dias Grátis"}
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            ) : (
+              <a
+                href="#planos"
+                className="group inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-7 text-[14px] font-semibold tracking-[-0.01em] text-zinc-950 transition-all hover:scale-[1.02] hover:bg-white/90 active:scale-[0.98] sm:h-auto sm:py-3.5"
+              >
+                Solicitar Meu Convite de Acesso
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </a>
+            )}
             <a
               href="#arsenal"
               className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-full border border-white/15 bg-white/6 px-7 text-[14px] font-semibold tracking-[-0.01em] text-white backdrop-blur-sm transition-colors hover:border-white/25 hover:bg-white/10 sm:h-auto sm:py-3.5"
@@ -1886,6 +1904,182 @@ function Coroacao() {
   );
 }
 
+/* ─── Waitlist Form ───────────────────────────────────────── */
+function WaitlistForm() {
+  const [name, setName]       = useState("");
+  const [email, setEmail]     = useState("");
+  const [volume, setVolume]   = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone]       = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    setLoading(true);
+    const { error } = await supabase.from("waitlist_leads").insert({ name: name.trim(), email: email.trim().toLowerCase(), volume: volume.trim() || null });
+    setLoading(false);
+    if (error) {
+      toast.error("Erro ao enviar. Tente novamente.");
+      return;
+    }
+    setDone(true);
+  };
+
+  if (done) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl border border-green-500/30 bg-green-500/8 p-8 text-center space-y-3"
+      >
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-500/15 border border-green-500/25">
+          <Check className="h-5 w-5 text-green-400" />
+        </div>
+        <p className="font-sans-display text-[18px] font-medium tracking-[-0.025em] text-foreground">
+          Solicitação recebida.
+        </p>
+        <p className="text-[14px] leading-[1.6] text-muted-foreground">
+          Seu perfil entrou na fila de análise. Retorno em até 48 horas úteis no e-mail informado.
+        </p>
+      </motion.div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <div>
+        <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Seu Nome Completo <span className="text-red-500">*</span>
+        </label>
+        <input
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ex: Roberto Mendes"
+          className="w-full rounded-xl border border-border bg-background px-4 py-3 text-[14px] placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition"
+        />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Seu Melhor E-mail Profissional <span className="text-red-500">*</span>
+        </label>
+        <input
+          required
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="nome@suaconsultoria.com.br"
+          className="w-full rounded-xl border border-border bg-background px-4 py-3 text-[14px] placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition"
+        />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Qual o volume mensal de crédito/consórcio que sua estrutura opera?
+        </label>
+        <textarea
+          rows={3}
+          value={volume}
+          onChange={(e) => setVolume(e.target.value)}
+          placeholder="Conte-nos brevemente o seu volume ou o perfil dos clientes de alta renda que você atende..."
+          className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-[14px] placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={loading}
+        className="group flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-4 text-[14px] font-bold uppercase tracking-wide text-primary-foreground transition-all hover:opacity-90 disabled:opacity-50"
+      >
+        {loading ? (
+          <><Loader2 className="h-4 w-4 animate-spin" /> Enviando…</>
+        ) : (
+          <><Users className="h-4 w-4" /> Entrar na Lista de Envio de Convites</>
+        )}
+      </button>
+      <p className="text-center text-[11px] leading-[1.6] text-muted-foreground">
+        Análise rigorosa de perfil para liberação de chaves de acesso. Retorno em até 48 horas.
+      </p>
+    </form>
+  );
+}
+
+/* ─── Oferta restrita (isReferral = false) ────────────────── */
+function OfertaRestrita() {
+  return (
+    <SectionShell id="planos">
+      <FadeIn>
+        <div className="mb-4 flex items-center gap-3">
+          <Lock className="h-4 w-4 text-red-500" />
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-red-500">
+            Acesso Restrito
+          </span>
+        </div>
+      </FadeIn>
+
+      <div className="grid gap-16 lg:grid-cols-[1.15fr_1fr] lg:items-start">
+        {/* ── Left: Copy ── */}
+        <FadeIn>
+          <div className="space-y-8">
+            <h2 className="font-sans-display text-[clamp(1.875rem,5vw,3.5rem)] font-medium leading-[1.02] tracking-[-0.04em] text-foreground">
+              Esta infraestrutura é restrita a vendedores e operadores{" "}
+              <span className="font-display italic tracking-[-0.02em]">convidados.</span>
+            </h2>
+
+            <p className="text-[16px] leading-[1.7] tracking-[-0.01em] text-muted-foreground">
+              Para blindar o poder estratégico das nossas telas de simulação e manter o suporte de
+              alta performance padrão{" "}
+              <span className="font-medium text-foreground">Family Office</span>, limitamos
+              severamente quem pode operar o software{" "}
+              <span className="font-medium text-foreground">Quanto Custa?</span>.
+            </p>
+
+            {/* Alert box */}
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-6 space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
+                <p className="font-sans-display text-[16px] font-semibold tracking-[-0.02em] text-foreground">
+                  Como conseguir acesso imediato?
+                </p>
+              </div>
+              <p className="text-[14px] leading-[1.7] tracking-[-0.01em] text-muted-foreground pl-[2.625rem]">
+                Se você conhece algum operador financeiro ou consultor de investimentos que já
+                utiliza o nosso ecossistema, solicite diretamente a ele o seu{" "}
+                <span className="font-semibold text-foreground">Link de Indicação</span>. Com o
+                link dele, as suas portas se abrem e o seu cadastro é liberado na hora.
+              </p>
+            </div>
+
+            <p className="text-[15px] leading-[1.7] tracking-[-0.01em] text-muted-foreground">
+              Caso não possua contato com nenhum membro ativo da nossa rede, você pode aplicar para
+              entrar na lista de envio de convites ao lado. Liberamos apenas uma{" "}
+              <span className="font-medium text-foreground">
+                quantidade restrita de novas chaves por lote de homologação
+              </span>
+              .
+            </p>
+          </div>
+        </FadeIn>
+
+        {/* ── Right: Form ── */}
+        <FadeIn delay={0.1}>
+          <div className="rounded-3xl border border-border bg-card p-7 shadow-elegant sm:p-10">
+            <div className="mb-6">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Validação de Perfil
+              </p>
+              <h3 className="mt-2 font-sans-display text-[22px] font-medium tracking-[-0.03em] text-foreground">
+                Solicitar Meu Convite de Acesso
+              </h3>
+            </div>
+            <WaitlistForm />
+          </div>
+        </FadeIn>
+      </div>
+    </SectionShell>
+  );
+}
+
 /* ─── Oferta (Planos) ─────────────────────────────────────── */
 const planFeatures = [
   "Acesso às 7 Estratégias de Fechamento",
@@ -1899,13 +2093,16 @@ const planFeatures = [
 
 function Oferta() {
   const { isAuthenticated } = useAuth();
+  const { isReferral } = useReferralStatus();
+
+  if (!isReferral) return <OfertaRestrita />;
 
   return (
     <SectionShell id="planos">
       <FadeIn>
         <div className="mb-4 flex items-center gap-3">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-          <Eyebrow>Assuma o controle.</Eyebrow>
+          <span className="text-[11px] text-green-600 dark:text-green-400">✦</span>
+          <Eyebrow>Acesso Liberado por Indicação</Eyebrow>
         </div>
         <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-end">
           <h2 className="font-sans-display text-[clamp(1.875rem,5.5vw,3.75rem)] font-medium leading-[1.02] tracking-[-0.04em] text-foreground">
@@ -2199,24 +2396,35 @@ function FinalCTA() {
 
           <div className="relative grid gap-10 sm:gap-12 lg:grid-cols-[1.4fr_1fr] lg:items-end">
             <h2 className="font-sans-display max-w-[14ch] text-[clamp(2rem,7vw,4.5rem)] font-medium leading-[0.97] tracking-[-0.045em]">
-              Pare de explicar.
-              <br />
-              <span className="font-display italic tracking-[-0.02em] text-primary-foreground/60">
-                Comece a provar.
-              </span>
+              {isReferral ? (
+                <>Pare de explicar.<br /><span className="font-display italic tracking-[-0.02em] text-primary-foreground/60">Comece a provar.</span></>
+              ) : (
+                <>Está pronto para<br /><span className="font-display italic tracking-[-0.02em] text-primary-foreground/60">entrar na rede?</span></>
+              )}
             </h2>
             <div className="space-y-6 sm:space-y-8">
               <p className="text-[15px] leading-[1.6] tracking-[-0.01em] text-primary-foreground/75 sm:text-[17px]">
-                Acesse a Infraestrutura de Inteligência de Conversão e transforme a próxima reunião em
-                um fechamento high ticket.
+                {isReferral
+                  ? "Acesse a Infraestrutura de Inteligência de Conversão e transforme a próxima reunião em um fechamento high ticket."
+                  : "Você viu a infraestrutura. Sabe o que ela faz. O próximo passo é solicitar seu convite e entrar na lista de homologação."}
               </p>
-              <Link
-                to={isAuthenticated ? "/app" : "/checkout"}
-                className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-background px-6 text-[14px] font-medium tracking-[-0.01em] text-foreground transition-all hover:gap-3 sm:h-auto sm:w-auto sm:py-3.5"
-              >
-                {isAuthenticated ? "Abrir Plataforma" : isReferral ? "Iniciar Meus 14 Dias Grátis" : "Quero dominar minhas reuniões"}
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </Link>
+              {isReferral ? (
+                <Link
+                  to={isAuthenticated ? "/app" : "/checkout"}
+                  className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-background px-6 text-[14px] font-medium tracking-[-0.01em] text-foreground transition-all hover:gap-3 sm:h-auto sm:w-auto sm:py-3.5"
+                >
+                  {isAuthenticated ? "Abrir Plataforma" : "Iniciar Meus 14 Dias Grátis"}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              ) : (
+                <a
+                  href="#planos"
+                  className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-background px-6 text-[14px] font-medium tracking-[-0.01em] text-foreground transition-all hover:gap-3 sm:h-auto sm:w-auto sm:py-3.5"
+                >
+                  Entrar na Lista de Convites
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </a>
+              )}
             </div>
           </div>
         </motion.div>
@@ -2323,13 +2531,23 @@ function MobileCTA() {
       style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
     >
       <div className="pointer-events-auto mx-3 rounded-full border border-border bg-background/85 p-1.5 shadow-xl backdrop-blur-xl">
-        <Link
-          to={isAuthenticated ? "/app" : "/checkout"}
-          className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-6 text-[14px] font-medium tracking-[-0.01em] text-primary-foreground"
-        >
-          {isAuthenticated ? "Abrir App" : isReferral ? "Iniciar 14 Dias Grátis" : "Dominar minhas reuniões"}
-          <ArrowRight className="h-4 w-4" />
-        </Link>
+        {isReferral || isAuthenticated ? (
+          <Link
+            to={isAuthenticated ? "/app" : "/checkout"}
+            className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-6 text-[14px] font-medium tracking-[-0.01em] text-primary-foreground"
+          >
+            {isAuthenticated ? "Abrir App" : "Iniciar 14 Dias Grátis"}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        ) : (
+          <a
+            href="#planos"
+            className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-6 text-[14px] font-medium tracking-[-0.01em] text-primary-foreground"
+          >
+            Solicitar Acesso
+            <Lock className="h-4 w-4" />
+          </a>
+        )}
       </div>
     </motion.div>
   );

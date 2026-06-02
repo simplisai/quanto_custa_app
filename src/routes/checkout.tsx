@@ -153,9 +153,15 @@ function CheckoutPage() {
   const [cardExpiry, setCardExpiry]   = useState("");
   const [cardCvv, setCardCvv]         = useState("");
 
-  const [submitting, setSubmitting]   = useState(false);
+  const [submitting, setSubmitting]     = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const idempotencyKey = useRef(crypto.randomUUID());
+
+  // Inline login — shown when the user tries to check out with an already-registered email
+  const [showInlineLogin, setShowInlineLogin] = useState(false);
+  const [loginPassword, setLoginPassword]     = useState("");
+  const [loginError, setLoginError]           = useState("");
+  const [loggingIn, setLoggingIn]             = useState(false);
 
   // ── Detect existing session (Google OAuth callback or already logged in) ──
   useEffect(() => {
@@ -231,6 +237,31 @@ function CheckoutPage() {
       toast.error("Erro ao iniciar login com Google.");
       setOauthLoading(false);
     }
+  };
+
+  // ── Inline login (triggered when EMAIL_EXISTS) ───────────────────────────
+  const handleInlineLogin = async () => {
+    if (!loginPassword) { setLoginError("Digite sua senha."); return; }
+    setLoggingIn(true);
+    setLoginError("");
+    const { data: { session }, error } = await supabase.auth.signInWithPassword({
+      email:    email.trim(),
+      password: loginPassword,
+    });
+    setLoggingIn(false);
+    if (error || !session) {
+      setLoginError("E-mail ou senha incorretos. Tente novamente.");
+      return;
+    }
+    // Login succeeded — switch to authenticated mode; form data (CPF, address, card) is preserved
+    setExistingUser({
+      id:    session.user.id,
+      email: session.user.email ?? "",
+      name:  session.user.user_metadata?.full_name as string | undefined,
+    });
+    setName(session.user.user_metadata?.full_name ?? name);
+    setShowInlineLogin(false);
+    setLoginPassword("");
   };
 
   // ── Submit ───────────────────────────────────────────────────────────────
@@ -348,33 +379,39 @@ function CheckoutPage() {
         const body3 = await res.json() as {
           error?: string; code?: string;
           success?: boolean; subscriptionId?: string;
+          access_token?: string; refresh_token?: string;
         };
 
         if (!res.ok) {
           if (body3.code === "EMAIL_EXISTS") {
-            toast.error("E-mail já cadastrado. Faça login para continuar.", { duration: 6000 });
-            // Redirect to login with plan param so they can come back to checkout
-            nav({ to: `/login?plan=${cycle}` as any });
+            // Show inline login — do NOT redirect, preserving all form data
+            setShowInlineLogin(true);
             return;
           }
           toast.error(body3.error ?? "Erro ao processar pagamento");
           return;
         }
 
-        // Sign in client-side now that the account exists
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInErr) {
-          // Payment succeeded, account created, but sign-in failed
-          // Just redirect to login — they can log in with their new credentials
-          toast.success("Conta criada! Faça login para acessar a plataforma.");
-          nav({ to: "/login" });
-          return;
+        // Authenticate the user using tokens returned by the edge function.
+        // setSession() is synchronous (no extra network call) and is more reliable.
+        if (body3.access_token && body3.refresh_token) {
+          await supabase.auth.setSession({
+            access_token:  body3.access_token,
+            refresh_token: body3.refresh_token,
+          });
+        } else {
+          // Fallback: edge function didn't return tokens (e.g. server-side sign-in failed)
+          const { error: signInErr } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
+          if (signInErr) {
+            toast.success("Conta criada! Faça login para acessar a plataforma.");
+            nav({ to: "/login" });
+            return;
+          }
         }
 
-        // Limpa o código de indicação após uso bem-sucedido
         clearReferral();
         toast.success(isReferral
           ? "Trial VIP iniciado! 14 dias grátis. Bem-vindo ao Quanto Custa!"
@@ -513,7 +550,7 @@ function CheckoutPage() {
                   label="E-mail"
                   type="email"
                   value={email}
-                  onChange={setEmail}
+                  onChange={(v) => { setEmail(v); setShowInlineLogin(false); setLoginError(""); }}
                   placeholder="voce@email.com"
                   autoComplete="email"
                 />
@@ -526,6 +563,40 @@ function CheckoutPage() {
                   autoComplete="new-password"
                 />
               </div>
+
+              {/* ── Inline login — shown when EMAIL_EXISTS ── */}
+              {showInlineLogin && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-700/40 dark:bg-amber-950/20 p-4 space-y-3">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    Este e-mail já está cadastrado.
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    Entre com sua senha para continuar o checkout com os dados já preenchidos.
+                  </p>
+                  <div className="space-y-2">
+                    <input
+                      type="password"
+                      placeholder="Sua senha"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleInlineLogin(); } }}
+                      autoFocus
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition"
+                    />
+                    {loginError && (
+                      <p className="text-xs text-red-600 dark:text-red-400">{loginError}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleInlineLogin}
+                      disabled={loggingIn}
+                      className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition"
+                    >
+                      {loggingIn ? "Entrando…" : "Entrar e continuar checkout"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           )}
 

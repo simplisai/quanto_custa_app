@@ -29,6 +29,8 @@ export interface LanceResults {
   parcelaPadrao: number;
   parcelaPosLance: number;
   lanceEmbR: number;
+  lanceEmbutidoR: number;   // alias de lanceEmbR — usado no PDF
+  lanceProprioR: number;    // lance próprio desembolsado — usado no PDF
   lanceTotalR: number;
   percLanceTotalSobreCarta: number;
   creditoLiquido: number;
@@ -140,6 +142,8 @@ export function calcLance(i: LanceInputs): LanceResults {
     parcelaPadrao,
     parcelaPosLance,
     lanceEmbR,
+    lanceEmbutidoR: lanceEmbR,  // alias para compatibilidade com o PDF
+    lanceProprioR:  lanceProprio,
     lanceTotalR,
     percLanceTotalSobreCarta,
     creditoLiquido,

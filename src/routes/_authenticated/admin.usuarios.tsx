@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Search, ShieldCheck, ShieldOff, Settings } from 'lucide-react'
+import { Loader2, Search, ShieldCheck, ShieldOff, Settings, KeyRound, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { toast } from 'sonner'
@@ -62,6 +62,10 @@ function AdminUsuarios() {
   const [editStatus, setEditStatus] = useState('')
   const [editCycle, setEditCycle] = useState('monthly')
   const [saving, setSaving] = useState(false)
+  const [pwdTarget, setPwdTarget] = useState<UserRow | null>(null)
+  const [newPwd, setNewPwd] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
+  const [savingPwd, setSavingPwd] = useState(false)
 
   const load = async () => {
     const [profilesRes, rolesRes, subsRes, simsRes, plansRes] = await Promise.all([
@@ -138,6 +142,43 @@ function AdminUsuarios() {
       toast.error((e as Error).message)
     }
     setSaving(false)
+  }
+
+  const openPwdModal = (u: UserRow) => {
+    setPwdTarget(u)
+    setNewPwd('')
+    setShowPwd(false)
+  }
+
+  const savePassword = async () => {
+    if (!pwdTarget) return
+    if (newPwd.length < 8) {
+      toast.error('A senha deve ter no mínimo 8 caracteres.')
+      return
+    }
+    setSavingPwd(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Sessão inválida')
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+      const res = await fetch(`${supabaseUrl}/functions/v1/admin-reset-user-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: pwdTarget.id, newPassword: newPwd }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erro desconhecido')
+      toast.success(`Senha de ${pwdTarget.email} atualizada.`)
+      setPwdTarget(null)
+    } catch (e: unknown) {
+      toast.error((e as Error).message)
+    }
+    setSavingPwd(false)
   }
 
   const toggleAdmin = async (u: UserRow) => {
@@ -244,6 +285,9 @@ function AdminUsuarios() {
                           <Button size="icon" variant="ghost" title="Editar assinatura" onClick={() => openEdit(u)}>
                             <Settings className="h-4 w-4" />
                           </Button>
+                          <Button size="icon" variant="ghost" title="Alterar senha" onClick={() => openPwdModal(u)}>
+                            <KeyRound className="h-4 w-4 text-muted-foreground" />
+                          </Button>
                           <Button
                             size="icon"
                             variant="ghost"
@@ -267,6 +311,47 @@ function AdminUsuarios() {
         </CardContent>
       </Card>
 
+      {/* ── Modal: alterar senha ─────────────────────────────── */}
+      <Dialog open={!!pwdTarget} onOpenChange={() => setPwdTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+          </DialogHeader>
+          {pwdTarget && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{pwdTarget.email}</p>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Nova senha</label>
+                <div className="relative">
+                  <input
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2.5 pr-10 text-sm focus:border-primary focus:outline-none"
+                    type={showPwd ? 'text' : 'password'}
+                    placeholder="Mínimo 8 caracteres"
+                    value={newPwd}
+                    onChange={(e) => setNewPwd(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPwd((v) => !v)}
+                    tabIndex={-1}
+                  >
+                    {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPwdTarget(null)}>Cancelar</Button>
+            <Button onClick={savePassword} disabled={savingPwd}>
+              {savingPwd ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando…</> : 'Salvar senha'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: editar assinatura ──────────────────────────── */}
       <Dialog open={!!editing} onOpenChange={() => setEditing(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
