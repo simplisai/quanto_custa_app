@@ -134,15 +134,18 @@ function CalculatorPage() {
   const [loadingContext, setLoadingContext] = useState(true);
 
   // ── Restore sessionStorage on mount ─────────────────────────────────────
+  // Skip when ?load= is present — the simulation will be fetched from the DB.
+  // Restoring stale sessionStorage would briefly flash wrong data before the async fetch completes.
   useEffect(() => {
+    if (search.load) return;
     const saved = sessionStorage.getItem("calc-inputs");
     if (!saved) return;
     try {
       const s = JSON.parse(saved);
       if (s.raws && typeof s.raws === "object") setRaws(s.raws);
-      if (s.baseLance) setBaseLance(s.baseLance);
+      if (s.baseLance)  setBaseLance(s.baseLance);
       if (s.usoCredito) setUsoCredito(s.usoCredito);
-      if (s.amortTipo) setAmortTipo(s.amortTipo);
+      if (s.amortTipo)  setAmortTipo(s.amortTipo);
     } catch {}
   }, []);
 
@@ -164,14 +167,35 @@ function CalculatorPage() {
   useEffect(() => {
     if (!search.load || !user) return;
     supabase.from("simulations").select("*").eq("id", search.load).eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => {
-        if (!data) return;
-        const inputs = data.inputs as Record<string, unknown>;
-        setRaws(inputsToRaws(inputs));
-        if (inputs.baseLance) setBaseLance(inputs.baseLance as "credito" | "plano");
-        if (inputs.usoCredito) setUsoCredito(inputs.usoCredito as "comprar" | "patrimonio");
-        if (inputs.amortTipo) setAmortTipo(inputs.amortTipo as "prazo" | "parcela");
+      .then(({ data, error }) => {
+        if (error) { toast.error("Erro ao carregar simulação: " + error.message); return; }
+        if (!data)  { toast.error("Simulação não encontrada ou sem permissão de acesso."); return; }
+        // Merge with defaultInputs for version compatibility: fields added after the simulation
+        // was saved will receive their default value instead of undefined.
+        const inputs = { ...defaultInputs, ...(data.inputs as Record<string, unknown>) };
+        const loadedRaws       = inputsToRaws(inputs);
+        const loadedBaseLance  = (inputs.baseLance  as "credito" | "plano")      ?? "credito";
+        const loadedUsoCredito = (inputs.usoCredito as "comprar" | "patrimonio") ?? "comprar";
+        const loadedAmortTipo  = (inputs.amortTipo  as "prazo"   | "parcela")    ?? "prazo";
+        // Clear stale results/savedId from a previous calculation in the same session.
+        setResults(null);
+        setSavedId(null);
+        setRaws(loadedRaws);
+        setBaseLance(loadedBaseLance);
+        setUsoCredito(loadedUsoCredito);
+        setAmortTipo(loadedAmortTipo);
         if (data.client_id) setSelectedClientId(data.client_id);
+        // Sync sessionStorage so an F5 reload keeps the loaded simulation, not stale session data.
+        sessionStorage.setItem("calc-inputs", JSON.stringify({
+          raws: loadedRaws, baseLance: loadedBaseLance,
+          usoCredito: loadedUsoCredito, amortTipo: loadedAmortTipo,
+        }));
+        // Non-blocking audit log: who opened which simulation and from where.
+        supabase.from("simulation_views").insert({
+          simulation_id: search.load,
+          user_id: user.id,
+          source: search.client ? "client_panel" : "direct",
+        }).catch(() => {});
         toast.success("Simulação carregada.");
       });
   }, [search.load, user]);

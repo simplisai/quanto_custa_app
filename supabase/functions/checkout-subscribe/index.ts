@@ -180,7 +180,10 @@ Deno.serve(async (req: Request) => {
     email:         customer.email,
     password:      customer.password,
     email_confirm: true,
-    user_metadata: { full_name: customer.name },
+    user_metadata: {
+      full_name: customer.name,
+      ...(referralCode ? { referral_code: referralCode.toLowerCase().trim() } : {}),
+    },
   });
 
   if (authErr) {
@@ -262,15 +265,19 @@ Deno.serve(async (req: Request) => {
   }, { onConflict: 'id', ignoreDuplicates: false }).catch(() => {});
 
   // ── Apply referral ────────────────────────────────────────────────────────
+  // Belt-and-suspenders: trigger handle_new_user() already applied it via user_metadata,
+  // but we await here explicitly so the RPC completes before the response is sent
+  // (Deno terminates the runtime after return, killing unawaited promises).
   if (referralCode) {
-    supabase.rpc('apply_referral', {
+    const { error: refErr } = await supabase.rpc('apply_referral', {
       p_referral_code:    referralCode.toLowerCase().trim(),
       p_referred_user_id: userId,
-    }).then(() => {
-      console.log('[checkout-subscribe] Referral applied:', referralCode, '→', userId);
-    }).catch((err: unknown) => {
-      console.error('[checkout-subscribe] Referral apply error (non-fatal):', err);
     });
+    if (refErr) {
+      console.error('[checkout-subscribe] Referral apply error (non-fatal):', refErr);
+    } else {
+      console.log('[checkout-subscribe] Referral applied:', referralCode, '→', userId);
+    }
   }
 
   // ── 8. Sign in server-side to produce session tokens ─────────────────────

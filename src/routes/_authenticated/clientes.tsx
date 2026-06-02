@@ -35,15 +35,39 @@ type Simulation = {
   results: Record<string, unknown>
 }
 
+type FormField = {
+  key: string
+  label: string
+  type: string
+  options?: { label: string; value: string }[]
+}
+
 type FormSubmission = {
   id: string
   form_id: string
   submitted_at: string
-  responses: Record<string, any>
-  form_templates: { title: string } | null
+  responses: Record<string, unknown>
+  form_templates: { title: string; fields: FormField[] } | null
 }
 
 const emptyForm = { name: '', document: '', email: '', phone: '', notes: '' }
+
+function renderResponseValue(value: unknown, field?: FormField): string {
+  if (value === null || value === undefined || value === '') return '—';
+  // Money fields are stored as centavos string, e.g. "50000000" = R$ 500.000,00
+  if (field?.type === 'money' && typeof value === 'string') {
+    const num = parseInt(value, 10);
+    if (!isNaN(num)) return (num / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+  // Enum fields: resolve raw value to human-readable option label
+  if (field?.type === 'enum' && field.options) {
+    const opt = field.options.find(o => o.value === String(value));
+    if (opt) return opt.label;
+  }
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
+  return String(value);
+}
 
 function ClientesPage() {
   const { user } = useAuth()
@@ -83,7 +107,7 @@ function ClientesPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('form_submissions')
-        .select('id, form_id, submitted_at, responses, form_templates(title)')
+        .select('id, form_id, submitted_at, responses, form_templates(title, fields)')
         .eq('client_id', clientId)
         .order('submitted_at', { ascending: false })
     ])
@@ -240,10 +264,13 @@ function ClientesPage() {
                                   </CardHeader>
                                   <CardContent className="py-3 px-4 border-t text-sm bg-muted/5">
                                     <dl className="space-y-2">
-                                      {Object.entries(sub.responses).map(([k, v]) => (
-                                        <div key={k} className="flex flex-col">
-                                          <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wider">{k}</dt>
-                                          <dd className="font-semibold">{String(v)}</dd>
+                                      {(sub.form_templates?.fields && sub.form_templates.fields.length > 0
+                                        ? sub.form_templates.fields
+                                        : Object.keys(sub.responses).map(k => ({ key: k, label: k, type: 'text', options: undefined }))
+                                      ).map((field) => (
+                                        <div key={field.key} className="flex flex-col">
+                                          <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wider">{field.label}</dt>
+                                          <dd className="font-semibold">{renderResponseValue(sub.responses[field.key], field)}</dd>
                                         </div>
                                       ))}
                                     </dl>
